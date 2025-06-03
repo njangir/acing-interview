@@ -9,10 +9,11 @@ import { Calendar, Video, FileText, DollarSign, AlertTriangle, MessageSquare, Ro
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDesc, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription as DialogDesc, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"; // Renamed DialogDescription to DialogDesc
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDescComponent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"; // Renamed AlertDialogDescription to AlertDialogDescComponent
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; // Added Alert imports
 
 interface BookingCardProps {
   booking: Booking;
@@ -82,16 +83,12 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
     }
     console.log("Refund requested for booking:", booking.id, "Reason:", refundReason);
     
-    // Simulate backend update:
     const updatedBooking: Booking = { ...booking, requestedRefund: true, refundReason };
-    setBooking(updatedBooking); // Update local state for immediate UI change
+    setBooking(updatedBooking); 
     if (onBookingUpdate) {
-      onBookingUpdate(updatedBooking); // Notify parent if prop exists (for admin panel)
+      onBookingUpdate(updatedBooking); 
     }
-    // In a real app, this would be an API call to update the backend.
-    // For now, we'll assume MOCK_BOOKINGS in constants would be updated if this were not a simulation.
-    // This change is local to this card component or reflected via onBookingUpdate.
-
+    
     toast({
       title: "Refund Request Submitted",
       description: `Your request for booking ${booking.serviceName} has been received. Reason: ${refundReason}. Admin will review it.`,
@@ -207,10 +204,10 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
                 <DialogContent>
                     <DialogHeader>
                     <DialogTitle>Request Refund</DialogTitle>
-                    <DialogDescription>
+                    <DialogDesc>
                         Please provide a reason for your refund request for {booking.serviceName} on {formattedDate}.
                         This action can only be done up to 2 hours before the scheduled time.
-                    </DialogDescription>
+                    </DialogDesc>
                     </DialogHeader>
                     <div className="py-4 space-y-2">
                         <Label htmlFor="refundReason">Reason for Refund (Required)</Label>
@@ -245,9 +242,9 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Share Your Feedback</DialogTitle>
-                  <DialogDescription>
+                  <DialogDesc>
                     How was your session for "{booking.serviceName}" on {formattedDate}?
-                  </DialogDescription>
+                  </DialogDesc>
                 </DialogHeader>
                 <div className="py-4">
                   <Label htmlFor="feedbackText" className="sr-only">Your Feedback</Label>
