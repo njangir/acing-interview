@@ -1,8 +1,13 @@
 
+'use client';
+
 import Link from 'next/link';
 import { Logo } from '@/components/icons/logo';
+import { useAuth } from '@/hooks/use-auth';
 
 export function Footer() {
+  const { isLoggedIn } = useAuth();
+
   return (
     <footer className="border-t bg-card text-card-foreground">
       <div className="container py-12">
@@ -31,9 +36,11 @@ export function Footer() {
             <h3 className="text-lg font-semibold mb-4 font-headline">Contact Us</h3>
             <p className="text-sm text-muted-foreground">Email: info@afinterviewace.com</p>
             <p className="text-sm text-muted-foreground">Phone: +91 12345 67890</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              <Link href="/dashboard/contact" className="hover:text-foreground">Send us a message</Link>
-            </p>
+            {isLoggedIn && (
+              <p className="text-sm text-muted-foreground mt-2">
+                <Link href="/dashboard/contact" className="hover:text-foreground">Send us a message</Link>
+              </p>
+            )}
           </div>
         </div>
         <div className="mt-8 border-t pt-8 text-center">

@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { MailQuestion } from 'lucide-react';
-import { MOCK_USER_MESSAGES, MOCK_USER_PROFILE_FOR_CONTACT } from '@/constants';
+import { MOCK_USER_PROFILE_FOR_CONTACT } from '@/constants';
 import type { UserMessage } from '@/types';
 
 const contactFormSchema = z.object({
@@ -42,18 +42,14 @@ export default function ContactSupportPage() {
   });
 
   function onSubmit(data: ContactFormValues) {
-    const newMessage: UserMessage = {
-      id: `msg-${Date.now()}`,
-      userName: userProfile.name, // In real app, get from authenticated user
-      userEmail: userProfile.email, // In real app, get from authenticated user
+    const newMessage: Omit<UserMessage, 'id' | 'timestamp' | 'status'> = { // Data to be sent to backend
+      userName: userProfile.name, 
+      userEmail: userProfile.email, 
       subject: data.subject,
       messageBody: data.message,
-      timestamp: new Date(),
-      status: 'new',
     };
-    MOCK_USER_MESSAGES.push(newMessage); // Simulate saving message
-
-    console.log("Message submitted (simulated):", newMessage); 
+    
+    console.log("Message submitted (simulated backend send):", newMessage); 
     toast({
       title: "Message Sent!",
       description: "Your message has been sent to our support team. We'll get back to you shortly.",

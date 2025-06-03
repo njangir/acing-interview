@@ -10,7 +10,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { AVAILABLE_SLOTS, updateAvailableSlots } from '@/constants'; // For simulation
+import { AVAILABLE_SLOTS } from '@/constants'; // For simulation
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info, CalendarCheck } from 'lucide-react';
 
@@ -24,7 +24,7 @@ export default function AdminSlotsPage() {
   const generateTimeSlots = (start: string, end: string, intervalMin: number): string[] => {
     const slots: string[] = [];
     let currentTime = new Date(`1970-01-01T${start}:00`);
-    const_endTime = new Date(`1970-01-01T${end}:00`);
+    const const_endTime = new Date(`1970-01-01T${end}:00`);
 
     while (currentTime < const_endTime) {
       slots.push(currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }));
@@ -51,17 +51,12 @@ export default function AdminSlotsPage() {
     });
     
     // Simulate backend update
-    const success = updateAvailableSlots(updates); // This updates the mock in-memory store
+    console.log("Simulating update for AVAILABLE_SLOTS with:", updates);
     
-    if (success) {
-      toast({
-        title: "Availability Updated (Simulated)",
-        description: `Slots for ${dates.length} date(s) have been updated. In a real app, this would be saved.`,
-      });
-      console.log("Updated AVAILABLE_SLOTS (simulated):", AVAILABLE_SLOTS);
-    } else {
-      toast({ title: "Update Failed", description: "Could not update availability.", variant: "destructive" });
-    }
+    toast({
+      title: "Availability Updated (Simulated)",
+      description: `Slots for ${dates.length} date(s) have been 'updated'. In a real app, this would be saved to a backend.`,
+    });
   };
 
   const handleMakeDateAvailable = () => {
@@ -104,7 +99,7 @@ export default function AdminSlotsPage() {
         <Info className="h-4 w-4 !text-primary" />
         <AlertTitle>Simulation Notice</AlertTitle>
         <AlertDescription>
-          This page simulates updating available slots. Changes are reflected in the booking calendar for this session only and are not permanently stored.
+          This page simulates updating available slots. Changes are reflected in the booking calendar for this session only (based on initial constants) and are not permanently stored.
         </AlertDescription>
       </Alert>
       <div className="grid md:grid-cols-2 gap-8">

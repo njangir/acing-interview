@@ -203,7 +203,7 @@ export const ADMIN_DASHBOARD_NAV_LINKS = [
   { href: '/admin/messages', label: 'User Messages', icon: MessagesSquare },
 ];
 
-export let AVAILABLE_SLOTS: Record<string, string[]> = {
+export const AVAILABLE_SLOTS: Record<string, string[]> = {
   [getFutureDate(7)]: ["09:00 AM", "11:00 AM", "02:00 PM", "04:00 PM"],
   [getFutureDate(8)]: ["10:00 AM", "01:00 PM", "03:00 PM"],
   [getFutureDate(9)]: ["09:30 AM", "11:30 AM", "02:30 PM"],
@@ -216,12 +216,6 @@ export let AVAILABLE_SLOTS: Record<string, string[]> = {
   [getFutureDate(3)]: ["09:00 AM", "10:00 AM", "11:00 AM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM"],
   [getFutureDate(1)]: ["02:00 PM", "03:00 PM", "04:00 PM"],
 };
-
-export const updateAvailableSlots = (newSlots: Record<string, string[]>) => {
-  AVAILABLE_SLOTS = { ...AVAILABLE_SLOTS, ...newSlots };
-  return true; 
-};
-
 
 export const USER_FORM_FIELDS = [
   { name: 'name', label: 'Full Name', type: 'text', placeholder: 'Enter your full name' },
@@ -250,7 +244,7 @@ export const MENTOR_PROFILE: MentorProfileData = {
   contactPhone: "+91 9988776655"
 };
 
-export let MOCK_USER_MESSAGES: UserMessage[] = [
+export const MOCK_USER_MESSAGES: UserMessage[] = [
   {
     id: 'msg1',
     userName: 'Rohan Sharma',
