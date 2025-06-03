@@ -1,5 +1,6 @@
+
 import type { Service, Testimonial, Booking, Resource } from '@/types';
-import { Shield, Video, FileText, Link as LinkIcon, CalendarDays, CheckCircle, Users } from 'lucide-react';
+import { Shield, Video, FileText, Link as LinkIcon, CalendarDays, Users, UserSquare2 } from 'lucide-react';
 
 export const MOCK_SERVICES: Service[] = [
   {
@@ -65,7 +66,7 @@ export const MOCK_BOOKINGS: Booking[] = [
   {
     id: 'booking1',
     serviceName: 'SSB Mock Interview',
-    date: '2024-08-15',
+    date: '2024-11-15', // Future date
     time: '10:00 AM',
     meetingLink: 'https://meet.google.com/xyz-abc-pqr',
     status: 'upcoming',
@@ -73,7 +74,7 @@ export const MOCK_BOOKINGS: Booking[] = [
   {
     id: 'booking2',
     serviceName: 'Personal Counselling Session',
-    date: '2024-07-20',
+    date: '2024-10-20', // Past date for testing
     time: '02:00 PM',
     meetingLink: 'https://meet.google.com/def-ghi-jkl',
     status: 'completed',
@@ -115,7 +116,7 @@ export const MOCK_RESOURCES: Resource[] = [
     type: 'link',
     url: 'https://www.indiandefensenews.in/',
     description: 'Stay updated with the latest in defence.',
-    serviceCategory: 'general',
+    serviceCategory: 'general', // 'general' category for resources accessible to all logged-in users or specific conditions
     icon: LinkIcon,
   }
 ];
@@ -127,11 +128,24 @@ export const DASHBOARD_NAV_LINKS = [
   { href: '/dashboard/profile', label: 'Profile', icon: Users },
 ];
 
-export const AVAILABLE_SLOTS: Record<string, string[]> = {
-  "2024-09-01": ["09:00 AM", "11:00 AM", "02:00 PM"],
-  "2024-09-02": ["10:00 AM", "01:00 PM", "03:00 PM"],
-  "2024-09-03": ["09:30 AM", "11:30 AM"],
+// Ensure these dates are in the future for testing purposes
+const today = new Date();
+const getFutureDate = (daysToAdd: number): string => {
+  const futureDate = new Date(today);
+  futureDate.setDate(today.getDate() + daysToAdd);
+  return futureDate.toISOString().split('T')[0];
 };
+
+export const AVAILABLE_SLOTS: Record<string, string[]> = {
+  [getFutureDate(7)]: ["09:00 AM", "11:00 AM", "02:00 PM", "04:00 PM"],
+  [getFutureDate(8)]: ["10:00 AM", "01:00 PM", "03:00 PM"],
+  [getFutureDate(9)]: ["09:30 AM", "11:30 AM", "02:30 PM"],
+  [getFutureDate(14)]: ["10:00 AM", "12:00 PM", "03:00 PM"],
+  [getFutureDate(15)]: ["09:00 AM", "11:00 AM"],
+  [getFutureDate(60)]: ["10:00 AM", "11:00 AM", "12:00 PM"], // Approx 2 months later
+  [getFutureDate(61)]: ["02:00 PM", "03:00 PM", "04:00 PM"],
+};
+
 
 export const USER_FORM_FIELDS = [
   { name: 'name', label: 'Full Name', type: 'text', placeholder: 'Enter your full name' },
@@ -140,3 +154,20 @@ export const USER_FORM_FIELDS = [
   { name: 'examApplied', label: 'Defense Exams Applied For', type: 'text', placeholder: 'e.g., NDA, CDS, AFCAT' },
   { name: 'previousAttempts', label: 'Previous SSB Attempts (if any)', type: 'number', placeholder: '0' },
 ];
+
+export const MENTOR_PROFILE = {
+  name: "Col. (Retd.) Arjun Singh",
+  title: "Lead Mentor & SSB Expert",
+  imageUrl: "https://placehold.co/300x300.png",
+  dataAiHint: "mentor portrait",
+  bio: "Col. (Retd.) Arjun Singh is a seasoned veteran with an illustrious career in the Indian Armed Forces. Having successfully cleared the Services Selection Board (SSB) an exceptional seven times for various entries, he possesses an unparalleled understanding of the selection process. His passion for mentoring and guiding young aspirants has led him to help countless candidates achieve their dreams of joining the forces.",
+  experience: [
+    "7-time SSB cleared (NDA, IMA, OTA, TES, UES, NCC Special Entry, TA)",
+    "Over 20 years of distinguished service in the Indian Army.",
+    "Expert in psychological testing, interview techniques, and GTO tasks.",
+    "Certified assessor and trainer.",
+    "Proven track record of mentoring successful candidates.",
+  ],
+  philosophy: "My approach is to demystify the SSB process and empower candidates with self-awareness and genuine confidence. I focus on honing their innate abilities rather than prescribing coached responses. Success in SSB is about showcasing your true potential, and I am here to help you discover and project that effectively.",
+  quote: "The best way to predict your future is to create it. Let's create yours in the Armed Forces."
+};

@@ -1,12 +1,14 @@
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, Shield } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { Logo } from '@/components/icons/logo';
 
 const navLinks = [
   { href: '/', label: 'Home' },
   { href: '/services', label: 'Services' },
+  { href: '/mentor', label: 'Mentor Profile' },
   { href: '/book', label: 'Book Interview' },
   { href: '/testimonials', label: 'Testimonials' },
   { href: '/dashboard', label: 'Dashboard' },

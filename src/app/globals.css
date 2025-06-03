@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -8,33 +9,33 @@ body {
 
 @layer base {
   :root {
-    --background: 210 17% 90%; /* Light blue-gray #E0E5EA */
-    --foreground: 0 0% 3.9%; /* Dark text #0A0A0A */
+    --background: 210 30% 97%; /* Very light, clean cool grey/off-white */
+    --foreground: 210 10% 23%; /* Dark cool grey for text */
 
     --card: 0 0% 100%; /* White */
-    --card-foreground: 0 0% 3.9%; /* Dark text */
+    --card-foreground: 210 10% 23%; /* Dark cool grey for text */
 
     --popover: 0 0% 100%; /* White */
-    --popover-foreground: 0 0% 3.9%; /* Dark text */
+    --popover-foreground: 210 10% 23%; /* Dark cool grey for text */
 
-    --primary: 212 47% 35%; /* Navy blue #2E5984 */
-    --primary-foreground: 0 0% 98%; /* Light text #FAFAFA */
+    --primary: 217 75% 45%; /* A strong, confident blue */
+    --primary-foreground: 0 0% 98%; /* Off-white */
 
-    --secondary: 210 17% 85%; /* Slightly darker than background for secondary elements */
-    --secondary-foreground: 0 0% 9%; /* Dark text for secondary */
+    --secondary: 210 30% 90%; /* Light cool grey, slightly darker than background */
+    --secondary-foreground: 210 10% 30%; /* Darker grey for secondary text */
 
-    --muted: 210 17% 80%; /* Muted elements, slightly darker than secondary */
-    --muted-foreground: 0 0% 45.1%; /* Muted text */
+    --muted: 210 30% 85%; /* Muted elements */
+    --muted-foreground: 210 10% 45%; /* Muted text */
 
-    --accent: 45 66% 52%; /* Gold #D4AF37 */
-    --accent-foreground: 45 100% 10%; /* Dark text for accent #332700 */
+    --accent: 170 55% 40%; /* A deep teal */
+    --accent-foreground: 0 0% 98%; /* Off-white for accent text */
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 210 17% 80%; /* Border color */
-    --input: 210 17% 88%; /* Input background slightly different from main bg */
-    --ring: 212 47% 35%; /* Navy blue for focus rings */
+    --border: 210 20% 85%; /* Softer border */
+    --input: 210 30% 94%; /* Input background, slightly off-white */
+    --ring: 217 75% 55%; /* Ring color based on new primary */
 
     --radius: 0.5rem;
 
@@ -46,51 +47,52 @@ body {
     --chart-5: 27 87% 67%;
 
     /* Sidebar specific theme variables */
-    --sidebar-background: 212 47% 25%; /* Darker Navy */
+    /* Keeping sidebar distinct or could align it with new theme if preferred */
+    --sidebar-background: 217 60% 28%; /* Darker shade of new primary */
     --sidebar-foreground: 210 20% 95%; /* Light text */
-    --sidebar-primary: 45 66% 52%; /* Gold for active/primary items */
-    --sidebar-primary-foreground: 45 100% 10%; /* Dark text on gold */
-    --sidebar-accent: 212 47% 30%; /* Slightly lighter Navy for hover */
+    --sidebar-primary: 170 55% 45%; /* Sidebar primary using new accent (teal) */
+    --sidebar-primary-foreground: 0 0% 98%; /* Dark text on accent */
+    --sidebar-accent: 217 60% 35%; /* Slightly lighter shade of new primary for hover */
     --sidebar-accent-foreground: 210 20% 98%; /* Light text for hover */
-    --sidebar-border: 212 47% 20%; /* Even darker navy for borders */
-    --sidebar-ring: 45 66% 52%; /* Gold for focus ring */
+    --sidebar-border: 217 60% 20%; /* Even darker shade of new primary for borders */
+    --sidebar-ring: 170 55% 45%; /* Accent (teal) for focus ring */
   }
 
   .dark {
-    /* Define dark theme variables if needed in the future, for now, focus on light theme based on proposal */
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    /* Define dark theme variables if needed in the future */
+    --background: 210 10% 15%;
+    --foreground: 210 30% 95%;
+    --card: 210 10% 12%;
+    --card-foreground: 210 30% 95%;
+    --popover: 210 10% 10%;
+    --popover-foreground: 210 30% 95%;
+    --primary: 217 75% 55%; /* Brighter blue for dark mode */
+    --primary-foreground: 210 10% 15%;
+    --secondary: 210 10% 25%;
+    --secondary-foreground: 210 30% 90%;
+    --muted: 210 10% 30%;
+    --muted-foreground: 210 20% 65%;
+    --accent: 170 50% 50%; /* Brighter teal for dark mode */
+    --accent-foreground: 210 10% 15%;
+    --destructive: 0 60% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    --border: 210 10% 30%;
+    --input: 210 10% 20%;
+    --ring: 217 75% 60%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
 
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 210 10% 12%;
+    --sidebar-foreground: 210 30% 95%;
+    --sidebar-primary: 170 50% 50%;
+    --sidebar-primary-foreground: 210 10% 15%;
+    --sidebar-accent: 210 10% 20%;
+    --sidebar-accent-foreground: 210 30% 95%;
+    --sidebar-border: 210 10% 25%;
+    --sidebar-ring: 170 50% 50%;
   }
 }
 
