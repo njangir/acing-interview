@@ -21,16 +21,16 @@ export interface Testimonial {
   story: string;
   imageUrl?: string;
   dataAiHint?: string;
-  serviceTaken: string; // Could be service ID or name
-  serviceId?: string; // Optional: To link directly to a service
-  submissionStatus?: 'aspirant' | 'selected_cleared'; // New field
+  serviceTaken: string; 
+  serviceId?: string; 
+  submissionStatus?: 'aspirant' | 'selected_cleared'; 
   status: 'pending' | 'approved' | 'rejected'; 
 }
 
 export interface Booking {
   id:string;
   serviceName: string;
-  serviceId: string; // Added to link back to service for rebooking etc.
+  serviceId: string; 
   date: string; // YYYY-MM-DD
   time: string; // e.g., 10:00 AM
   userName: string; 
@@ -40,8 +40,9 @@ export interface Booking {
   paymentStatus: 'paid' | 'pay_later_pending' | 'pay_later_unpaid'; 
   reportUrl?: string;
   userFeedback?: string;
-  requestedRefund?: boolean; // New field
-  refundReason?: string; // New field
+  requestedRefund?: boolean; 
+  refundReason?: string; 
+  transactionId?: string | null; // Added for sales report
 }
 
 export interface Resource {

@@ -1,6 +1,6 @@
 
 import type { Service, Testimonial, Booking, Resource, MentorProfileData, UserMessage, Badge } from '@/types';
-import { Shield, Video, FileText, Link as LinkIcon, CalendarDays, Users, UserSquare2, ListChecks, Edit3, UploadCloud, BookCopy, MessageSquare, UserCog, CalendarPlus, MailQuestion, MessagesSquare, Award, Edit2Icon } from 'lucide-react';
+import { Shield, Video, FileText, Link as LinkIcon, CalendarDays, Users, UserSquare2, ListChecks, Edit3, UploadCloud, BookCopy, MessageSquare, UserCog, CalendarPlus, MailQuestion, MessagesSquare, Award, Edit2Icon, DownloadCloud } from 'lucide-react';
 
 const today = new Date();
 export function getFutureDate(daysToAdd: number): string {
@@ -112,6 +112,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     meetingLink: 'https://meet.google.com/xyz-abc-pqr',
     status: 'upcoming',
     paymentStatus: 'paid',
+    transactionId: 'txn_ananya_ssb_mock_01',
     requestedRefund: false,
   },
   {
@@ -125,6 +126,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     meetingLink: 'https://meet.google.com/def-ghi-jkl',
     status: 'completed',
     paymentStatus: 'paid',
+    transactionId: 'txn_vikram_counsel_01',
     reportUrl: '/path/to/report.pdf',
   },
   {
@@ -138,6 +140,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     meetingLink: 'https://meet.google.com/mno-pqr-stu',
     status: 'pending_approval',
     paymentStatus: 'pay_later_pending',
+    transactionId: null,
   },
    {
     id: 'booking4',
@@ -150,6 +153,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     meetingLink: 'https://meet.google.com/uvw-xyz-123',
     status: 'upcoming', 
     paymentStatus: 'pay_later_pending',
+    transactionId: null,
     requestedRefund: true,
     refundReason: "Unexpected travel conflict. Unable to attend the session.",
   },
@@ -164,6 +168,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     meetingLink: 'https://meet.google.com/123-456-789',
     status: 'upcoming',
     paymentStatus: 'paid',
+    transactionId: 'txn_priya_counsel_02',
   },
   {
     id: 'booking6',
@@ -176,6 +181,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     meetingLink: 'https://meet.google.com/amit-afcat-link',
     status: 'completed',
     paymentStatus: 'paid',
+    transactionId: 'txn_amit_afcat_01',
   },
 ];
 
@@ -237,6 +243,7 @@ export const ADMIN_DASHBOARD_NAV_LINKS = [
   { href: '/admin/testimonials', label: 'Approve Testimonials', icon: MessageSquare },
   { href: '/admin/mentor-profile', label: 'Update Mentor Profile', icon: UserCog },
   { href: '/admin/messages', label: 'User Messages', icon: MessagesSquare },
+  { href: '/admin/export-reports', label: 'Export Reports', icon: DownloadCloud },
 ];
 
 // Represents the available slots that admins can manage.

@@ -14,7 +14,7 @@ export function AdminNav() {
     <nav className="grid items-start gap-2">
       {ADMIN_DASHBOARD_NAV_LINKS.map((item) => {
         const Icon = item.icon;
-        const isActive = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));
+        const isActive = pathname === item.href || (item.href !== '/admin' && item.href !== '/admin/export-reports' && pathname.startsWith(item.href));
         return (
           <Link key={item.href} href={item.href} legacyBehavior>
             <a className="block">

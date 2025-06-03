@@ -9,15 +9,14 @@ import { Calendar, Video, FileText, DollarSign, AlertTriangle, MessageSquare, Ro
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogDescription as DialogDesc, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"; // Renamed DialogDescription to DialogDesc
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDescComponent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"; // Renamed AlertDialogDescription to AlertDialogDescComponent
+import { Dialog, DialogContent, DialogDescription as DialogDesc, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"; 
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; // Added Alert imports
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface BookingCardProps {
   booking: Booking;
-  onBookingUpdate?: (updatedBooking: Booking) => void; // For admin panel to reflect changes
+  onBookingUpdate?: (updatedBooking: Booking) => void; 
 }
 
 export function BookingCard({ booking: initialBooking, onBookingUpdate }: BookingCardProps) {
@@ -30,7 +29,7 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
   const [isRefundEligible, setIsRefundEligible] = useState(false);
 
   useEffect(() => {
-    setBooking(initialBooking); // Sync with prop changes
+    setBooking(initialBooking); 
   }, [initialBooking]);
 
   const formattedDate = new Date(booking.date).toLocaleDateString('en-GB', {
@@ -65,9 +64,6 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
       return;
     }
     console.log("Feedback submitted for booking:", booking.id, "Feedback:", feedbackText);
-    // Simulate backend: Update MOCK_TESTIMONIALS
-    // This is a frontend simulation for now.
-    // In a real app, you'd send this to a backend.
     toast({
       title: "Feedback Submitted!",
       description: "Thank you for your valuable feedback. It will be reviewed by our team.",
@@ -175,7 +171,7 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
         <div className="flex flex-wrap gap-2">
           {booking.status === 'upcoming' && isPayLaterPending && (
             <Button asChild variant="default" size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground">
-              <Link href={`/book/${booking.serviceId}/payment?bookingId=${booking.id}`}> {/* Pass bookingId if needed */}
+              <Link href={`/book/${booking.serviceId}/payment?bookingId=${booking.id}`}> 
                 <DollarSign className="mr-2 h-4 w-4" /> Complete Payment
               </Link>
             </Button>
@@ -194,7 +190,7 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
               </a>
             </Button>
           )}
-          {booking.status === 'upcoming' && isRefundEligible && !booking.requestedRefund && (
+          {booking.status === 'upcoming' && isPaid && isRefundEligible && !booking.requestedRefund && (
             <Dialog open={isRefundModalOpen} onOpenChange={setIsRefundModalOpen}>
                 <DialogTrigger asChild>
                     <Button variant="outline" size="sm" className="border-destructive text-destructive hover:bg-destructive/10">
