@@ -1,6 +1,6 @@
 
-import type { Service, Testimonial, Booking, Resource, MentorProfileData, UserMessage } from '@/types';
-import { Shield, Video, FileText, Link as LinkIcon, CalendarDays, Users, UserSquare2, ListChecks, Edit3, UploadCloud, BookCopy, MessageSquare, UserCog, CalendarPlus, MailQuestion, MessagesSquare } from 'lucide-react';
+import type { Service, Testimonial, Booking, Resource, MentorProfileData, UserMessage, Badge } from '@/types';
+import { Shield, Video, FileText, Link as LinkIcon, CalendarDays, Users, UserSquare2, ListChecks, Edit3, UploadCloud, BookCopy, MessageSquare, UserCog, CalendarPlus, MailQuestion, MessagesSquare, Award } from 'lucide-react';
 
 const today = new Date();
 export function getFutureDate(daysToAdd: number): string {
@@ -19,6 +19,7 @@ export const MOCK_SERVICES: Service[] = [
     features: ['One-on-One Interview', 'Psychological Test Analysis (TAT, WAT, SRT)', 'GTO Task Briefing', 'Personalized Feedback Report', 'Doubt Clearing Session'],
     image: 'https://placehold.co/600x400.png',
     dataAiHint: 'interview meeting',
+    defaultForce: 'General',
   },
   {
     id: 'counselling-session',
@@ -29,6 +30,7 @@ export const MOCK_SERVICES: Service[] = [
     features: ['Career Path Guidance', 'Strengths & Weaknesses Analysis', 'Confidence Building Techniques', 'SSB Procedure Walkthrough'],
     image: 'https://placehold.co/600x400.png',
     dataAiHint: 'counseling support',
+    defaultForce: 'General',
   },
   {
     id: 'afcat-guidance',
@@ -39,6 +41,7 @@ export const MOCK_SERVICES: Service[] = [
     features: ['Syllabus Overview', 'Study Material Recommendation', 'Time Management Tips', 'Mock Test Strategy'],
     image: 'https://placehold.co/600x400.png',
     dataAiHint: 'exam preparation',
+    defaultForce: 'Air Force',
   },
 ];
 
@@ -187,7 +190,7 @@ export const DASHBOARD_NAV_LINKS = [
   { href: '/dashboard', label: 'Overview', icon: Shield },
   { href: '/dashboard/bookings', label: 'My Bookings', icon: CalendarDays },
   { href: '/dashboard/resources', label: 'My Resources', icon: FileText },
-  { href: '/dashboard/profile', label: 'Profile', icon: Users },
+  { href: '/dashboard/profile', label: 'Profile & Badges', icon: Users },
   { href: '/dashboard/contact', label: 'Contact Support', icon: MailQuestion },
 ];
 
@@ -196,7 +199,7 @@ export const ADMIN_DASHBOARD_NAV_LINKS = [
   { href: '/admin/bookings', label: 'Booking Requests', icon: ListChecks },
   { href: '/admin/slots', label: 'Manage Slots', icon: CalendarPlus },
   { href: '/admin/services', label: 'Manage Services', icon: Edit3 },
-  { href: '/admin/reports', label: 'Upload Report', icon: UploadCloud },
+  { href: '/admin/reports', label: 'Upload Report & Feedback', icon: UploadCloud },
   { href: '/admin/resources', label: 'Manage Resources', icon: BookCopy },
   { href: '/admin/testimonials', label: 'Approve Testimonials', icon: MessageSquare },
   { href: '/admin/mentor-profile', label: 'Update Mentor Profile', icon: UserCog },
@@ -244,7 +247,7 @@ export const MENTOR_PROFILE: MentorProfileData = {
   contactPhone: "+91 9988776655"
 };
 
-export const MOCK_USER_MESSAGES: UserMessage[] = [
+export let MOCK_USER_MESSAGES: UserMessage[] = [
   {
     id: 'msg1',
     userName: 'Rohan Sharma',
@@ -270,3 +273,51 @@ export const MOCK_USER_PROFILE_FOR_CONTACT = {
   name: "Test User",
   email: "testuser@example.com",
 };
+
+export const MOCK_BADGES: Badge[] = [
+  {
+    id: 'af_pilot_aspirant',
+    name: 'Pilot Aspirant Badge',
+    description: 'Awarded for showing strong aptitude towards aviation concepts during AFCAT guidance.',
+    force: 'Air Force',
+    rankName: 'Pilot Aspirant',
+    imageUrl: 'https://placehold.co/100x100.png',
+    dataAiHint: 'air force pilot insignia',
+  },
+  {
+    id: 'army_leadership_potential',
+    name: 'Leadership Potential Badge',
+    description: 'Recognized for demonstrating key leadership qualities in SSB mock interview.',
+    force: 'Army',
+    rankName: 'Officer Candidate',
+    imageUrl: 'https://placehold.co/100x100.png',
+    dataAiHint: 'army officer badge',
+  },
+  {
+    id: 'navy_strategic_thinker',
+    name: 'Strategic Thinker Badge',
+    description: 'Commended for excellent strategic thinking during SSB counselling.',
+    force: 'Navy',
+    rankName: 'Midshipman Aspirant',
+    imageUrl: 'https://placehold.co/100x100.png',
+    dataAiHint: 'navy insignia',
+  },
+  {
+    id: 'ssb_screened_in',
+    name: 'SSB Stage-I Cleared Badge',
+    description: 'Successfully cleared Stage-I of the SSB mock process.',
+    force: 'General',
+    rankName: 'Stage-I Qualified',
+    imageUrl: 'https://placehold.co/100x100.png',
+    dataAiHint: 'achievement badge',
+  },
+  {
+    id: 'commendable_effort',
+    name: 'Commendable Effort Badge',
+    description: 'Awarded for outstanding effort and dedication during preparation.',
+    force: 'General',
+    rankName: 'Dedicated Learner',
+    imageUrl: 'https://placehold.co/100x100.png',
+    dataAiHint: 'star award',
+  }
+];

@@ -8,6 +8,7 @@ export interface Service {
   features: string[];
   image?: string;
   dataAiHint?: string;
+  defaultForce?: 'Air Force' | 'Army' | 'Navy' | 'General';
 }
 
 export interface Testimonial {
@@ -58,15 +59,6 @@ export interface MentorProfileData {
   contactPhone: string; 
 }
 
-export interface SlotCreationOptions {
-  startDate: Date;
-  endDate?: Date; 
-  startTime: string; 
-  endTime: string; 
-  interval: number; 
-  daysOfWeek: ('Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun')[];
-}
-
 export interface UserMessage {
   id: string;
   userName: string;
@@ -75,4 +67,21 @@ export interface UserMessage {
   messageBody: string;
   timestamp: Date;
   status: 'new' | 'read' | 'replied';
+}
+
+export interface Badge {
+  id: string;
+  name: string;
+  description: string;
+  force: 'Air Force' | 'Army' | 'Navy' | 'General';
+  rankName: string;
+  imageUrl: string;
+  dataAiHint: string;
+}
+
+export interface UserProfile {
+  name: string;
+  email: string;
+  phone: string;
+  awardedBadges: Badge[];
 }
