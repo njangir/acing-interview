@@ -1,6 +1,6 @@
 
 import type { Service, Testimonial, Booking, Resource, MentorProfileData, UserMessage, Badge } from '@/types';
-import { Shield, Video, FileText, Link as LinkIcon, CalendarDays, Users, UserSquare2, ListChecks, Edit3, UploadCloud, BookCopy, MessageSquare, UserCog, CalendarPlus, MailQuestion, MessagesSquare, Award } from 'lucide-react';
+import { Shield, Video, FileText, Link as LinkIcon, CalendarDays, Users, UserSquare2, ListChecks, Edit3, UploadCloud, BookCopy, MessageSquare, UserCog, CalendarPlus, MailQuestion, MessagesSquare, Award, Edit2Icon } from 'lucide-react';
 
 const today = new Date();
 export function getFutureDate(daysToAdd: number): string {
@@ -22,7 +22,7 @@ export const MOCK_SERVICES: Service[] = [
     defaultForce: 'General',
   },
   {
-    id: 'counselling-session',
+    id: 'personal-counselling-session',
     name: 'Personal Counselling Session',
     description: 'Guidance and mentorship to help you prepare mentally and strategically for the SSB.',
     price: 1499,
@@ -33,7 +33,7 @@ export const MOCK_SERVICES: Service[] = [
     defaultForce: 'General',
   },
   {
-    id: 'afcat-guidance',
+    id: 'afcat-exam-guidance',
     name: 'AFCAT Exam Guidance',
     description: 'Expert guidance and study strategies to crack the AFCAT exam.',
     price: 999,
@@ -49,12 +49,14 @@ export const MOCK_TESTIMONIALS: Testimonial[] = [
   {
     id: 't1',
     name: 'Rohan Sharma',
-    userEmail: 'aspirant@example.com', // Matches MOCK_USER_DATA in profile page for demo
+    userEmail: 'aspirant@example.com', 
     batch: 'NDA Aspirant',
     story: "The mock interview was incredibly realistic and the feedback helped me identify my weak areas. Cleared SSB in my first attempt!",
     imageUrl: 'https://placehold.co/100x100.png',
     dataAiHint: 'happy student',
     serviceTaken: 'SSB Mock Interview',
+    serviceId: 'ssb-mock-interview',
+    submissionStatus: 'selected_cleared',
     status: 'approved',
   },
   {
@@ -66,6 +68,8 @@ export const MOCK_TESTIMONIALS: Testimonial[] = [
     imageUrl: 'https://placehold.co/100x100.png',
     dataAiHint: 'smiling person',
     serviceTaken: 'Personal Counselling Session',
+    serviceId: 'personal-counselling-session',
+    submissionStatus: 'aspirant',
     status: 'approved',
   },
   {
@@ -77,6 +81,8 @@ export const MOCK_TESTIMONIALS: Testimonial[] = [
     imageUrl: 'https://placehold.co/100x100.png',
     dataAiHint: 'focused individual',
     serviceTaken: 'AFCAT Exam Guidance',
+    serviceId: 'afcat-exam-guidance',
+    submissionStatus: 'selected_cleared',
     status: 'approved',
   },
   {
@@ -88,6 +94,8 @@ export const MOCK_TESTIMONIALS: Testimonial[] = [
     imageUrl: 'https://placehold.co/100x100.png',
     dataAiHint: 'confident woman',
     serviceTaken: 'SSB Mock Interview',
+    serviceId: 'ssb-mock-interview',
+    submissionStatus: 'aspirant',
     status: 'pending',
   },
 ];
@@ -96,6 +104,7 @@ export const MOCK_BOOKINGS: Booking[] = [
   {
     id: 'booking1',
     serviceName: 'SSB Mock Interview',
+    serviceId: 'ssb-mock-interview',
     date: getFutureDate(3), 
     time: '10:00 AM',
     userName: "Ananya Sharma",
@@ -103,10 +112,12 @@ export const MOCK_BOOKINGS: Booking[] = [
     meetingLink: 'https://meet.google.com/xyz-abc-pqr',
     status: 'upcoming',
     paymentStatus: 'paid',
+    requestedRefund: false,
   },
   {
     id: 'booking2',
     serviceName: 'Personal Counselling Session',
+    serviceId: 'personal-counselling-session',
     date: '2024-07-10', 
     time: '02:00 PM',
     userName: "Vikram Singh",
@@ -119,10 +130,11 @@ export const MOCK_BOOKINGS: Booking[] = [
   {
     id: 'booking3',
     serviceName: 'AFCAT Exam Guidance',
+    serviceId: 'afcat-exam-guidance',
     date: getFutureDate(5),
     time: '03:00 PM',
     userName: "Nisha Patel",
-    userEmail: "nisha.patel@example.com", // User who might get AFCAT badge
+    userEmail: "nisha.patel@example.com", 
     meetingLink: 'https://meet.google.com/mno-pqr-stu',
     status: 'pending_approval',
     paymentStatus: 'pay_later_pending',
@@ -130,6 +142,7 @@ export const MOCK_BOOKINGS: Booking[] = [
    {
     id: 'booking4',
     serviceName: 'SSB Mock Interview',
+    serviceId: 'ssb-mock-interview',
     date: getFutureDate(10),
     time: '11:00 AM',
     userName: "Rajesh Kumar",
@@ -137,14 +150,17 @@ export const MOCK_BOOKINGS: Booking[] = [
     meetingLink: 'https://meet.google.com/uvw-xyz-123',
     status: 'upcoming', 
     paymentStatus: 'pay_later_pending',
+    requestedRefund: true,
+    refundReason: "Unexpected travel conflict. Unable to attend the session.",
   },
    {
     id: 'booking5',
     serviceName: 'Personal Counselling Session',
+    serviceId: 'personal-counselling-session',
     date: getFutureDate(1), 
     time: '04:00 PM',
     userName: "Priya Desai",
-    userEmail: "aspirant@example.com", // User for whom badges are stored in localStorage for profile page
+    userEmail: "aspirant@example.com",
     meetingLink: 'https://meet.google.com/123-456-789',
     status: 'upcoming',
     paymentStatus: 'paid',
@@ -152,9 +168,10 @@ export const MOCK_BOOKINGS: Booking[] = [
   {
     id: 'booking6',
     serviceName: 'AFCAT Exam Guidance',
+    serviceId: 'afcat-exam-guidance',
     date: '2024-07-12', 
     time: '11:00 AM',
-    userName: "Amit Patel", // Matches testimonial for potential badge linking
+    userName: "Amit Patel", 
     userEmail: "amit.patel@example.com", 
     meetingLink: 'https://meet.google.com/amit-afcat-link',
     status: 'completed',
@@ -187,7 +204,7 @@ export const MOCK_RESOURCES: Resource[] = [
     type: 'document',
     url: '/resources/afcat_study_plan.pdf',
     description: 'A structured study plan for AFCAT preparation.',
-    serviceCategory: 'afcat-guidance',
+    serviceCategory: 'afcat-exam-guidance',
     icon: FileText,
   },
   {
@@ -206,6 +223,7 @@ export const DASHBOARD_NAV_LINKS = [
   { href: '/dashboard/bookings', label: 'My Bookings', icon: CalendarDays },
   { href: '/dashboard/resources', label: 'My Resources', icon: FileText },
   { href: '/dashboard/profile', label: 'Profile & Badges', icon: Users },
+  { href: '/dashboard/submit-testimonial', label: 'Submit Testimonial', icon: Edit2Icon },
   { href: '/dashboard/contact', label: 'Contact Support', icon: MailQuestion },
 ];
 
@@ -223,6 +241,7 @@ export const ADMIN_DASHBOARD_NAV_LINKS = [
 
 // Represents the available slots that admins can manage.
 // In a real app, this would be fetched from and updated to a backend.
+// Admin slot page will show a toast for simulation and not modify this directly.
 export const AVAILABLE_SLOTS: Record<string, string[]> = {
   [getFutureDate(7)]: ["09:00 AM", "11:00 AM", "02:00 PM", "04:00 PM"],
   [getFutureDate(8)]: ["10:00 AM", "01:00 PM", "03:00 PM"],
@@ -264,7 +283,9 @@ export const MENTOR_PROFILE: MentorProfileData = {
   contactPhone: "+91 9988776655"
 };
 
-export let MOCK_USER_MESSAGES: UserMessage[] = [
+// User messages are now only added via contact form simulation (toast message)
+// This array serves as initial data for the admin message viewing UI
+export const MOCK_USER_MESSAGES: UserMessage[] = [
   {
     id: 'msg1',
     userName: 'Rohan Sharma',

@@ -41,7 +41,7 @@ export function ServiceCard({ service }: ServiceCardProps) {
       </CardContent>
       <CardFooter>
         <Button asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-          <Link href={`/book?serviceId=${service.id}`}>Book Now</Link>
+          <Link href={`/book/${service.id}/slots`}>Book Now</Link>
         </Button>
       </CardFooter>
     </Card>

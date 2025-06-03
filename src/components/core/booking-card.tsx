@@ -10,19 +10,27 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDesc, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
 interface BookingCardProps {
   booking: Booking;
+  onBookingUpdate?: (updatedBooking: Booking) => void; // For admin panel to reflect changes
 }
 
-export function BookingCard({ booking }: BookingCardProps) {
+export function BookingCard({ booking: initialBooking, onBookingUpdate }: BookingCardProps) {
   const { toast } = useToast();
+  const [booking, setBooking] = useState<Booking>(initialBooking);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
+  const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+  const [refundReason, setRefundReason] = useState('');
   const [isRefundEligible, setIsRefundEligible] = useState(false);
+
+  useEffect(() => {
+    setBooking(initialBooking); // Sync with prop changes
+  }, [initialBooking]);
 
   const formattedDate = new Date(booking.date).toLocaleDateString('en-GB', {
     day: 'numeric',
@@ -39,34 +47,58 @@ export function BookingCard({ booking }: BookingCardProps) {
       const [timePart, ampm] = booking.time.split(' ');
       let [hours, minutes] = timePart.split(':').map(Number);
       if (ampm === 'PM' && hours < 12) hours += 12;
-      if (ampm === 'AM' && hours === 12) hours = 0; // Midnight case
+      if (ampm === 'AM' && hours === 12) hours = 0; 
       bookingDateTime.setHours(hours, minutes, 0, 0);
 
       const now = new Date();
       const twoHoursInMs = 2 * 60 * 60 * 1000;
       setIsRefundEligible(bookingDateTime.getTime() - now.getTime() > twoHoursInMs);
+    } else {
+      setIsRefundEligible(false);
     }
   }, [booking.date, booking.time, booking.status]);
 
   const handleFeedbackSubmit = () => {
+    if (!feedbackText.trim()) {
+      toast({ title: "Feedback Empty", description: "Please enter your feedback before submitting.", variant: "destructive" });
+      return;
+    }
     console.log("Feedback submitted for booking:", booking.id, "Feedback:", feedbackText);
+    // Simulate backend: Update MOCK_TESTIMONIALS
+    // This is a frontend simulation for now.
+    // In a real app, you'd send this to a backend.
     toast({
       title: "Feedback Submitted!",
-      description: "Thank you for your valuable feedback.",
+      description: "Thank you for your valuable feedback. It will be reviewed by our team.",
     });
     setIsFeedbackModalOpen(false);
     setFeedbackText('');
-    // Here you would typically send the feedback to your backend
   };
 
-  const handleRefundRequest = () => {
-    console.log("Refund requested for booking:", booking.id);
+  const handleRefundRequestSubmit = () => {
+    if (!refundReason.trim()) {
+      toast({ title: "Reason Required", description: "Please provide a reason for your refund request.", variant: "destructive" });
+      return;
+    }
+    console.log("Refund requested for booking:", booking.id, "Reason:", refundReason);
+    
+    // Simulate backend update:
+    const updatedBooking: Booking = { ...booking, requestedRefund: true, refundReason };
+    setBooking(updatedBooking); // Update local state for immediate UI change
+    if (onBookingUpdate) {
+      onBookingUpdate(updatedBooking); // Notify parent if prop exists (for admin panel)
+    }
+    // In a real app, this would be an API call to update the backend.
+    // For now, we'll assume MOCK_BOOKINGS in constants would be updated if this were not a simulation.
+    // This change is local to this card component or reflected via onBookingUpdate.
+
     toast({
       title: "Refund Request Submitted",
-      description: "Your refund request has been received. We will process it shortly.",
+      description: `Your request for booking ${booking.serviceName} has been received. Reason: ${refundReason}. Admin will review it.`,
       variant: "default"
     });
-    // Update booking status or make API call
+    setIsRefundModalOpen(false);
+    setRefundReason('');
   };
 
 
@@ -76,11 +108,17 @@ export function BookingCard({ booking }: BookingCardProps) {
         <div className="flex justify-between items-start">
           <CardTitle className="font-headline text-lg text-primary">{booking.serviceName}</CardTitle>
           <div className="flex flex-col items-end gap-1">
-            <Badge variant={booking.status === 'upcoming' ? 'default' : booking.status === 'completed' ? 'secondary' : 'destructive'}
+            <Badge variant={
+                booking.status === 'upcoming' ? 'default' : 
+                booking.status === 'completed' ? 'secondary' : 
+                booking.status === 'cancelled' ? 'destructive' :
+                'outline' 
+            }
             className={
                 booking.status === 'upcoming' ? 'bg-green-600 text-white' : 
                 booking.status === 'pending_approval' ? 'bg-yellow-500 text-black' : 
-                booking.status === 'cancelled' ? 'bg-red-500 text-white' : ''
+                booking.status === 'cancelled' ? 'bg-red-600 text-white' : 
+                booking.status === 'completed' ? 'bg-gray-500 text-white' : ''
             }>
               {booking.status.replace('_', ' ').toUpperCase()}
             </Badge>
@@ -103,10 +141,19 @@ export function BookingCard({ booking }: BookingCardProps) {
             <span>Your payment is pending. Please complete it before the session to confirm your spot and activate the meeting link.</span>
           </div>
         )}
-        {booking.status === 'upcoming' && isPaid && (
+        {booking.status === 'upcoming' && isPaid && !booking.requestedRefund && (
           <p className="text-sm text-muted-foreground">
             Your session is confirmed! Meeting link will be active shortly before the session.
           </p>
+        )}
+        {booking.status === 'upcoming' && booking.requestedRefund && (
+          <Alert variant="default" className="mb-3 border-orange-500 text-orange-700 bg-orange-50">
+            <AlertTriangle className="h-4 w-4 !text-orange-600"/>
+            <AlertTitle className="!text-orange-700">Refund Requested</AlertTitle>
+            <AlertDescription className="!text-orange-600">
+                Your refund request is pending admin approval. Reason: {booking.refundReason}
+            </AlertDescription>
+          </Alert>
         )}
          {booking.status === 'pending_approval' && (
           <p className="text-sm text-muted-foreground">
@@ -123,12 +170,15 @@ export function BookingCard({ booking }: BookingCardProps) {
             Session completed. Feedback report will be available soon.
           </p>
         )}
+        {booking.status === 'cancelled' && (
+            <p className="text-sm text-destructive/80">This booking has been cancelled.</p>
+        )}
       </CardContent>
       <CardFooter className="flex flex-wrap justify-between items-center gap-2">
         <div className="flex flex-wrap gap-2">
           {booking.status === 'upcoming' && isPayLaterPending && (
             <Button asChild variant="default" size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground">
-              <Link href={`/book/${booking.id}/pay`}> {/* Assuming a route like this for payment */}
+              <Link href={`/book/${booking.serviceId}/payment?bookingId=${booking.id}`}> {/* Pass bookingId if needed */}
                 <DollarSign className="mr-2 h-4 w-4" /> Complete Payment
               </Link>
             </Button>
@@ -138,38 +188,52 @@ export function BookingCard({ booking }: BookingCardProps) {
               asChild 
               variant="outline" 
               size="sm" 
-              className={`border-primary text-primary hover:bg-primary/10 ${!isPaid ? 'opacity-60 cursor-not-allowed' : ''}`}
-              disabled={!isPaid}
-              title={!isPaid ? "Complete payment to join meeting" : "Join Meeting"}
+              className={`border-primary text-primary hover:bg-primary/10 ${(!isPaid || booking.requestedRefund) ? 'opacity-60 cursor-not-allowed' : ''}`}
+              disabled={!isPaid || !!booking.requestedRefund}
+              title={!isPaid ? "Complete payment to join meeting" : booking.requestedRefund ? "Refund request pending" : "Join Meeting"}
             >
-              <a href={isPaid ? booking.meetingLink : undefined} target="_blank" rel="noopener noreferrer">
+              <a href={(isPaid && !booking.requestedRefund) ? booking.meetingLink : undefined} target="_blank" rel="noopener noreferrer">
                 <Video className="mr-2 h-4 w-4" /> Join Meeting
               </a>
             </Button>
           )}
-          {booking.status === 'upcoming' && isRefundEligible && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" size="sm" className="border-destructive text-destructive hover:bg-destructive/10">
-                  <RotateCcw className="mr-2 h-4 w-4" /> Request Refund
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Confirm Refund Request</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to request a refund for {booking.serviceName} on {formattedDate}? 
-                    This action can only be done up to 2 hours before the scheduled time.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleRefundRequest} className="bg-destructive hover:bg-destructive/90">
-                    Confirm Request
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+          {booking.status === 'upcoming' && isRefundEligible && !booking.requestedRefund && (
+            <Dialog open={isRefundModalOpen} onOpenChange={setIsRefundModalOpen}>
+                <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="border-destructive text-destructive hover:bg-destructive/10">
+                    <RotateCcw className="mr-2 h-4 w-4" /> Request Refund
+                    </Button>
+                </DialogTrigger>
+                <DialogContent>
+                    <DialogHeader>
+                    <DialogTitle>Request Refund</DialogTitle>
+                    <DialogDescription>
+                        Please provide a reason for your refund request for {booking.serviceName} on {formattedDate}.
+                        This action can only be done up to 2 hours before the scheduled time.
+                    </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-2">
+                        <Label htmlFor="refundReason">Reason for Refund (Required)</Label>
+                        <Textarea
+                            id="refundReason"
+                            value={refundReason}
+                            onChange={(e) => setRefundReason(e.target.value)}
+                            placeholder="e.g., Unexpected conflict, change of plans..."
+                            rows={3}
+                        />
+                    </div>
+                    <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsRefundModalOpen(false)}>Cancel</Button>
+                    <Button 
+                        onClick={handleRefundRequestSubmit} 
+                        disabled={!refundReason.trim()}
+                        className="bg-destructive hover:bg-destructive/90"
+                    >
+                        Submit Refund Request
+                    </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
           )}
           {booking.status === 'completed' && (
              <Dialog open={isFeedbackModalOpen} onOpenChange={setIsFeedbackModalOpen}>
@@ -210,11 +274,13 @@ export function BookingCard({ booking }: BookingCardProps) {
             </Button>
           )}
         </div>
-         <Button asChild variant="link" size="sm" className="text-primary justify-end mt-2 sm:mt-0">
-            <Link href={`/book?serviceId=${booking.serviceName.toLowerCase().replace(/\s+/g, '-')}&rebook=true`}>
-               Re-book Service
-            </Link>
-          </Button>
+         {booking.status !== 'cancelled' && (
+            <Button asChild variant="link" size="sm" className="text-primary justify-end mt-2 sm:mt-0">
+                <Link href={`/book/${booking.serviceId}/slots`}> 
+                Re-book Service
+                </Link>
+            </Button>
+         )}
       </CardFooter>
     </Card>
   );

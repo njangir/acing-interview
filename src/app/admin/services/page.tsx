@@ -1,28 +1,31 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription as DialogDesc } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { MOCK_SERVICES } from "@/constants";
 import type { Service } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Upload } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import Image from 'next/image';
 
 
-const initialServiceFormState: Omit<Service, 'id' | 'image' | 'dataAiHint' | 'features'> & { features: string } = {
+const initialServiceFormState: Omit<Service, 'id' | 'features'> & { features: string } = {
   name: '',
   description: '',
   price: 0,
   duration: '',
   features: '',
+  image: '',
+  dataAiHint: '',
 };
 
 export default function AdminServicesPage() {
@@ -30,39 +33,75 @@ export default function AdminServicesPage() {
   const [services, setServices] = useState<Service[]>(MOCK_SERVICES);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentService, setCurrentService] = useState<Service | null>(null);
-  const [formData, setFormData] = useState<Omit<Service, 'id' | 'image' | 'dataAiHint' | 'features'> & { features: string }>(initialServiceFormState);
+  const [formData, setFormData] = useState<Omit<Service, 'id' | 'features'> & { features: string }>(initialServiceFormState);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+
+  useEffect(() => {
+    if (currentService) {
+      setFormData({
+        name: currentService.name,
+        description: currentService.description,
+        price: currentService.price,
+        duration: currentService.duration,
+        features: currentService.features.join(', '),
+        image: currentService.image || '',
+        dataAiHint: currentService.dataAiHint || '',
+      });
+      setImagePreview(currentService.image || null);
+    } else {
+      setFormData(initialServiceFormState);
+      setImagePreview(null);
+    }
+    setSelectedFile(null);
+  }, [currentService, isModalOpen]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: name === 'price' ? parseFloat(value) || 0 : value }));
   };
+  
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    } else {
+      setSelectedFile(null);
+      setImagePreview(currentService?.image || null); // Revert to original if file selection is cleared
+    }
+  };
 
   const handleEdit = (service: Service) => {
     setCurrentService(service);
-    setFormData({
-      name: service.name,
-      description: service.description,
-      price: service.price,
-      duration: service.duration,
-      features: service.features.join(', '),
-    });
     setIsModalOpen(true);
   };
 
   const handleAddNew = () => {
     setCurrentService(null);
-    setFormData(initialServiceFormState);
     setIsModalOpen(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    let imageUrl = formData.image;
+    if (selectedFile) {
+      // Simulate upload: In a real app, upload selectedFile to storage and get URL
+      // For now, use a placeholder or filename.
+      // We'll use the selectedFile.name as a mock URL.
+      imageUrl = `https://placehold.co/600x400.png?text=Uploaded+${selectedFile.name.substring(0,10)}`; 
+      console.log("Simulating upload of:", selectedFile.name);
+    }
+
+
     const serviceToSave: Service = {
       ...formData,
-      id: currentService?.id || `service-${Date.now()}`, // Generate new ID or use existing
-      features: formData.features.split(',').map(f => f.trim()).filter(f => f), // Split features string into array
-      image: currentService?.image || 'https://placehold.co/600x400.png', // Default image
-      dataAiHint: currentService?.dataAiHint || 'service related',
+      id: currentService?.id || `service-${Date.now()}`, 
+      features: formData.features.split(',').map(f => f.trim()).filter(f => f), 
+      image: imageUrl || 'https://placehold.co/600x400.png', // Default if no image provided
+      dataAiHint: formData.dataAiHint || 'service related',
     };
 
     if (currentService) {
@@ -72,7 +111,8 @@ export default function AdminServicesPage() {
       setServices(prev => [...prev, serviceToSave]);
       toast({ title: "Service Added", description: `${serviceToSave.name} has been added.` });
     }
-    console.log("Saving service:", serviceToSave);
+    // MOCK_SERVICES = services; // This would update the constant in a real state management scenario or backend
+    console.log("Saving service (simulated):", serviceToSave);
     setIsModalOpen(false);
   };
   
@@ -80,6 +120,7 @@ export default function AdminServicesPage() {
     setServices(prev => prev.filter(s => s.id !== serviceId));
     toast({ title: "Service Deleted", description: `Service has been deleted.`});
     console.log("Deleting service:", serviceId);
+    // MOCK_SERVICES = services.filter(s => s.id !== serviceId);
   };
 
   return (
@@ -101,6 +142,7 @@ export default function AdminServicesPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Thumbnail</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Duration</TableHead>
@@ -110,6 +152,9 @@ export default function AdminServicesPage() {
             <TableBody>
               {services.map((service) => (
                 <TableRow key={service.id}>
+                  <TableCell>
+                    <Image src={service.image || "https://placehold.co/80x60.png"} alt={service.name} width={80} height={60} className="rounded-md object-cover" data-ai-hint={service.dataAiHint || "service"}/>
+                  </TableCell>
                   <TableCell className="font-medium">{service.name}</TableCell>
                   <TableCell>₹{service.price}</TableCell>
                   <TableCell>{service.duration}</TableCell>
@@ -148,13 +193,13 @@ export default function AdminServicesPage() {
       </Card>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[525px]">
+        <DialogContent className="sm:max-w-[625px]">
           <form onSubmit={handleSubmit}>
             <DialogHeader>
               <DialogTitle>{currentService ? 'Edit Service' : 'Add New Service'}</DialogTitle>
-              <DialogDescription>
+              <DialogDesc>
                 {currentService ? `Update details for ${currentService.name}.` : 'Fill in the details for the new service.'}
-              </DialogDescription>
+              </DialogDesc>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
@@ -176,6 +221,21 @@ export default function AdminServicesPage() {
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="features" className="text-right">Features</Label>
                 <Textarea id="features" name="features" value={formData.features} onChange={handleInputChange} className="col-span-3" placeholder="Comma-separated, e.g., Feature 1, Feature 2" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="imageUpload" className="text-right">Thumbnail</Label>
+                <Input id="imageUpload" name="imageUpload" type="file" accept="image/*" onChange={handleFileChange} className="col-span-3" />
+              </div>
+              {imagePreview && (
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="col-start-2 col-span-3">
+                        <Image src={imagePreview} alt="Thumbnail preview" width={200} height={150} className="rounded-md object-cover border" />
+                    </div>
+                </div>
+              )}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="dataAiHint" className="text-right">AI Hint</Label>
+                <Input id="dataAiHint" name="dataAiHint" value={formData.dataAiHint} onChange={handleInputChange} className="col-span-3" placeholder="e.g., meeting, study" />
               </div>
             </div>
             <DialogFooter>

@@ -16,18 +16,20 @@ export function DashboardNav() {
         const Icon = item.icon;
         const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
         return (
-          <Link key={item.href} href={item.href}>
-            <Button
-              variant={isActive ? 'default': 'ghost'}
-              className={cn(
-                "w-full justify-start",
-                isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground",
-                !isActive && "hover:bg-accent/10 hover:text-accent-foreground" // Updated hover for non-active
-              )}
-            >
-              <Icon className="mr-2 h-4 w-4" />
-              {item.label}
-            </Button>
+          <Link key={item.href} href={item.href} legacyBehavior passHref>
+            <a className="block">
+                <Button
+                variant={isActive ? 'default': 'ghost'}
+                className={cn(
+                    "w-full justify-start",
+                    isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground",
+                    !isActive && "hover:bg-accent/10 hover:text-accent-foreground" 
+                )}
+                >
+                <Icon className="mr-2 h-4 w-4" />
+                {item.label}
+                </Button>
+            </a>
           </Link>
         );
       })}

@@ -65,9 +65,11 @@ export default function PaymentPage() {
       if (paymentSuccess) {
         localStorage.setItem('confirmationDetails', JSON.stringify({
           serviceName: service?.name,
+          serviceId: service?.id,
           date: bookingDetails?.date,
           time: bookingDetails?.time,
           userName: userDetails?.name,
+          userEmail: userDetails?.email,
           meetingLink: "https://meet.google.com/mock-link-" + Math.random().toString(36).substring(7),
           transactionId: "mock_txn_" + Date.now(),
           paymentStatus: 'paid',
@@ -87,13 +89,15 @@ export default function PaymentPage() {
         });
       }
     } else { // Pay Later
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Shorter delay for pay later
+      await new Promise(resolve => setTimeout(resolve, 1000)); 
       localStorage.setItem('confirmationDetails', JSON.stringify({
         serviceName: service?.name,
+        serviceId: service?.id,
         date: bookingDetails?.date,
         time: bookingDetails?.time,
         userName: userDetails?.name,
-        meetingLink: "https://meet.google.com/mock-link-" + Math.random().toString(36).substring(7), // Still generate a link
+        userEmail: userDetails?.email,
+        meetingLink: "https://meet.google.com/mock-link-" + Math.random().toString(36).substring(7), 
         transactionId: null,
         paymentStatus: 'pay_later_pending',
       }));

@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { MOCK_TESTIMONIALS, MOCK_BADGES } from "@/constants";
 import type { Testimonial, Badge as BadgeType, UserProfile } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { Check, X, Eye, EyeOff, Filter } from 'lucide-react';
+import { Check, X, Eye, EyeOff, Filter, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from '@/components/ui/label';
 
@@ -45,23 +45,23 @@ export default function AdminTestimonialsPage() {
   };
 
   const filteredTestimonials = useMemo(() => {
-    if (filterBadgeId === 'all') {
-      return testimonials;
+    let filtered = testimonials;
+    if (filterBadgeId !== 'all') {
+      filtered = filtered.filter(testimonial => {
+        if (!testimonial.userEmail) return false;
+        const mockUserProfileKey = `mockUserProfile_${testimonial.userEmail}`;
+        const storedProfileData = localStorage.getItem(mockUserProfileKey);
+        
+        if (storedProfileData) {
+          const userProfile: UserProfile = JSON.parse(storedProfileData);
+          return userProfile.awardedBadges?.some(badge => badge.id === filterBadgeId);
+        }
+        return false;
+      });
     }
-    return testimonials.filter(testimonial => {
-      if (!testimonial.userEmail) return false;
-      
-      // Simulate fetching user profile and their badges based on email
-      // In a real app, this would be an API call or a more robust lookup.
-      // For this demo, we'll check against the localStorage pattern used in profile page.
-      const mockUserProfileKey = `mockUserProfile_${testimonial.userEmail}`;
-      const storedProfileData = localStorage.getItem(mockUserProfileKey);
-      
-      if (storedProfileData) {
-        const userProfile: UserProfile = JSON.parse(storedProfileData);
-        return userProfile.awardedBadges?.some(badge => badge.id === filterBadgeId);
-      }
-      return false;
+    return filtered.sort((a,b) => {
+        const statusOrder = { pending: 0, approved: 1, rejected: 2 };
+        return statusOrder[a.status] - statusOrder[b.status];
     });
   }, [testimonials, filterBadgeId]);
 
@@ -76,7 +76,7 @@ export default function AdminTestimonialsPage() {
         <CardHeader>
           <CardTitle>Testimonial Submissions</CardTitle>
           <CardDescription>
-            Filter testimonials by awarded badges to evaluate relevance and user progress.
+            Filter testimonials by awarded badges to evaluate relevance and user progress. Current count: {filteredTestimonials.length}.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -105,8 +105,9 @@ export default function AdminTestimonialsPage() {
               <TableRow>
                 <TableHead>User</TableHead>
                 <TableHead>Testimonial</TableHead>
-                <TableHead>Service Taken</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Service</TableHead>
+                <TableHead>Submission Status</TableHead>
+                <TableHead>Approval Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -116,9 +117,17 @@ export default function AdminTestimonialsPage() {
                   <TableCell className="font-medium">
                     <div>{testimonial.name}</div>
                     <div className="text-xs text-muted-foreground">{testimonial.userEmail || 'N/A'}</div>
+                    {testimonial.batch && <div className="text-xs text-muted-foreground">Batch: {testimonial.batch}</div>}
                   </TableCell>
-                  <TableCell className="max-w-sm truncate">{testimonial.story}</TableCell>
-                  <TableCell>{testimonial.serviceTaken}</TableCell>
+                  <TableCell className="max-w-sm text-sm">{testimonial.story}</TableCell>
+                  <TableCell className="text-xs">{testimonial.serviceTaken}</TableCell>
+                   <TableCell>
+                    {testimonial.submissionStatus === 'selected_cleared' ? (
+                        <Badge variant="secondary" className="bg-sky-100 text-sky-700"><CheckCircle2 className="mr-1 h-3 w-3"/>Selected/Cleared</Badge>
+                    ) : (
+                        <Badge variant="outline" className="border-amber-500 text-amber-700"><ShieldAlert className="mr-1 h-3 w-3"/>Aspirant</Badge>
+                    )}
+                   </TableCell>
                   <TableCell>
                     <Badge variant={
                       testimonial.status === 'approved' ? 'default' :
@@ -149,14 +158,14 @@ export default function AdminTestimonialsPage() {
               ))}
                {filteredTestimonials.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={5} className="text-center h-24">
+                    <TableCell colSpan={6} className="text-center h-24">
                         No testimonials found matching the current filter.
                     </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
-          {testimonials.length === 0 && filterBadgeId === 'all' && ( // Only show if no testimonials at all
+          {testimonials.length === 0 && filterBadgeId === 'all' && ( 
             <p className="text-center text-muted-foreground py-4">No testimonials submitted yet.</p>
           )}
         </CardContent>

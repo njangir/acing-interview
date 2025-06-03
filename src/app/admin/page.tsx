@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ADMIN_DASHBOARD_NAV_LINKS, MOCK_BOOKINGS, MOCK_USER_MESSAGES, MOCK_SERVICES } from "@/constants";
-import { ArrowRight, BellRing, BarChart3, MessagesSquare, Star, TrendingUp } from "lucide-react";
+import { ArrowRight, BellRing, TrendingUp, MessagesSquare, Star } from "lucide-react";
 
 export default function AdminOverviewPage() {
   const newBookingRequests = MOCK_BOOKINGS.filter(b => b.status === 'pending_approval').length;

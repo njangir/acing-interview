@@ -1,4 +1,6 @@
 
+import type { LucideIcon } from 'lucide-react';
+
 export interface Service {
   id: string;
   name: string;
@@ -14,18 +16,21 @@ export interface Service {
 export interface Testimonial {
   id: string;
   name: string;
-  userEmail?: string; // Added to link testimonial to a user with badges
+  userEmail?: string; 
   batch?: string;
   story: string;
   imageUrl?: string;
   dataAiHint?: string;
-  serviceTaken: string;
+  serviceTaken: string; // Could be service ID or name
+  serviceId?: string; // Optional: To link directly to a service
+  submissionStatus?: 'aspirant' | 'selected_cleared'; // New field
   status: 'pending' | 'approved' | 'rejected'; 
 }
 
 export interface Booking {
   id:string;
   serviceName: string;
+  serviceId: string; // Added to link back to service for rebooking etc.
   date: string; // YYYY-MM-DD
   time: string; // e.g., 10:00 AM
   userName: string; 
@@ -35,6 +40,8 @@ export interface Booking {
   paymentStatus: 'paid' | 'pay_later_pending' | 'pay_later_unpaid'; 
   reportUrl?: string;
   userFeedback?: string;
+  requestedRefund?: boolean; // New field
+  refundReason?: string; // New field
 }
 
 export interface Resource {
@@ -44,7 +51,7 @@ export interface Resource {
   url: string;
   description?: string;
   serviceCategory: string; 
-  icon?: React.ElementType;
+  icon?: LucideIcon;
 }
 
 export interface MentorProfileData {
