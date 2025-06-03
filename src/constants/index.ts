@@ -1,6 +1,6 @@
 
 import type { Service, Testimonial, Booking, Resource, MentorProfileData } from '@/types';
-import { Shield, Video, FileText, Link as LinkIcon, CalendarDays, Users, UserSquare2, ListChecks, Edit3, UploadCloud, BookCopy, MessageSquare, UserCog } from 'lucide-react';
+import { Shield, Video, FileText, Link as LinkIcon, CalendarDays, Users, UserSquare2, ListChecks, Edit3, UploadCloud, BookCopy, MessageSquare, UserCog, CalendarPlus } from 'lucide-react';
 
 export const MOCK_SERVICES: Service[] = [
   {
@@ -95,6 +95,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     userEmail: "ananya.sharma@example.com",
     meetingLink: 'https://meet.google.com/xyz-abc-pqr',
     status: 'upcoming',
+    paymentStatus: 'paid',
   },
   {
     id: 'booking2',
@@ -105,17 +106,19 @@ export const MOCK_BOOKINGS: Booking[] = [
     userEmail: "vikram.singh@example.com",
     meetingLink: 'https://meet.google.com/def-ghi-jkl',
     status: 'completed',
+    paymentStatus: 'paid',
     reportUrl: '/path/to/report.pdf',
   },
   {
     id: 'booking3',
     serviceName: 'AFCAT Exam Guidance',
-    date: getFutureDate(5), 
+    date: getFutureDate(5),
     time: '03:00 PM',
     userName: "Nisha Patel",
     userEmail: "nisha.patel@example.com",
     meetingLink: 'https://meet.google.com/mno-pqr-stu',
     status: 'pending_approval',
+    paymentStatus: 'pay_later_pending',
   },
    {
     id: 'booking4',
@@ -126,6 +129,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     userEmail: "rajesh.kumar@example.com",
     meetingLink: 'https://meet.google.com/uvw-xyz-123',
     status: 'pending_approval',
+    paymentStatus: 'paid',
   },
 ];
 
@@ -178,6 +182,7 @@ export const DASHBOARD_NAV_LINKS = [
 export const ADMIN_DASHBOARD_NAV_LINKS = [
   { href: '/admin', label: 'Admin Overview', icon: Shield },
   { href: '/admin/bookings', label: 'Booking Requests', icon: ListChecks },
+  { href: '/admin/slots', label: 'Manage Slots', icon: CalendarPlus },
   { href: '/admin/services', label: 'Manage Services', icon: Edit3 },
   { href: '/admin/reports', label: 'Upload Report', icon: UploadCloud },
   { href: '/admin/resources', label: 'Manage Resources', icon: BookCopy },
@@ -185,14 +190,25 @@ export const ADMIN_DASHBOARD_NAV_LINKS = [
   { href: '/admin/mentor-profile', label: 'Update Mentor Profile', icon: UserCog },
 ];
 
-export const AVAILABLE_SLOTS: Record<string, string[]> = {
+// This is a mock in-memory store for available slots.
+// In a real app, this would come from a database and be updated by the admin panel.
+export let AVAILABLE_SLOTS: Record<string, string[]> = {
   [getFutureDate(7)]: ["09:00 AM", "11:00 AM", "02:00 PM", "04:00 PM"],
   [getFutureDate(8)]: ["10:00 AM", "01:00 PM", "03:00 PM"],
   [getFutureDate(9)]: ["09:30 AM", "11:30 AM", "02:30 PM"],
   [getFutureDate(14)]: ["10:00 AM", "12:00 PM", "03:00 PM"],
   [getFutureDate(15)]: ["09:00 AM", "11:00 AM"],
+  [getFutureDate(20)]: ["10:00 AM", "11:00 AM", "02:00 PM", "03:00 PM", "04:00 PM"],
+  [getFutureDate(21)]: ["09:00 AM", "10:00 AM", "11:00 AM", "01:00 PM", "02:00 PM"],
   [getFutureDate(60)]: ["10:00 AM", "11:00 AM", "12:00 PM"], 
   [getFutureDate(61)]: ["02:00 PM", "03:00 PM", "04:00 PM"],
+};
+
+// Mock function to update slots - in a real app, this would be an API call.
+export const updateAvailableSlots = (newSlots: Record<string, string[]>) => {
+  AVAILABLE_SLOTS = { ...AVAILABLE_SLOTS, ...newSlots };
+  // console.log("Simulated: Available slots updated", AVAILABLE_SLOTS);
+  return true; // Simulate success
 };
 
 
@@ -222,5 +238,3 @@ export const MENTOR_PROFILE: MentorProfileData = {
   contactEmail: "arjun.singh.mentor@example.com",
   contactPhone: "+91 9988776655"
 };
-
-    

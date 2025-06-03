@@ -30,6 +30,7 @@ export interface Booking {
   userEmail: string; // Added for admin panel
   meetingLink: string;
   status: 'upcoming' | 'completed' | 'cancelled' | 'pending_approval'; // Added 'pending_approval'
+  paymentStatus: 'paid' | 'pay_later_pending' | 'pay_later_unpaid'; // Added for pay later logic
   reportUrl?: string;
 }
 
@@ -54,4 +55,14 @@ export interface MentorProfileData {
   quote: string;
   contactEmail: string; // Added
   contactPhone: string; // Added
+}
+
+// For Admin Slot Management Page
+export interface SlotCreationOptions {
+  startDate: Date;
+  endDate?: Date; // For ranges
+  startTime: string; // e.g., "09:00"
+  endTime: string; // e.g., "17:00"
+  interval: number; // in minutes, e.g., 60
+  daysOfWeek: ('Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun')[];
 }
