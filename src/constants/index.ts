@@ -49,6 +49,7 @@ export const MOCK_TESTIMONIALS: Testimonial[] = [
   {
     id: 't1',
     name: 'Rohan Sharma',
+    userEmail: 'aspirant@example.com', // Matches MOCK_USER_DATA in profile page for demo
     batch: 'NDA Aspirant',
     story: "The mock interview was incredibly realistic and the feedback helped me identify my weak areas. Cleared SSB in my first attempt!",
     imageUrl: 'https://placehold.co/100x100.png',
@@ -59,6 +60,7 @@ export const MOCK_TESTIMONIALS: Testimonial[] = [
   {
     id: 't2',
     name: 'Priya Singh',
+    userEmail: 'priya.singh@example.com',
     batch: 'CDS Aspirant',
     story: "The counselling session gave me the confidence I needed. The insights into the SSB process were invaluable.",
     imageUrl: 'https://placehold.co/100x100.png',
@@ -69,6 +71,7 @@ export const MOCK_TESTIMONIALS: Testimonial[] = [
   {
     id: 't3',
     name: 'Amit Patel',
+    userEmail: 'amit.patel@example.com',
     batch: 'AFCAT Aspirant',
     story: "Thanks to the AFCAT guidance, I was able to structure my preparation effectively and scored well. Highly recommended!",
     imageUrl: 'https://placehold.co/100x100.png',
@@ -79,6 +82,7 @@ export const MOCK_TESTIMONIALS: Testimonial[] = [
   {
     id: 't4',
     name: 'Sneha Reddy',
+    userEmail: 'sneha.reddy@example.com',
     batch: 'SSB Aspirant',
     story: "The mentor's profile was very inspiring. The guidance was top-notch.",
     imageUrl: 'https://placehold.co/100x100.png',
@@ -118,7 +122,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     date: getFutureDate(5),
     time: '03:00 PM',
     userName: "Nisha Patel",
-    userEmail: "nisha.patel@example.com",
+    userEmail: "nisha.patel@example.com", // User who might get AFCAT badge
     meetingLink: 'https://meet.google.com/mno-pqr-stu',
     status: 'pending_approval',
     paymentStatus: 'pay_later_pending',
@@ -140,9 +144,20 @@ export const MOCK_BOOKINGS: Booking[] = [
     date: getFutureDate(1), 
     time: '04:00 PM',
     userName: "Priya Desai",
-    userEmail: "priya.desai@example.com",
+    userEmail: "aspirant@example.com", // User for whom badges are stored in localStorage for profile page
     meetingLink: 'https://meet.google.com/123-456-789',
     status: 'upcoming',
+    paymentStatus: 'paid',
+  },
+  {
+    id: 'booking6',
+    serviceName: 'AFCAT Exam Guidance',
+    date: '2024-07-12', 
+    time: '11:00 AM',
+    userName: "Amit Patel", // Matches testimonial for potential badge linking
+    userEmail: "amit.patel@example.com", 
+    meetingLink: 'https://meet.google.com/amit-afcat-link',
+    status: 'completed',
     paymentStatus: 'paid',
   },
 ];
@@ -206,6 +221,8 @@ export const ADMIN_DASHBOARD_NAV_LINKS = [
   { href: '/admin/messages', label: 'User Messages', icon: MessagesSquare },
 ];
 
+// Represents the available slots that admins can manage.
+// In a real app, this would be fetched from and updated to a backend.
 export const AVAILABLE_SLOTS: Record<string, string[]> = {
   [getFutureDate(7)]: ["09:00 AM", "11:00 AM", "02:00 PM", "04:00 PM"],
   [getFutureDate(8)]: ["10:00 AM", "01:00 PM", "03:00 PM"],
@@ -251,7 +268,7 @@ export let MOCK_USER_MESSAGES: UserMessage[] = [
   {
     id: 'msg1',
     userName: 'Rohan Sharma',
-    userEmail: 'rohan.sharma@example.com',
+    userEmail: 'aspirant@example.com',
     subject: 'Question about GTO tasks',
     messageBody: 'Hello, I had a quick question regarding the GTO tasks for the SSB mock interview. Could you please elaborate on what to expect?',
     timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago

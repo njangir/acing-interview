@@ -14,6 +14,7 @@ export interface Service {
 export interface Testimonial {
   id: string;
   name: string;
+  userEmail?: string; // Added to link testimonial to a user with badges
   batch?: string;
   story: string;
   imageUrl?: string;
