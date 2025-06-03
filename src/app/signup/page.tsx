@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -7,20 +8,23 @@ import * as z from 'zod';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Logo } from '@/components/icons/logo';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/use-auth';
 
 const signupFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email address." }),
   password: z.string().min(8, { message: "Password must be at least 8 characters." }),
   confirmPassword: z.string(),
+  isNotRobot: z.boolean().refine(val => val === true, { message: "Please complete the CAPTCHA." }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
-  path: ["confirmPassword"], // path of error
+  path: ["confirmPassword"], 
 });
 
 type SignupFormValues = z.infer<typeof signupFormSchema>;
@@ -28,6 +32,7 @@ type SignupFormValues = z.infer<typeof signupFormSchema>;
 export default function SignupPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const { login } = useAuth();
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupFormSchema),
     defaultValues: {
@@ -35,25 +40,23 @@ export default function SignupPage() {
       email: '',
       password: '',
       confirmPassword: '',
+      isNotRobot: false,
     },
   });
 
   async function onSubmit(data: SignupFormValues) {
-    // Mock signup logic
     console.log('Signup attempt with:', data);
+    login(); 
     toast({
-      title: 'Signup Submitted (Mock)',
-      description: 'In a real app, this would create your account.',
+      title: 'Signup Successful (Mock)',
+      description: 'Your account has been created. Redirecting to dashboard...',
     });
-    // Simulate successful signup and redirect
-    setTimeout(() => {
-      router.push('/dashboard');
-    }, 1000);
+    router.push('/dashboard');
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md shadow-xl">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 p-4">
+      <Card className="w-full max-w-md shadow-xl animate-subtle-appear">
         <CardHeader className="space-y-1 text-center">
           <Link href="/" className="inline-block mb-4">
             <Logo />
@@ -115,6 +118,29 @@ export default function SignupPage() {
                       <Input type="password" placeholder="••••••••" {...field} />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="isNotRobot"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>
+                        CAPTCHA
+                      </FormLabel>
+                      <FormDescription>
+                        Please confirm you're not a robot.
+                      </FormDescription>
+                      <FormMessage />
+                    </div>
                   </FormItem>
                 )}
               />

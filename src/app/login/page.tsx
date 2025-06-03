@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -12,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Logo } from '@/components/icons/logo';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/use-auth'; // Import useAuth
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
@@ -23,6 +25,7 @@ type LoginFormValues = z.infer<typeof loginFormSchema>;
 export default function LoginPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const { login } = useAuth(); // Get the login function
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
@@ -32,21 +35,19 @@ export default function LoginPage() {
   });
 
   async function onSubmit(data: LoginFormValues) {
-    // Mock login logic
     console.log('Login attempt with:', data);
+    // Simulate successful login
+    login(); // Set login state
     toast({
-      title: 'Login Submitted (Mock)',
-      description: 'In a real app, this would attempt to log you in.',
+      title: 'Login Successful (Mock)',
+      description: 'Welcome back! Redirecting to dashboard...',
     });
-    // Simulate successful login and redirect
-    setTimeout(() => {
-      router.push('/dashboard');
-    }, 1000);
+    router.push('/dashboard');
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md shadow-xl">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 p-4">
+      <Card className="w-full max-w-md shadow-xl animate-subtle-appear">
         <CardHeader className="space-y-1 text-center">
           <Link href="/" className="inline-block mb-4">
             <Logo />

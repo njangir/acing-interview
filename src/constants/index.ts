@@ -1,6 +1,13 @@
 
-import type { Service, Testimonial, Booking, Resource, MentorProfileData } from '@/types';
-import { Shield, Video, FileText, Link as LinkIcon, CalendarDays, Users, UserSquare2, ListChecks, Edit3, UploadCloud, BookCopy, MessageSquare, UserCog, CalendarPlus } from 'lucide-react';
+import type { Service, Testimonial, Booking, Resource, MentorProfileData, UserMessage } from '@/types';
+import { Shield, Video, FileText, Link as LinkIcon, CalendarDays, Users, UserSquare2, ListChecks, Edit3, UploadCloud, BookCopy, MessageSquare, UserCog, CalendarPlus, MailQuestion, MessagesSquare } from 'lucide-react';
+
+const today = new Date();
+export function getFutureDate(daysToAdd: number): string {
+  const futureDate = new Date(today);
+  futureDate.setDate(today.getDate() + daysToAdd);
+  return futureDate.toISOString().split('T')[0];
+};
 
 export const MOCK_SERVICES: Service[] = [
   {
@@ -78,18 +85,11 @@ export const MOCK_TESTIMONIALS: Testimonial[] = [
   },
 ];
 
-const today = new Date();
-export function getFutureDate(daysToAdd: number): string {
-  const futureDate = new Date(today);
-  futureDate.setDate(today.getDate() + daysToAdd);
-  return futureDate.toISOString().split('T')[0];
-};
-
 export const MOCK_BOOKINGS: Booking[] = [
   {
     id: 'booking1',
     serviceName: 'SSB Mock Interview',
-    date: '2024-11-15', // Future date
+    date: getFutureDate(3), 
     time: '10:00 AM',
     userName: "Ananya Sharma",
     userEmail: "ananya.sharma@example.com",
@@ -100,7 +100,7 @@ export const MOCK_BOOKINGS: Booking[] = [
   {
     id: 'booking2',
     serviceName: 'Personal Counselling Session',
-    date: '2024-10-20', // Past date for testing
+    date: '2024-07-10', 
     time: '02:00 PM',
     userName: "Vikram Singh",
     userEmail: "vikram.singh@example.com",
@@ -128,7 +128,18 @@ export const MOCK_BOOKINGS: Booking[] = [
     userName: "Rajesh Kumar",
     userEmail: "rajesh.kumar@example.com",
     meetingLink: 'https://meet.google.com/uvw-xyz-123',
-    status: 'pending_approval',
+    status: 'upcoming', 
+    paymentStatus: 'pay_later_pending',
+  },
+   {
+    id: 'booking5',
+    serviceName: 'Personal Counselling Session',
+    date: getFutureDate(1), 
+    time: '04:00 PM',
+    userName: "Priya Desai",
+    userEmail: "priya.desai@example.com",
+    meetingLink: 'https://meet.google.com/123-456-789',
+    status: 'upcoming',
     paymentStatus: 'paid',
   },
 ];
@@ -167,7 +178,7 @@ export const MOCK_RESOURCES: Resource[] = [
     type: 'link',
     url: 'https://www.indiandefensenews.in/',
     description: 'Stay updated with the latest in defence.',
-    serviceCategory: 'general', // 'general' category for resources accessible to all logged-in users or specific conditions
+    serviceCategory: 'general', 
     icon: LinkIcon,
   }
 ];
@@ -177,6 +188,7 @@ export const DASHBOARD_NAV_LINKS = [
   { href: '/dashboard/bookings', label: 'My Bookings', icon: CalendarDays },
   { href: '/dashboard/resources', label: 'My Resources', icon: FileText },
   { href: '/dashboard/profile', label: 'Profile', icon: Users },
+  { href: '/dashboard/contact', label: 'Contact Support', icon: MailQuestion },
 ];
 
 export const ADMIN_DASHBOARD_NAV_LINKS = [
@@ -188,10 +200,9 @@ export const ADMIN_DASHBOARD_NAV_LINKS = [
   { href: '/admin/resources', label: 'Manage Resources', icon: BookCopy },
   { href: '/admin/testimonials', label: 'Approve Testimonials', icon: MessageSquare },
   { href: '/admin/mentor-profile', label: 'Update Mentor Profile', icon: UserCog },
+  { href: '/admin/messages', label: 'User Messages', icon: MessagesSquare },
 ];
 
-// This is a mock in-memory store for available slots.
-// In a real app, this would come from a database and be updated by the admin panel.
 export let AVAILABLE_SLOTS: Record<string, string[]> = {
   [getFutureDate(7)]: ["09:00 AM", "11:00 AM", "02:00 PM", "04:00 PM"],
   [getFutureDate(8)]: ["10:00 AM", "01:00 PM", "03:00 PM"],
@@ -202,13 +213,13 @@ export let AVAILABLE_SLOTS: Record<string, string[]> = {
   [getFutureDate(21)]: ["09:00 AM", "10:00 AM", "11:00 AM", "01:00 PM", "02:00 PM"],
   [getFutureDate(60)]: ["10:00 AM", "11:00 AM", "12:00 PM"], 
   [getFutureDate(61)]: ["02:00 PM", "03:00 PM", "04:00 PM"],
+  [getFutureDate(3)]: ["09:00 AM", "10:00 AM", "11:00 AM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM"],
+  [getFutureDate(1)]: ["02:00 PM", "03:00 PM", "04:00 PM"],
 };
 
-// Mock function to update slots - in a real app, this would be an API call.
 export const updateAvailableSlots = (newSlots: Record<string, string[]>) => {
   AVAILABLE_SLOTS = { ...AVAILABLE_SLOTS, ...newSlots };
-  // console.log("Simulated: Available slots updated", AVAILABLE_SLOTS);
-  return true; // Simulate success
+  return true; 
 };
 
 
@@ -237,4 +248,31 @@ export const MENTOR_PROFILE: MentorProfileData = {
   quote: "The best way to predict your future is to create it. Let's create yours in the Armed Forces.",
   contactEmail: "arjun.singh.mentor@example.com",
   contactPhone: "+91 9988776655"
+};
+
+export let MOCK_USER_MESSAGES: UserMessage[] = [
+  {
+    id: 'msg1',
+    userName: 'Rohan Sharma',
+    userEmail: 'rohan.sharma@example.com',
+    subject: 'Question about GTO tasks',
+    messageBody: 'Hello, I had a quick question regarding the GTO tasks for the SSB mock interview. Could you please elaborate on what to expect?',
+    timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+    status: 'new',
+  },
+  {
+    id: 'msg2',
+    userName: 'Priya Singh',
+    userEmail: 'priya.singh@example.com',
+    subject: 'Reschedule Counselling Session',
+    messageBody: 'Is it possible to reschedule my counselling session from next Tuesday to Wednesday? Please let me know.',
+    timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+    status: 'read',
+  },
+];
+
+// Mock user profile for contact page display (in a real app, this comes from auth)
+export const MOCK_USER_PROFILE_FOR_CONTACT = {
+  name: "Test User",
+  email: "testuser@example.com",
 };

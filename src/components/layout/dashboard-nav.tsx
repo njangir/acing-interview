@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -21,7 +22,7 @@ export function DashboardNav() {
               className={cn(
                 "w-full justify-start",
                 isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground",
-                !isActive && "hover:bg-accent/50"
+                !isActive && "hover:bg-accent/10 hover:text-accent-foreground" // Updated hover for non-active
               )}
             >
               <Icon className="mr-2 h-4 w-4" />

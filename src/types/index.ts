@@ -18,20 +18,21 @@ export interface Testimonial {
   imageUrl?: string;
   dataAiHint?: string;
   serviceTaken: string;
-  status: 'pending' | 'approved' | 'rejected'; // New field
+  status: 'pending' | 'approved' | 'rejected'; 
 }
 
 export interface Booking {
   id:string;
   serviceName: string;
-  date: string;
-  time: string;
-  userName: string; // Added for admin panel
-  userEmail: string; // Added for admin panel
+  date: string; // YYYY-MM-DD
+  time: string; // e.g., 10:00 AM
+  userName: string; 
+  userEmail: string; 
   meetingLink: string;
-  status: 'upcoming' | 'completed' | 'cancelled' | 'pending_approval'; // Added 'pending_approval'
-  paymentStatus: 'paid' | 'pay_later_pending' | 'pay_later_unpaid'; // Added for pay later logic
+  status: 'upcoming' | 'completed' | 'cancelled' | 'pending_approval'; 
+  paymentStatus: 'paid' | 'pay_later_pending' | 'pay_later_unpaid'; 
   reportUrl?: string;
+  userFeedback?: string;
 }
 
 export interface Resource {
@@ -40,7 +41,7 @@ export interface Resource {
   type: 'video' | 'document' | 'link';
   url: string;
   description?: string;
-  serviceCategory: string; // To link resource to a service
+  serviceCategory: string; 
   icon?: React.ElementType;
 }
 
@@ -53,16 +54,25 @@ export interface MentorProfileData {
   experience: string[];
   philosophy: string;
   quote: string;
-  contactEmail: string; // Added
-  contactPhone: string; // Added
+  contactEmail: string; 
+  contactPhone: string; 
 }
 
-// For Admin Slot Management Page
 export interface SlotCreationOptions {
   startDate: Date;
-  endDate?: Date; // For ranges
-  startTime: string; // e.g., "09:00"
-  endTime: string; // e.g., "17:00"
-  interval: number; // in minutes, e.g., 60
+  endDate?: Date; 
+  startTime: string; 
+  endTime: string; 
+  interval: number; 
   daysOfWeek: ('Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun')[];
+}
+
+export interface UserMessage {
+  id: string;
+  userName: string;
+  userEmail: string;
+  subject: string;
+  messageBody: string;
+  timestamp: Date;
+  status: 'new' | 'read' | 'replied';
 }
