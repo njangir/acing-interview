@@ -3,46 +3,61 @@
 @tailwind utilities;
 
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  /* Default body font will be set by tailwind.config.ts font-body */
 }
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
+    --background: 210 17% 90%; /* Light blue-gray #E0E5EA */
+    --foreground: 0 0% 3.9%; /* Dark text #0A0A0A */
+
+    --card: 0 0% 100%; /* White */
+    --card-foreground: 0 0% 3.9%; /* Dark text */
+
+    --popover: 0 0% 100%; /* White */
+    --popover-foreground: 0 0% 3.9%; /* Dark text */
+
+    --primary: 212 47% 35%; /* Navy blue #2E5984 */
+    --primary-foreground: 0 0% 98%; /* Light text #FAFAFA */
+
+    --secondary: 210 17% 85%; /* Slightly darker than background for secondary elements */
+    --secondary-foreground: 0 0% 9%; /* Dark text for secondary */
+
+    --muted: 210 17% 80%; /* Muted elements, slightly darker than secondary */
+    --muted-foreground: 0 0% 45.1%; /* Muted text */
+
+    --accent: 45 66% 52%; /* Gold #D4AF37 */
+    --accent-foreground: 45 100% 10%; /* Dark text for accent #332700 */
+
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
+
+    --border: 210 17% 80%; /* Border color */
+    --input: 210 17% 88%; /* Input background slightly different from main bg */
+    --ring: 212 47% 35%; /* Navy blue for focus rings */
+
+    --radius: 0.5rem;
+
+    /* Chart colors can be adjusted if needed, keeping defaults for now */
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Sidebar specific theme variables */
+    --sidebar-background: 212 47% 25%; /* Darker Navy */
+    --sidebar-foreground: 210 20% 95%; /* Light text */
+    --sidebar-primary: 45 66% 52%; /* Gold for active/primary items */
+    --sidebar-primary-foreground: 45 100% 10%; /* Dark text on gold */
+    --sidebar-accent: 212 47% 30%; /* Slightly lighter Navy for hover */
+    --sidebar-accent-foreground: 210 20% 98%; /* Light text for hover */
+    --sidebar-border: 212 47% 20%; /* Even darker navy for borders */
+    --sidebar-ring: 45 66% 52%; /* Gold for focus ring */
   }
+
   .dark {
+    /* Define dark theme variables if needed in the future, for now, focus on light theme based on proposal */
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
     --card: 0 0% 3.9%;
@@ -67,6 +82,7 @@ body {
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
