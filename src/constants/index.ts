@@ -1,6 +1,6 @@
 
 import type { Service, Testimonial, Booking, Resource, MentorProfileData } from '@/types';
-import { Shield, Video, FileText, Link as LinkIcon, CalendarDays, Users, UserSquare2, ListChecks, Edit3, UploadCloud, BookCopy, MessageSquareCheck, UserCog } from 'lucide-react';
+import { Shield, Video, FileText, Link as LinkIcon, CalendarDays, Users, UserSquare2, ListChecks, Edit3, UploadCloud, BookCopy, MessageSquare, UserCog } from 'lucide-react';
 
 export const MOCK_SERVICES: Service[] = [
   {
@@ -77,6 +77,13 @@ export const MOCK_TESTIMONIALS: Testimonial[] = [
     status: 'pending',
   },
 ];
+
+const today = new Date();
+export function getFutureDate(daysToAdd: number): string {
+  const futureDate = new Date(today);
+  futureDate.setDate(today.getDate() + daysToAdd);
+  return futureDate.toISOString().split('T')[0];
+};
 
 export const MOCK_BOOKINGS: Booking[] = [
   {
@@ -174,16 +181,9 @@ export const ADMIN_DASHBOARD_NAV_LINKS = [
   { href: '/admin/services', label: 'Manage Services', icon: Edit3 },
   { href: '/admin/reports', label: 'Upload Report', icon: UploadCloud },
   { href: '/admin/resources', label: 'Manage Resources', icon: BookCopy },
-  { href: '/admin/testimonials', label: 'Approve Testimonials', icon: MessageSquareCheck },
+  { href: '/admin/testimonials', label: 'Approve Testimonials', icon: MessageSquare },
   { href: '/admin/mentor-profile', label: 'Update Mentor Profile', icon: UserCog },
 ];
-
-const today = new Date();
-export function getFutureDate(daysToAdd: number): string {
-  const futureDate = new Date(today);
-  futureDate.setDate(today.getDate() + daysToAdd);
-  return futureDate.toISOString().split('T')[0];
-};
 
 export const AVAILABLE_SLOTS: Record<string, string[]> = {
   [getFutureDate(7)]: ["09:00 AM", "11:00 AM", "02:00 PM", "04:00 PM"],
@@ -222,3 +222,5 @@ export const MENTOR_PROFILE: MentorProfileData = {
   contactEmail: "arjun.singh.mentor@example.com",
   contactPhone: "+91 9988776655"
 };
+
+    
