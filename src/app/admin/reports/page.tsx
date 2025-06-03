@@ -152,7 +152,7 @@ export default function AdminReportsPage() {
                     <SelectValue placeholder="Choose a badge to assign..." />
                     </SelectTrigger>
                     <SelectContent>
-                    <SelectItem value="">No Badge</SelectItem>
+                    <SelectItem value="no-badge-placeholder">No Badge</SelectItem>
                     {availableBadges.map(badge => (
                         <SelectItem key={badge.id} value={badge.id}>
                          {badge.force !== "General" && <span className='text-xs text-muted-foreground mr-1'>[{badge.force}]</span>} {badge.name} - {badge.rankName}
@@ -165,7 +165,7 @@ export default function AdminReportsPage() {
 
           </CardContent>
           <CardFooter>
-            <Button type="submit" className="w-full" disabled={!selectedBookingId || !reportFile}>
+            <Button type="submit" className="w-full" disabled={!selectedBookingId || !reportFile || (selectedBadgeId === "no-badge-placeholder" && !MOCK_BADGES.find(b => b.id === selectedBadgeId))}>
               <UploadCloud className="mr-2 h-4 w-4" /> Upload Report & Assign Badge
             </Button>
           </CardFooter>
@@ -174,3 +174,4 @@ export default function AdminReportsPage() {
     </>
   );
 }
+
