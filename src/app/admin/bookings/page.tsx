@@ -77,7 +77,7 @@ export default function AdminBookingsPage() {
                     <div className="text-sm text-muted-foreground">{booking.userEmail}</div>
                   </TableCell>
                   <TableCell>{booking.serviceName}</TableCell>
-                  <TableCell>{new Date(booking.date).toLocaleDateString()} - {booking.time}</TableCell>
+                  <TableCell>{new Date(booking.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })} - {booking.time}</TableCell>
                   <TableCell>
                     <span className={`px-2 py-1 text-xs rounded-full ${
                       booking.status === 'pending_approval' ? 'bg-yellow-100 text-yellow-700' :

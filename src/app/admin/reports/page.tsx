@@ -85,7 +85,7 @@ export default function AdminReportsPage() {
                 <SelectContent>
                   {completedBookings.length > 0 ? completedBookings.map(booking => (
                     <SelectItem key={booking.id} value={booking.id}>
-                      {booking.userName} - {booking.serviceName} ({new Date(booking.date).toLocaleDateString()})
+                      {booking.userName} - {booking.serviceName} ({new Date(booking.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })})
                     </SelectItem>
                   )) : (
                     <SelectItem value="no-bookings" disabled>No completed bookings available</SelectItem>

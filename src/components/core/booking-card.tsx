@@ -11,10 +11,10 @@ interface BookingCardProps {
 }
 
 export function BookingCard({ booking }: BookingCardProps) {
-  const formattedDate = new Date(booking.date).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
+  const formattedDate = new Date(booking.date).toLocaleDateString('en-GB', {
     day: 'numeric',
+    month: 'long',
+    year: 'numeric',
   });
 
   const isPaid = booking.paymentStatus === 'paid';
