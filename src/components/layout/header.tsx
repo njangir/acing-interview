@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu } from 'lucide-react';
+import { Menu, LogIn, UserPlus, ShieldCheck } from 'lucide-react';
 import { Logo } from '@/components/icons/logo';
 
 const navLinks = [
@@ -32,15 +32,26 @@ export function Header() {
             </Link>
           ))}
         </nav>
-        <div className="flex flex-1 items-center justify-end space-x-4">
-          <Button asChild variant="ghost">
-            <Link href="/login">Login</Link>
+        <div className="flex flex-1 items-center justify-end space-x-2">
+          <Button asChild variant="outline" size="sm" className="hidden sm:flex border-primary text-primary hover:bg-primary/10">
+            <Link href="/admin">
+              <ShieldCheck className="mr-2 h-4 w-4" /> Admin Panel
+            </Link>
           </Button>
-          <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
-            <Link href="/signup">Sign Up</Link>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/login">
+              <LogIn className="mr-0 sm:mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Login</span>
+            </Link>
+          </Button>
+          <Button asChild size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Link href="/signup">
+               <UserPlus className="mr-0 sm:mr-2 h-4 w-4" />
+               <span className="hidden sm:inline">Sign Up</span>
+            </Link>
           </Button>
         </div>
-        <div className="md:hidden ml-4">
+        <div className="md:hidden ml-2">
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -62,6 +73,12 @@ export function Header() {
                     {link.label}
                   </Link>
                 ))}
+                 <Link
+                    href="/admin"
+                    className="text-muted-foreground hover:text-foreground flex items-center"
+                  >
+                    <ShieldCheck className="mr-2 h-5 w-5" /> Admin Panel
+                  </Link>
               </nav>
             </SheetContent>
           </Sheet>
