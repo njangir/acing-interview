@@ -38,7 +38,7 @@ export default function ProfilePage() {
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
-    defaultValues: { // Initialize with defined values
+    defaultValues: { 
       name: '',
       email: '',
       phone: '',
@@ -64,16 +64,15 @@ export default function ProfilePage() {
         localStorage.setItem(mockUserProfileKey, JSON.stringify(loadedProfile));
       }
       setUserProfile(loadedProfile);
-      // Ensure form is reset with potentially empty but defined phone value.
       form.reset({
         name: loadedProfile.name,
         email: loadedProfile.email,
-        phone: loadedProfile.phone || '', // Ensure phone is always a string
+        phone: loadedProfile.phone || '', 
         imageUrl: loadedProfile.imageUrl || PREDEFINED_AVATARS[0].url,
       });
       setSelectedAvatarForForm(loadedProfile.imageUrl || PREDEFINED_AVATARS[0].url);
     }
-  }, [currentUser, form]); // Added form to dependencies of useEffect for reset
+  }, [currentUser, form]); 
 
   function onSubmit(data: ProfileFormValues) {
     if (!userProfile || !currentUser) return;
@@ -260,21 +259,4 @@ export default function ProfilePage() {
     </>
   );
 }
-
-// Dummy Anchor icon if not available in lucide-react, or use a generic one
-// Renamed the local const to avoid conflict with potential lucide-react exports if any
-const Anchor = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="M12 22V8"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/><circle cx="12" cy="5" r="3"/>
-  </svg>
-);
-// If lucide-react truly doesn't have Anchor, this is fine. Otherwise, use the imported one.
-// For the profile page, I used AnchorIconLucide for clarity.
-// Let's assume the local dummy Anchor is not needed if AnchorIconLucide (from lucide-react) is available and used.
-// If AnchorIconLucide is not a real icon, the dummy component would be used.
-// The profile page uses the Anchor from lucide-react directly, which is better.
-// I've renamed the local const Anchor to AnchorIconLocal on the off-chance it was used by the Badge card.
-// Re-checking the badge card in profile: it uses AnchorIconLucide (which is fine if it's a real Lucide icon).
-// If AnchorIconLucide isn't real, it would error. The error we're fixing is about controlled inputs.
-// Let's ensure the schema for phone also allows an empty string. `z.string().min(10, ...).or(z.literal(''))`
 

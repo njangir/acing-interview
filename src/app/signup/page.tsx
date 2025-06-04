@@ -171,7 +171,7 @@ export default function SignupPage() {
             <CardContent className="space-y-4">
               <div className="mb-6">
                 <FormLabel>Choose Your Avatar</FormLabel>
-                <div className="mt-2 grid grid-cols-3 sm:grid-cols-6 gap-3">
+                <div className="mt-2 grid grid-cols-4 gap-2">
                   {PREDEFINED_AVATARS.map(avatar => (
                     <button
                       key={avatar.id}
@@ -183,7 +183,7 @@ export default function SignupPage() {
                           }
                       }}
                       className={cn(
-                        "rounded-full overflow-hidden border-2 transition-all",
+                        "rounded-full overflow-hidden border-2 transition-all w-16 h-16",
                         selectedAvatar === avatar.url ? "border-primary ring-2 ring-primary" : "border-transparent hover:border-primary/50",
                         disableDetails && "cursor-not-allowed opacity-70"
                       )}
@@ -193,8 +193,8 @@ export default function SignupPage() {
                       <Image 
                         src={avatar.url} 
                         alt={`Avatar ${avatar.id}`} 
-                        width={60} 
-                        height={60}
+                        width={64} 
+                        height={64}
                         className="aspect-square object-cover"
                         data-ai-hint={avatar.hint} 
                       />
