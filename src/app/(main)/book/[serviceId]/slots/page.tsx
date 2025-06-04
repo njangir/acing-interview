@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -9,27 +10,40 @@ import { Calendar } from "@/components/ui/calendar";
 import { MOCK_SERVICES, AVAILABLE_SLOTS } from "@/constants";
 import type { Service } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
 
 export default function SlotSelectionPage() {
   const params = useParams();
   const router = useRouter();
   const serviceId = params.serviceId as string;
+  const { currentUser } = useAuth();
   
   const [service, setService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (currentUser === undefined) { // Auth state still loading
+      setIsLoading(true);
+      return;
+    }
+    if (currentUser === null) {
+      router.push(`/login?redirect=/book/${serviceId}/slots`);
+      return;
+    }
+    setIsLoading(false);
+
     const currentService = MOCK_SERVICES.find(s => s.id === serviceId);
     if (currentService) {
       setService(currentService);
     } else {
       setError("Service not found.");
     }
-  }, [serviceId]);
+  }, [serviceId, currentUser, router]);
 
   useEffect(() => {
     if (selectedDate) {
@@ -44,10 +58,38 @@ export default function SlotSelectionPage() {
       setError("Please select a date and time slot.");
       return;
     }
-    // Store selected slot (e.g., in localStorage or state management) for next step
-    localStorage.setItem('bookingDetails', JSON.stringify({ serviceId, date: selectedDate.toISOString().split('T')[0], time: selectedTime }));
-    router.push(`/book/${serviceId}/details`);
+    if (!currentUser) {
+        // This should ideally be caught by the useEffect redirect, but as a safeguard
+        router.push(`/login?redirect=/book/${serviceId}/slots`);
+        return;
+    }
+
+    localStorage.setItem('bookingDetails', JSON.stringify({ 
+        serviceId, 
+        date: selectedDate.toISOString().split('T')[0], 
+        time: selectedTime 
+    }));
+    
+    // Pre-fill userDetails from currentUser for logged-in users
+    const userDetailsToStore = {
+      name: currentUser.name,
+      email: currentUser.email,
+      phone: currentUser.phone || "", // Assuming phone might not always be present in AuthUser
+      // examApplied and previousAttempts are skipped as per the new flow
+    };
+    localStorage.setItem('userDetails', JSON.stringify(userDetailsToStore));
+    
+    router.push(`/book/${serviceId}/payment`);
   };
+
+  if (isLoading) {
+    return (
+      <div className="container py-12 flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Loading slot information...</p>
+      </div>
+    );
+  }
 
   if (error && !service) {
     return (
@@ -72,7 +114,7 @@ export default function SlotSelectionPage() {
         description="Select an available date and time slot for your session."
       />
       <div className="container py-12">
-        {error && (
+        {error && !selectedDate && !selectedTime && ( // Show general error if no selection yet
           <Alert variant="destructive" className="mb-6">
             <XCircle className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
@@ -112,6 +154,12 @@ export default function SlotSelectionPage() {
               ) : (
                 <p className="text-muted-foreground">{selectedDate ? "No slots available for this date." : "Please select a date to see available times."}</p>
               )}
+               {error && (selectedDate || selectedTime) && ( // Show error related to selection
+                <Alert variant="destructive" className="mt-4">
+                  <XCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -119,10 +167,11 @@ export default function SlotSelectionPage() {
           <Button 
             size="lg" 
             onClick={handleProceed} 
-            disabled={!selectedDate || !selectedTime}
+            disabled={!selectedDate || !selectedTime || isLoading}
             className="bg-accent hover:bg-accent/90 text-accent-foreground"
           >
-            Proceed to Details
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+            Proceed to Payment
           </Button>
         </div>
       </div>

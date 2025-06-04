@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { MOCK_SERVICES, MOCK_BOOKINGS } from "@/constants"; // MOCK_BOOKINGS for updating
+import { MOCK_SERVICES, MOCK_BOOKINGS } from "@/constants"; 
 import type { Service, Booking } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, XCircle, CreditCard, Info, CheckCircle } from 'lucide-react';
@@ -20,9 +20,9 @@ type PaymentOption = 'payNow' | 'payLater';
 export default function PaymentPage() {
   const params = useParams();
   const router = useRouter();
-  const searchParamsHook = useSearchParams(); // Renamed to avoid conflict
+  const searchParamsHook = useSearchParams(); 
   const serviceId = params.serviceId as string;
-  const bookingIdFromQuery = searchParamsHook.get('bookingId'); // Get bookingId if paying for existing
+  const bookingIdFromQuery = searchParamsHook.get('bookingId'); 
   const { toast } = useToast();
   
   const [service, setService] = useState<Service | null>(null);
@@ -41,7 +41,6 @@ export default function PaymentPage() {
     }
 
     if (bookingIdFromQuery) {
-      // If bookingId is present, we are likely completing payment for a 'pay_later_pending' booking
       const existingBooking = MOCK_BOOKINGS.find(b => b.id === bookingIdFromQuery && b.serviceId === serviceId);
       if (existingBooking) {
         setBookingDetails({
@@ -49,16 +48,15 @@ export default function PaymentPage() {
             time: existingBooking.time,
             serviceId: existingBooking.serviceId,
         });
-        setUserDetails({ // Assuming user details were already captured or are part of booking
+        setUserDetails({ 
             name: existingBooking.userName,
             email: existingBooking.userEmail,
-            // phone, examApplied, previousAttempts might not be in existingBooking if not stored
+            phone: existingBooking.userEmail, // Assuming phone might be same or needs to be fetched differently
         });
       } else {
         setError("Existing booking information not found. Please try again or start a new booking.");
       }
     } else {
-        // New booking flow
         const storedBookingDetails = localStorage.getItem('bookingDetails');
         if (storedBookingDetails) {
           setBookingDetails(JSON.parse(storedBookingDetails));
@@ -105,12 +103,11 @@ export default function PaymentPage() {
           transactionId: "mock_txn_" + Date.now(),
           paymentStatus: 'paid',
         }));
-        // If this was a pay_later booking being paid now, update its status in MOCK_BOOKINGS
         if (bookingIdFromQuery) {
             const bookingIndex = MOCK_BOOKINGS.findIndex(b => b.id === bookingIdFromQuery);
             if (bookingIndex !== -1) {
                 MOCK_BOOKINGS[bookingIndex].paymentStatus = 'paid';
-                MOCK_BOOKINGS[bookingIndex].transactionId = confirmationPayload.meetingLink.split('/').pop(); // Mock
+                MOCK_BOOKINGS[bookingIndex].transactionId = confirmationPayload.meetingLink.split('/').pop(); 
             }
         }
         toast({
@@ -127,7 +124,7 @@ export default function PaymentPage() {
           variant: "destructive",
         });
       }
-    } else { // Pay Later (only for new bookings, not if bookingIdFromQuery exists)
+    } else { 
       if (bookingIdFromQuery) {
           setError("Pay Later option is not available for existing bookings.");
           setIsLoading(false);
@@ -139,8 +136,6 @@ export default function PaymentPage() {
         transactionId: null,
         paymentStatus: 'pay_later_pending',
       }));
-      // Here you would typically add this new booking to MOCK_BOOKINGS if it's a new "Pay Later" booking
-      // For simplicity in this prototype, we'll assume it's handled by the admin/confirmation flow
       toast({
         title: "Booking Tentatively Confirmed!",
         description: "Your slot is reserved. Payment will be due before the session. Redirecting...",
@@ -181,7 +176,9 @@ export default function PaymentPage() {
               Service: {service.name} <br />
               Date: {new Date(bookingDetails.date).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} <br/>
               Time: {bookingDetails.time} <br />
-              Name: {userDetails.name}
+              Name: {userDetails.name} <br />
+              Email: {userDetails.email}
+              {/* examApplied and previousAttempts are removed as they are no longer collected in the new flow */}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -194,7 +191,6 @@ export default function PaymentPage() {
                 defaultValue="payNow" 
                 onValueChange={(value: PaymentOption) => setPaymentOption(value)} 
                 className="space-y-2"
-                // Disable Pay Later if bookingIdFromQuery exists
                 value={bookingIdFromQuery ? 'payNow' : paymentOption}
             >
               <Label className="font-semibold text-md">Payment Options:</Label>
@@ -202,7 +198,7 @@ export default function PaymentPage() {
                 <RadioGroupItem value="payNow" id="payNow" />
                 <Label htmlFor="payNow" className="flex-1 cursor-pointer">Pay Now & Confirm Slot</Label>
               </div>
-              {!bookingIdFromQuery && ( // Only show Pay Later for new bookings
+              {!bookingIdFromQuery && ( 
                 <div className="flex items-center space-x-2 p-3 border rounded-md hover:border-primary transition-colors">
                     <RadioGroupItem value="payLater" id="payLater" />
                     <Label htmlFor="payLater" className="flex-1 cursor-pointer">Pay Later (Tentative Slot)</Label>

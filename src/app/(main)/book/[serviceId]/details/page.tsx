@@ -1,277 +1,385 @@
+import type { Service, Testimonial, Booking, Resource, MentorProfileData, UserMessage, Badge, UserProfile } from '@/types';
+import { Shield, Video, FileText, Link as LinkIcon, CalendarDays, Users, UserSquare2, ListChecks, Edit3, UploadCloud, BookCopy, MessageSquare, UserCog, CalendarPlus, MailQuestion, MessagesSquare, Award, Edit2Icon, DownloadCloud } from 'lucide-react';
 
-'use client';
+const today = new Date();
+export function getFutureDate(daysToAdd: number): string {
+  const futureDate = new Date(today);
+  futureDate.setDate(today.getDate() + daysToAdd);
+  return futureDate.toISOString().split('T')[0];
+};
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
+export const MOCK_SERVICES: Service[] = [
+  {
+    id: 'ssb-mock-interview',
+    name: 'SSB Mock Interview',
+    description: 'Comprehensive mock interview simulating the actual SSB experience with personalized feedback.',
+    price: 2999,
+    duration: '90 mins',
+    features: ['One-on-One Interview', 'Psychological Test Analysis (TAT, WAT, SRT)', 'GTO Task Briefing', 'Personalized Feedback Report', 'Doubt Clearing Session'],
+    image: 'https://placehold.co/600x400.png',
+    dataAiHint: 'interview meeting',
+    defaultForce: 'General',
+  },
+  {
+    id: 'personal-counselling-session',
+    name: 'Personal Counselling Session',
+    description: 'Guidance and mentorship to help you prepare mentally and strategically for the SSB.',
+    price: 1499,
+    duration: '60 mins',
+    features: ['Career Path Guidance', 'Strengths & Weaknesses Analysis', 'Confidence Building Techniques', 'SSB Procedure Walkthrough'],
+    image: 'https://placehold.co/600x400.png',
+    dataAiHint: 'counseling support',
+    defaultForce: 'General',
+  },
+  {
+    id: 'afcat-exam-guidance',
+    name: 'AFCAT Exam Guidance',
+    description: 'Expert guidance and study strategies to crack the AFCAT exam.',
+    price: 999,
+    duration: '45 mins',
+    features: ['Syllabus Overview', 'Study Material Recommendation', 'Time Management Tips', 'Mock Test Strategy'],
+    image: 'https://placehold.co/600x400.png',
+    dataAiHint: 'exam preparation',
+    defaultForce: 'Air Force',
+  },
+];
 
-import { PageHeader } from '@/components/core/page-header';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { MOCK_SERVICES, USER_FORM_FIELDS } from '@/constants';
-import type { Service } from '@/types';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { XCircle, MailCheck, PhoneCall } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+export const MOCK_TESTIMONIALS: Testimonial[] = [
+  {
+    id: 't1',
+    name: 'Rohan Sharma',
+    userEmail: 'aspirant@example.com', 
+    batch: 'NDA Aspirant',
+    story: "The mock interview was incredibly realistic and the feedback helped me identify my weak areas. Cleared SSB in my first attempt!",
+    imageUrl: 'https://placehold.co/100x100.png',
+    dataAiHint: 'happy student',
+    serviceTaken: 'SSB Mock Interview',
+    serviceId: 'ssb-mock-interview',
+    submissionStatus: 'selected_cleared',
+    status: 'approved',
+  },
+  {
+    id: 't2',
+    name: 'Priya Singh',
+    userEmail: 'priya.singh@example.com',
+    batch: 'CDS Aspirant',
+    story: "The counselling session gave me the confidence I needed. The insights into the SSB process were invaluable.",
+    imageUrl: 'https://placehold.co/100x100.png',
+    dataAiHint: 'smiling person',
+    serviceTaken: 'Personal Counselling Session',
+    serviceId: 'personal-counselling-session',
+    submissionStatus: 'aspirant',
+    status: 'approved',
+  },
+  {
+    id: 't3',
+    name: 'Amit Patel',
+    userEmail: 'amit.patel@example.com',
+    batch: 'AFCAT Aspirant',
+    story: "Thanks to the AFCAT guidance, I was able to structure my preparation effectively and scored well. Highly recommended!",
+    imageUrl: 'https://placehold.co/100x100.png',
+    dataAiHint: 'focused individual',
+    serviceTaken: 'AFCAT Exam Guidance',
+    serviceId: 'afcat-exam-guidance',
+    submissionStatus: 'selected_cleared',
+    status: 'approved',
+  },
+  {
+    id: 't4',
+    name: 'Sneha Reddy',
+    userEmail: 'sneha.reddy@example.com',
+    batch: 'SSB Aspirant',
+    story: "The mentor's profile was very inspiring. The guidance was top-notch.",
+    imageUrl: 'https://placehold.co/100x100.png',
+    dataAiHint: 'confident woman',
+    serviceTaken: 'SSB Mock Interview',
+    serviceId: 'ssb-mock-interview',
+    submissionStatus: 'aspirant',
+    status: 'pending',
+  },
+];
 
-const MOCK_OTP = "123456"; // For simulation
+export const MOCK_BOOKINGS: Booking[] = [
+  {
+    id: 'booking1',
+    serviceName: 'SSB Mock Interview',
+    serviceId: 'ssb-mock-interview',
+    date: getFutureDate(3), 
+    time: '10:00 AM',
+    userName: "Ananya Sharma",
+    userEmail: "ananya.sharma@example.com",
+    meetingLink: 'https://meet.google.com/xyz-abc-pqr',
+    status: 'upcoming',
+    paymentStatus: 'paid',
+    transactionId: 'txn_ananya_ssb_mock_01',
+    requestedRefund: false,
+  },
+  {
+    id: 'booking2',
+    serviceName: 'Personal Counselling Session',
+    serviceId: 'personal-counselling-session',
+    date: '2024-07-10', 
+    time: '02:00 PM',
+    userName: "Vikram Singh",
+    userEmail: "vikram.singh@example.com",
+    meetingLink: 'https://meet.google.com/def-ghi-jkl',
+    status: 'completed',
+    paymentStatus: 'paid',
+    transactionId: 'txn_vikram_counsel_01',
+    reportUrl: '/resources/mock_feedback_report.pdf',
+    detailedFeedback: [
+        { skill: 'Communication Skills', rating: 'Excellent', comments: 'Very articulate and clear.' },
+        { skill: 'Officer-Like Qualities (OLQs)', rating: 'Good', comments: 'Shows potential, needs to be more assertive.' },
+        { skill: 'General Awareness', rating: 'Satisfactory', comments: 'Good grasp of current affairs but can improve on specifics.' },
+    ],
+  },
+  {
+    id: 'booking3',
+    serviceName: 'AFCAT Exam Guidance',
+    serviceId: 'afcat-exam-guidance',
+    date: getFutureDate(5),
+    time: '03:00 PM',
+    userName: "Nisha Patel",
+    userEmail: "nisha.patel@example.com", 
+    meetingLink: 'https://meet.google.com/mno-pqr-stu',
+    status: 'pending_approval',
+    paymentStatus: 'pay_later_pending',
+    transactionId: null,
+  },
+   {
+    id: 'booking4',
+    serviceName: 'SSB Mock Interview',
+    serviceId: 'ssb-mock-interview',
+    date: getFutureDate(10),
+    time: '11:00 AM',
+    userName: "Rajesh Kumar",
+    userEmail: "rajesh.kumar@example.com",
+    meetingLink: 'https://meet.google.com/uvw-xyz-123',
+    status: 'upcoming', 
+    paymentStatus: 'pay_later_pending',
+    transactionId: null,
+    requestedRefund: true,
+    refundReason: "Unexpected travel conflict. Unable to attend the session.",
+  },
+   {
+    id: 'booking5',
+    serviceName: 'Personal Counselling Session',
+    serviceId: 'personal-counselling-session',
+    date: getFutureDate(1), 
+    time: '04:00 PM',
+    userName: "Priya Desai",
+    userEmail: "aspirant@example.com",
+    meetingLink: 'https://meet.google.com/123-456-789',
+    status: 'upcoming',
+    paymentStatus: 'paid',
+    transactionId: 'txn_priya_counsel_02',
+  },
+  {
+    id: 'booking6',
+    serviceName: 'AFCAT Exam Guidance',
+    serviceId: 'afcat-exam-guidance',
+    date: '2024-07-12', 
+    time: '11:00 AM',
+    userName: "Amit Patel", 
+    userEmail: "amit.patel@example.com", 
+    meetingLink: 'https://meet.google.com/amit-afcat-link',
+    status: 'completed',
+    paymentStatus: 'paid',
+    transactionId: 'txn_amit_afcat_01',
+    detailedFeedback: [
+      { skill: 'AFCAT Exam Knowledge', rating: 'Good', comments: 'Understands the syllabus well.' },
+      { skill: 'Time Management Strategy', rating: 'Satisfactory', comments: 'Needs to practice more timed tests.' },
+    ],
+  },
+];
 
-const formSchemaBase = z.object({
-  name: z.string().min(2, { message: "Name must be at least 2 characters." }),
-  email: z.string().email({ message: "Invalid email address." }),
-  phone: z.string().min(10, { message: "Phone number must be at least 10 digits." }),
-  examApplied: z.string().min(2, { message: "Please specify exams applied for." }),
-  previousAttempts: z.preprocess(
-    (val) => (val === "" ? undefined : Number(val)),
-    z.number().int().min(0).optional()
-  ),
-});
-
-const formSchemaWithOtp = formSchemaBase.extend({
-  emailOtp: z.string().min(6, { message: "Email OTP must be 6 digits." }),
-  phoneOtp: z.string().min(6, { message: "Phone OTP must be 6 digits." }),
-});
-
-type FormValues = z.infer<typeof formSchemaWithOtp>;
-
-
-export default function UserDetailsPage() {
-  const params = useParams();
-  const router = useRouter();
-  const serviceId = params.serviceId as string;
-  const { toast } = useToast();
-  
-  const [service, setService] = useState<Service | null>(null);
-  const [bookingInfo, setBookingInfo] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const [emailOtpSent, setEmailOtpSent] = useState(false);
-  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
-  const [emailVerified, setEmailVerified] = useState(false);
-  const [phoneVerified, setPhoneVerified] = useState(false);
-  const [verificationStep, setVerificationStep] = useState<'details' | 'emailOtp' | 'phoneOtp' | 'verified'>('details');
-
-
-  const form = useForm<FormValues>({
-    resolver: zodResolver(verificationStep === 'details' ? formSchemaBase : formSchemaWithOtp),
-    defaultValues: {
-      name: "",
-      email: "",
-      phone: "",
-      examApplied: "",
-      previousAttempts: 0,
-      emailOtp: "",
-      phoneOtp: "",
-    },
-  });
-
-  useEffect(() => {
-    const currentService = MOCK_SERVICES.find(s => s.id === serviceId);
-    if (currentService) {
-      setService(currentService);
-    } else {
-      setError("Service not found.");
-    }
-
-    const storedDetails = localStorage.getItem('bookingDetails');
-    if (storedDetails) {
-      setBookingInfo(JSON.parse(storedDetails));
-    } else {
-      setError("Booking slot information not found. Please select a slot first.");
-    }
-  }, [serviceId]);
-
-  const handleSendOtp = (type: 'email' | 'phone') => {
-    const emailValue = form.getValues('email');
-    const phoneValue = form.getValues('phone');
-
-    if (type === 'email') {
-       if (!emailValue || !/^\S+@\S+\.\S+$/.test(emailValue)) {
-        form.setError('email', { type: 'manual', message: 'Please enter a valid email to send OTP.' });
-        return;
-      }
-      setEmailOtpSent(true);
-      setVerificationStep('emailOtp');
-      toast({ title: 'OTP Sent', description: `OTP has been sent to ${emailValue} (Simulated: ${MOCK_OTP})` });
-    } else if (type === 'phone') {
-      if (!phoneValue || phoneValue.length < 10) {
-         form.setError('phone', { type: 'manual', message: 'Please enter a valid 10-digit phone number to send OTP.' });
-        return;
-      }
-      setPhoneOtpSent(true);
-      setVerificationStep('phoneOtp');
-      toast({ title: 'OTP Sent', description: `OTP has been sent to ${phoneValue} (Simulated: ${MOCK_OTP})` });
-    }
-  };
-
-  const handleVerifyOtp = (type: 'email' | 'phone') => {
-    if (type === 'email') {
-      const enteredOtp = form.getValues('emailOtp');
-      if (enteredOtp === MOCK_OTP) {
-        setEmailVerified(true);
-        toast({ title: 'Email Verified', description: 'Your email has been successfully verified.' });
-        if (phoneVerified) setVerificationStep('verified');
-        else setVerificationStep('phoneOtp');
-      } else {
-        form.setError('emailOtp', { type: 'manual', message: 'Invalid OTP. Please try again.' });
-      }
-    } else if (type === 'phone') {
-      const enteredOtp = form.getValues('phoneOtp');
-      if (enteredOtp === MOCK_OTP) {
-        setPhoneVerified(true);
-        toast({ title: 'Phone Verified', description: 'Your phone number has been successfully verified.' });
-        if (emailVerified) setVerificationStep('verified');
-        else setVerificationStep('emailOtp');
-      } else {
-        form.setError('phoneOtp', { type: 'manual', message: 'Invalid OTP. Please try again.' });
-      }
-    }
-  };
-
-
-  function onSubmit(values: FormValues) {
-    if (!emailVerified || !phoneVerified) {
-      toast({ title: 'Verification Required', description: 'Please verify both email and phone number.', variant: 'destructive' });
-      return;
-    }
-    // Exclude OTP fields from being stored
-    const { emailOtp, phoneOtp, ...userDetailsToStore } = values;
-    localStorage.setItem('userDetails', JSON.stringify(userDetailsToStore));
-    router.push(`/book/${serviceId}/payment`);
+export const MOCK_RESOURCES: Resource[] = [
+  {
+    id: 'res1',
+    title: 'SSB Interview Guide PDF',
+    type: 'document',
+    url: '/resources/ssb_guide.pdf',
+    description: 'A comprehensive guide covering all aspects of the SSB interview.',
+    serviceCategory: 'ssb-mock-interview',
+    icon: FileText,
+  },
+  {
+    id: 'res2',
+    title: 'Psychological Test Practice Video',
+    type: 'video',
+    url: 'https://www.youtube.com/watch?v=example',
+    description: 'Video tutorial on how to approach psychological tests.',
+    serviceCategory: 'ssb-mock-interview',
+    icon: Video,
+  },
+  {
+    id: 'res3',
+    title: 'AFCAT Study Plan',
+    type: 'document',
+    url: '/resources/afcat_study_plan.pdf',
+    description: 'A structured study plan for AFCAT preparation.',
+    serviceCategory: 'afcat-exam-guidance',
+    icon: FileText,
+  },
+  {
+    id: 'res4',
+    title: 'Important Defence News',
+    type: 'link',
+    url: 'https://www.indiandefensenews.in/',
+    description: 'Stay updated with the latest in defence.',
+    serviceCategory: 'general', 
+    icon: LinkIcon,
   }
+];
 
-  if (error && (!service || !bookingInfo)) {
-     return (
-      <div className="container py-12">
-        <Alert variant="destructive">
-          <XCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error} Please try selecting service and slot again.</AlertDescription>
-        </Alert>
-      </div>
-    );
+export const DASHBOARD_NAV_LINKS = [
+  { href: '/dashboard', label: 'Overview', icon: Shield },
+  { href: '/dashboard/bookings', label: 'My Bookings', icon: CalendarDays },
+  { href: '/dashboard/resources', label: 'My Resources', icon: FileText },
+  { href: '/dashboard/profile', label: 'Profile & Badges', icon: Users },
+  { href: '/dashboard/submit-testimonial', label: 'Submit Testimonial', icon: Edit2Icon },
+  { href: '/dashboard/contact', label: 'Contact Support', icon: MailQuestion },
+];
+
+export const ADMIN_DASHBOARD_NAV_LINKS = [
+  { href: '/admin', label: 'Admin Overview', icon: Shield },
+  { href: '/admin/bookings', label: 'Booking Requests', icon: ListChecks },
+  { href: '/admin/slots', label: 'Manage Slots', icon: CalendarPlus },
+  { href: '/admin/services', label: 'Manage Services', icon: Edit3 },
+  { href: '/admin/reports', label: 'Upload Report & Feedback', icon: UploadCloud },
+  { href: '/admin/resources', label: 'Manage Resources', icon: BookCopy },
+  { href: '/admin/testimonials', label: 'Approve Testimonials', icon: MessageSquare },
+  { href: '/admin/mentor-profile', label: 'Update Mentor Profile', icon: UserCog },
+  { href: '/admin/messages', label: 'User Messages', icon: MessagesSquare },
+  { href: '/admin/export-reports', label: 'Export Reports', icon: DownloadCloud },
+];
+
+export const AVAILABLE_SLOTS: Record<string, string[]> = {
+  [getFutureDate(7)]: ["09:00 AM", "11:00 AM", "02:00 PM", "04:00 PM"],
+  [getFutureDate(8)]: ["10:00 AM", "01:00 PM", "03:00 PM"],
+  [getFutureDate(9)]: ["09:30 AM", "11:30 AM", "02:30 PM"],
+  [getFutureDate(14)]: ["10:00 AM", "12:00 PM", "03:00 PM"],
+  [getFutureDate(15)]: ["09:00 AM", "11:00 AM"],
+  [getFutureDate(20)]: ["10:00 AM", "11:00 AM", "02:00 PM", "03:00 PM", "04:00 PM"],
+  [getFutureDate(21)]: ["09:00 AM", "10:00 AM", "11:00 AM", "01:00 PM", "02:00 PM"],
+  [getFutureDate(60)]: ["10:00 AM", "11:00 AM", "12:00 PM"], 
+  [getFutureDate(61)]: ["02:00 PM", "03:00 PM", "04:00 PM"],
+  [getFutureDate(3)]: ["09:00 AM", "10:00 AM", "11:00 AM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM"],
+  [getFutureDate(1)]: ["02:00 PM", "03:00 PM", "04:00 PM"],
+};
+
+
+export const MENTOR_PROFILE: MentorProfileData = {
+  name: "Col. (Retd.) Arjun Singh",
+  title: "Lead Mentor & SSB Expert",
+  imageUrl: "https://placehold.co/300x300.png",
+  dataAiHint: "mentor portrait",
+  bio: "Col. (Retd.) Arjun Singh is a seasoned veteran with an illustrious career in the Indian Armed Forces. Having successfully cleared the Services Selection Board (SSB) an exceptional seven times for various entries, he possesses an unparalleled understanding of the selection process. His passion for mentoring and guiding young aspirants has led him to help countless candidates achieve their dreams of joining the forces.",
+  experience: [
+    "7-time SSB cleared (NDA, IMA, OTA, TES, UES, NCC Special Entry, TA)",
+    "Over 20 years of distinguished service in the Indian Army.",
+    "Expert in psychological testing, interview techniques, and GTO tasks.",
+    "Certified assessor and trainer.",
+    "Proven track record of mentoring successful candidates.",
+  ],
+  philosophy: "My approach is to demystify the SSB process and empower candidates with self-awareness and genuine confidence. I focus on honing their innate abilities rather than prescribing coached responses. Success in SSB is about showcasing your true potential, and I am here to help you discover and project that effectively.",
+  quote: "The best way to predict your future is to create it. Let's create yours in the Armed Forces.",
+  contactEmail: "arjun.singh.mentor@example.com",
+  contactPhone: "+91 9988776655"
+};
+
+export const MOCK_USER_MESSAGES: UserMessage[] = [
+  {
+    id: 'msg1',
+    userName: 'Rohan Sharma',
+    userEmail: 'aspirant@example.com',
+    subject: 'Question about GTO tasks',
+    messageBody: 'Hello, I had a quick question regarding the GTO tasks for the SSB mock interview. Could you please elaborate on what to expect?',
+    timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+    status: 'new',
+  },
+  {
+    id: 'msg2',
+    userName: 'Priya Singh',
+    userEmail: 'priya.singh@example.com',
+    subject: 'Reschedule Counselling Session',
+    messageBody: 'Is it possible to reschedule my counselling session from next Tuesday to Wednesday? Please let me know.',
+    timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+    status: 'read',
+  },
+];
+
+export const MOCK_USER_PROFILE_FOR_CONTACT = {
+  name: "Test User",
+  email: "testuser@example.com",
+};
+
+export const MOCK_BADGES: Badge[] = [
+  {
+    id: 'af_pilot_aspirant',
+    name: 'Pilot Aspirant Badge',
+    description: 'Awarded for showing strong aptitude towards aviation concepts during AFCAT guidance.',
+    force: 'Air Force',
+    rankName: 'Pilot Aspirant',
+    imageUrl: 'https://placehold.co/100x100.png',
+    dataAiHint: 'air force pilot insignia',
+  },
+  {
+    id: 'army_leadership_potential',
+    name: 'Leadership Potential Badge',
+    description: 'Recognized for demonstrating key leadership qualities in SSB mock interview.',
+    force: 'Army',
+    rankName: 'Officer Candidate',
+    imageUrl: 'https://placehold.co/100x100.png',
+    dataAiHint: 'army officer badge',
+  },
+  {
+    id: 'navy_strategic_thinker',
+    name: 'Strategic Thinker Badge',
+    description: 'Commended for excellent strategic thinking during SSB counselling.',
+    force: 'Navy',
+    rankName: 'Midshipman Aspirant',
+    imageUrl: 'https://placehold.co/100x100.png',
+    dataAiHint: 'navy insignia',
+  },
+  {
+    id: 'ssb_screened_in',
+    name: 'SSB Stage-I Cleared Badge',
+    description: 'Successfully cleared Stage-I of the SSB mock process.',
+    force: 'General',
+    rankName: 'Stage-I Qualified',
+    imageUrl: 'https://placehold.co/100x100.png',
+    dataAiHint: 'achievement badge',
+  },
+  {
+    id: 'commendable_effort',
+    name: 'Commendable Effort Badge',
+    description: 'Awarded for outstanding effort and dedication during preparation.',
+    force: 'General',
+    rankName: 'Dedicated Learner',
+    imageUrl: 'https://placehold.co/100x100.png',
+    dataAiHint: 'star award',
   }
+];
 
-  if (!service || !bookingInfo) {
-    return <div className="container py-12">Loading details...</div>;
-  }
-  
-  const disableDetails = emailOtpSent || phoneOtpSent;
+export const PREDEFINED_SKILLS: string[] = [
+    "Communication Skills",
+    "Officer-Like Qualities (OLQs)",
+    "General Awareness",
+    "Confidence Level",
+    "Problem Solving Ability",
+    "Group Interaction",
+    "Technical Knowledge (if applicable)",
+    "AFCAT Exam Knowledge",
+    "Time Management Strategy",
+];
 
-
-  return (
-    <>
-      <PageHeader
-        title={`Your Details for ${service.name}`}
-        description="Please provide your information and verify email/phone to complete the booking."
-      />
-      <div className="container py-12">
-        <Card className="max-w-2xl mx-auto shadow-lg">
-          <CardHeader>
-            <CardTitle className="font-headline text-2xl text-primary">Enter Your Details</CardTitle>
-          </CardHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)}>
-              <CardContent className="space-y-6">
-                {USER_FORM_FIELDS.map((fieldConfig) => {
-                  const fieldName = fieldConfig.name as keyof FormValues;
-                  return (
-                    <FormField
-                      key={fieldName}
-                      control={form.control}
-                      name={fieldName}
-                      render={({ field: formFieldRender }) => (
-                        <FormItem>
-                          <FormLabel>{fieldConfig.label}</FormLabel>
-                          <div className="flex items-center gap-2">
-                            <FormControl>
-                              <Input 
-                                type={fieldConfig.type} 
-                                placeholder={fieldConfig.placeholder} 
-                                {...formFieldRender} 
-                                disabled={
-                                  (fieldName === 'email' && (emailVerified || (disableDetails && !emailOtpSent))) ||
-                                  (fieldName === 'phone' && (phoneVerified || (disableDetails && !phoneOtpSent))) ||
-                                  (disableDetails && fieldName !== 'email' && fieldName !== 'phone' && fieldName !== 'emailOtp' && fieldName !== 'phoneOtp')
-                                }
-                              />
-                            </FormControl>
-                            {fieldName === 'email' && !emailVerified && !emailOtpSent && (
-                              <Button type="button" variant="outline" size="sm" onClick={() => handleSendOtp('email')} disabled={emailOtpSent}>
-                                Send OTP
-                              </Button>
-                            )}
-                            {fieldName === 'email' && emailVerified && <MailCheck className="h-5 w-5 text-green-500" />}
-                            {fieldName === 'phone' && !phoneVerified && !phoneOtpSent && (
-                              <Button type="button" variant="outline" size="sm" onClick={() => handleSendOtp('phone')} disabled={phoneOtpSent}>
-                                Send OTP
-                              </Button>
-                            )}
-                             {fieldName === 'phone' && phoneVerified && <PhoneCall className="h-5 w-5 text-green-500" />}
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  );
-                })}
-
-                {emailOtpSent && !emailVerified && (
-                  <FormField
-                    control={form.control}
-                    name="emailOtp"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email OTP</FormLabel>
-                        <div className="flex items-center gap-2">
-                          <FormControl>
-                            <Input placeholder="Enter 6-digit OTP" {...field} />
-                          </FormControl>
-                          <Button type="button" size="sm" onClick={() => handleVerifyOtp('email')}>Verify Email</Button>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-
-                {phoneOtpSent && !phoneVerified && (
-                  <FormField
-                    control={form.control}
-                    name="phoneOtp"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone OTP</FormLabel>
-                        <div className="flex items-center gap-2">
-                          <FormControl>
-                            <Input placeholder="Enter 6-digit OTP" {...field} />
-                          </FormControl>
-                          <Button type="button" size="sm" onClick={() => handleVerifyOtp('phone')}>Verify Phone</Button>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-              </CardContent>
-              <CardFooter>
-                <Button 
-                  type="submit" 
-                  size="lg" 
-                  className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
-                  disabled={!emailVerified || !phoneVerified || !form.formState.isValid}
-                >
-                  Proceed to Payment
-                </Button>
-              </CardFooter>
-            </form>
-          </Form>
-        </Card>
-      </div>
-    </>
-  );
-}
+export const SKILL_RATINGS: string[] = [
+    "Needs Significant Improvement",
+    "Needs Improvement",
+    "Satisfactory",
+    "Good",
+    "Very Good",
+    "Excellent",
+    "Outstanding",
+];

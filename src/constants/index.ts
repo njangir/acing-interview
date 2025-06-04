@@ -1,5 +1,5 @@
 
-import type { Service, Testimonial, Booking, Resource, MentorProfileData, UserMessage, Badge } from '@/types';
+import type { Service, Testimonial, Booking, Resource, MentorProfileData, UserMessage, Badge, UserProfile } from '@/types';
 import { Shield, Video, FileText, Link as LinkIcon, CalendarDays, Users, UserSquare2, ListChecks, Edit3, UploadCloud, BookCopy, MessageSquare, UserCog, CalendarPlus, MailQuestion, MessagesSquare, Award, Edit2Icon, DownloadCloud } from 'lucide-react';
 
 const today = new Date();
@@ -127,7 +127,12 @@ export const MOCK_BOOKINGS: Booking[] = [
     status: 'completed',
     paymentStatus: 'paid',
     transactionId: 'txn_vikram_counsel_01',
-    reportUrl: '/path/to/report.pdf',
+    reportUrl: '/resources/mock_feedback_report.pdf',
+    detailedFeedback: [
+        { skill: 'Communication Skills', rating: 'Excellent', comments: 'Very articulate and clear.' },
+        { skill: 'Officer-Like Qualities (OLQs)', rating: 'Good', comments: 'Shows potential, needs to be more assertive.' },
+        { skill: 'General Awareness', rating: 'Satisfactory', comments: 'Good grasp of current affairs but can improve on specifics.' },
+    ],
   },
   {
     id: 'booking3',
@@ -182,6 +187,10 @@ export const MOCK_BOOKINGS: Booking[] = [
     status: 'completed',
     paymentStatus: 'paid',
     transactionId: 'txn_amit_afcat_01',
+    detailedFeedback: [
+      { skill: 'AFCAT Exam Knowledge', rating: 'Good', comments: 'Understands the syllabus well.' },
+      { skill: 'Time Management Strategy', rating: 'Satisfactory', comments: 'Needs to practice more timed tests.' },
+    ],
   },
 ];
 
@@ -246,9 +255,6 @@ export const ADMIN_DASHBOARD_NAV_LINKS = [
   { href: '/admin/export-reports', label: 'Export Reports', icon: DownloadCloud },
 ];
 
-// Represents the available slots that admins can manage.
-// In a real app, this would be fetched from and updated to a backend.
-// Admin slot page will show a toast for simulation and not modify this directly.
 export const AVAILABLE_SLOTS: Record<string, string[]> = {
   [getFutureDate(7)]: ["09:00 AM", "11:00 AM", "02:00 PM", "04:00 PM"],
   [getFutureDate(8)]: ["10:00 AM", "01:00 PM", "03:00 PM"],
@@ -263,13 +269,6 @@ export const AVAILABLE_SLOTS: Record<string, string[]> = {
   [getFutureDate(1)]: ["02:00 PM", "03:00 PM", "04:00 PM"],
 };
 
-export const USER_FORM_FIELDS = [
-  { name: 'name', label: 'Full Name', type: 'text', placeholder: 'Enter your full name' },
-  { name: 'email', label: 'Email Address', type: 'email', placeholder: 'Enter your email' },
-  { name: 'phone', label: 'Phone Number', type: 'tel', placeholder: 'Enter your phone number' },
-  { name: 'examApplied', label: 'Defense Exams Applied For', type: 'text', placeholder: 'e.g., NDA, CDS, AFCAT' },
-  { name: 'previousAttempts', label: 'Previous SSB Attempts (if any)', type: 'number', placeholder: '0' },
-];
 
 export const MENTOR_PROFILE: MentorProfileData = {
   name: "Col. (Retd.) Arjun Singh",
@@ -290,8 +289,6 @@ export const MENTOR_PROFILE: MentorProfileData = {
   contactPhone: "+91 9988776655"
 };
 
-// User messages are now only added via contact form simulation (toast message)
-// This array serves as initial data for the admin message viewing UI
 export const MOCK_USER_MESSAGES: UserMessage[] = [
   {
     id: 'msg1',
@@ -313,7 +310,6 @@ export const MOCK_USER_MESSAGES: UserMessage[] = [
   },
 ];
 
-// Mock user profile for contact page display (in a real app, this comes from auth)
 export const MOCK_USER_PROFILE_FOR_CONTACT = {
   name: "Test User",
   email: "testuser@example.com",
@@ -365,4 +361,26 @@ export const MOCK_BADGES: Badge[] = [
     imageUrl: 'https://placehold.co/100x100.png',
     dataAiHint: 'star award',
   }
+];
+
+export const PREDEFINED_SKILLS: string[] = [
+    "Communication Skills",
+    "Officer-Like Qualities (OLQs)",
+    "General Awareness",
+    "Confidence Level",
+    "Problem Solving Ability",
+    "Group Interaction",
+    "Technical Knowledge (if applicable)",
+    "AFCAT Exam Knowledge",
+    "Time Management Strategy",
+];
+
+export const SKILL_RATINGS: string[] = [
+    "Needs Significant Improvement",
+    "Needs Improvement",
+    "Satisfactory",
+    "Good",
+    "Very Good",
+    "Excellent",
+    "Outstanding",
 ];
