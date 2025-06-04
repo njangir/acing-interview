@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { useState } from 'react';
+import Image from 'next/image';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,9 +17,11 @@ import { Logo } from '@/components/icons/logo';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
-import { MailCheck, PhoneCall, ShieldCheck } from 'lucide-react';
+import { MailCheck, PhoneCall, ShieldCheck, UserCircle } from 'lucide-react';
+import { PREDEFINED_AVATARS } from '@/constants';
+import { cn } from '@/lib/utils';
 
-const MOCK_OTP = "123456"; // For simulation
+const MOCK_OTP = "123456"; 
 
 const signupFormSchemaBase = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -26,6 +29,7 @@ const signupFormSchemaBase = z.object({
   phone: z.string().min(10, {message: "Phone number must be at least 10 digits"}),
   password: z.string().min(8, { message: "Password must be at least 8 characters." }),
   confirmPassword: z.string(),
+  imageUrl: z.string().optional(), // For selected avatar
   isNotRobot: z.boolean().refine(val => val === true, { message: "Please complete the CAPTCHA." }),
 });
 
@@ -50,6 +54,8 @@ export default function SignupPage() {
   const [phoneOtpSent, setPhoneOtpSent] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
+  const [selectedAvatar, setSelectedAvatar] = useState<string>(PREDEFINED_AVATARS[0].url);
+
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(verificationStep === 'details' ? signupFormSchemaBase : signupFormSchemaWithOtp),
@@ -59,6 +65,7 @@ export default function SignupPage() {
       phone: '',
       password: '',
       confirmPassword: '',
+      imageUrl: PREDEFINED_AVATARS[0].url,
       isNotRobot: false,
       emailOtp: '',
       phoneOtp: '',
@@ -95,7 +102,7 @@ export default function SignupPage() {
         setEmailVerified(true);
         toast({ title: 'Email Verified', description: 'Your email has been successfully verified.' });
         if (phoneVerified) setVerificationStep('verified');
-        else setVerificationStep('phoneOtp'); // Move to phone OTP if not done
+        else setVerificationStep('phoneOtp'); 
       } else {
         form.setError('emailOtp', { type: 'manual', message: 'Invalid OTP. Please try again.' });
       }
@@ -105,7 +112,7 @@ export default function SignupPage() {
         setPhoneVerified(true);
         toast({ title: 'Phone Verified', description: 'Your phone number has been successfully verified.' });
         if (emailVerified) setVerificationStep('verified');
-        else setVerificationStep('emailOtp'); // Should ideally not happen if flow is email then phone
+        else setVerificationStep('emailOtp'); 
       } else {
         form.setError('phoneOtp', { type: 'manual', message: 'Invalid OTP. Please try again.' });
       }
@@ -118,8 +125,19 @@ export default function SignupPage() {
       toast({ title: 'Verification Required', description: 'Please verify both email and phone number.', variant: 'destructive' });
       return;
     }
-    console.log('Signup attempt with:', data);
-    login({email: data.email, name: data.name, isAdmin: false }); // Mock login with basic info
+    
+    login({email: data.email, name: data.name, isAdmin: false, imageUrl: selectedAvatar }); 
+    
+    // Store profile details in localStorage for demo persistence
+    const userProfileData = {
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        imageUrl: selectedAvatar,
+        awardedBadges: []
+    };
+    localStorage.setItem(`mockUserProfile_${data.email}`, JSON.stringify(userProfileData));
+
     toast({
       title: 'Signup Successful (Mock)',
       description: 'Your account has been created. Redirecting to dashboard...',
@@ -144,6 +162,40 @@ export default function SignupPage() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <CardContent className="space-y-4">
+              <div className="mb-6">
+                <FormLabel>Choose Your Avatar</FormLabel>
+                <div className="mt-2 grid grid-cols-3 sm:grid-cols-6 gap-3">
+                  {PREDEFINED_AVATARS.map(avatar => (
+                    <button
+                      key={avatar.id}
+                      type="button"
+                      onClick={() => {
+                          if(!disableDetails) {
+                            setSelectedAvatar(avatar.url);
+                            form.setValue('imageUrl', avatar.url);
+                          }
+                      }}
+                      className={cn(
+                        "rounded-full overflow-hidden border-2 transition-all",
+                        selectedAvatar === avatar.url ? "border-primary ring-2 ring-primary" : "border-transparent hover:border-primary/50",
+                        disableDetails && "cursor-not-allowed opacity-70"
+                      )}
+                      disabled={disableDetails}
+                      aria-label={`Select avatar ${avatar.id}`}
+                    >
+                      <Image 
+                        src={avatar.url} 
+                        alt={`Avatar ${avatar.id}`} 
+                        width={60} 
+                        height={60}
+                        className="aspect-square object-cover"
+                        data-ai-hint={avatar.hint} 
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <FormField
                 control={form.control}
                 name="name"

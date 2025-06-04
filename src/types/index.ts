@@ -37,7 +37,7 @@ export interface Booking {
   userName: string;
   userEmail: string;
   meetingLink: string;
-  status: 'upcoming' | 'completed' | 'cancelled' | 'pending_approval';
+  status: 'accepted' | 'scheduled' | 'completed' | 'cancelled' | 'pending_approval';
   paymentStatus: 'paid' | 'pay_later_pending' | 'pay_later_unpaid';
   reportUrl?: string;
   userFeedback?: string;
@@ -96,6 +96,6 @@ export interface UserProfile {
   name: string;
   email: string;
   phone: string;
+  imageUrl?: string; // Added for avatar
   awardedBadges: Badge[];
 }
-

@@ -9,6 +9,16 @@ export function getFutureDate(daysToAdd: number): string {
   return futureDate.toISOString().split('T')[0];
 };
 
+export const PREDEFINED_AVATARS: {id: string, url: string, hint: string}[] = [
+  { id: 'avatar1', url: 'https://placehold.co/100x100/EBF4FF/76A9FA?text=U1', hint: 'abstract user icon blue' },
+  { id: 'avatar2', url: 'https://placehold.co/100x100/FFF0EB/FA9F76?text=U2', hint: 'abstract user icon orange' },
+  { id: 'avatar3', url: 'https://placehold.co/100x100/EBFFF2/76FA91?text=U3', hint: 'abstract user icon green' },
+  { id: 'avatar4', url: 'https://placehold.co/100x100/F9EBFF/C576FA?text=U4', hint: 'abstract user icon purple' },
+  { id: 'avatar5', url: 'https://placehold.co/100x100/FFFDEB/F5E66B?text=U5', hint: 'abstract user icon yellow' },
+  { id: 'avatar6', url: 'https://placehold.co/100x100/FFEBEE/FA7689?text=U6', hint: 'abstract user icon red' },
+];
+
+
 export const MOCK_SERVICES: Service[] = [
   {
     id: 'ssb-mock-interview',
@@ -113,7 +123,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     userName: "Ananya Sharma",
     userEmail: "ananya.sharma@example.com",
     meetingLink: 'https://meet.google.com/xyz-abc-pqr',
-    status: 'scheduled', // Changed from upcoming
+    status: 'scheduled',
     paymentStatus: 'paid',
     transactionId: 'txn_ananya_ssb_mock_01',
     requestedRefund: false,
@@ -145,7 +155,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     time: '03:00 PM',
     userName: "Nisha Patel",
     userEmail: "nisha.patel@example.com",
-    meetingLink: '', // Admin needs to set this
+    meetingLink: '', 
     status: 'pending_approval',
     paymentStatus: 'pay_later_pending',
     transactionId: null,
@@ -158,8 +168,8 @@ export const MOCK_BOOKINGS: Booking[] = [
     time: '11:00 AM',
     userName: "Rajesh Kumar",
     userEmail: "rajesh.kumar@example.com",
-    meetingLink: '', // Admin needs to set this
-    status: 'accepted', // Example of accepted, awaiting link
+    meetingLink: '', 
+    status: 'accepted', 
     paymentStatus: 'pay_later_pending',
     transactionId: null,
     requestedRefund: true,
@@ -174,7 +184,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     userName: "Priya Desai",
     userEmail: "aspirant@example.com",
     meetingLink: 'https://meet.google.com/123-456-789',
-    status: 'scheduled', // Changed from upcoming
+    status: 'scheduled', 
     paymentStatus: 'paid',
     transactionId: 'txn_priya_counsel_02',
   },
@@ -300,18 +310,18 @@ export const MOCK_USER_MESSAGES: UserMessage[] = [
     userEmail: 'aspirant@example.com',
     subject: 'Question about GTO tasks',
     messageBody: 'Hello, I had a quick question regarding the GTO tasks for the SSB mock interview. Could you please elaborate on what to expect?',
-    timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-    status: 'replied', // This message from user was read and replied by admin
+    timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), 
+    status: 'replied', 
     senderType: 'user',
   },
   {
     id: 'msg1-reply1',
-    userName: 'Rohan Sharma', // Keep original user context for grouping
-    userEmail: 'aspirant@example.com', // Same userEmail to group conversation
-    subject: 'Re: Question about GTO tasks', // Admin's reply subject
+    userName: 'Rohan Sharma', 
+    userEmail: 'aspirant@example.com', 
+    subject: 'Re: Question about GTO tasks', 
     messageBody: 'Hi Rohan, GTO tasks typically include group discussions, group planning exercises, progressive group tasks, etc. We cover these in detail during the mock interview. Let me know if you have specific concerns!',
-    timestamp: new Date(Date.now() - 1.9 * 24 * 60 * 60 * 1000), // A bit after Rohan's message
-    status: 'replied', // This message itself is a reply from admin
+    timestamp: new Date(Date.now() - 1.9 * 24 * 60 * 60 * 1000), 
+    status: 'replied', 
     senderType: 'admin',
     adminName: 'Admin Team',
   },
@@ -321,15 +331,18 @@ export const MOCK_USER_MESSAGES: UserMessage[] = [
     userEmail: 'priya.singh@example.com',
     subject: 'Reschedule Counselling Session',
     messageBody: 'Is it possible to reschedule my counselling session from next Tuesday to Wednesday? Please let me know.',
-    timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
-    status: 'new', // This message is new from user
+    timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), 
+    status: 'new', 
     senderType: 'user',
   },
 ];
 
-export const MOCK_USER_PROFILE_FOR_CONTACT = {
+export const MOCK_USER_PROFILE_FOR_CONTACT: UserProfile = {
   name: "Test User",
   email: "testuser@example.com",
+  phone: "1234567890",
+  imageUrl: PREDEFINED_AVATARS[0].url, // Default avatar
+  awardedBadges: [],
 };
 
 export const MOCK_BADGES: Badge[] = [
@@ -401,4 +414,3 @@ export const SKILL_RATINGS: string[] = [
     "Excellent",
     "Outstanding",
 ];
-

@@ -13,79 +13,104 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { UserCircle, Award, ShieldCheck, Briefcase } from 'lucide-react';
+import { UserCircle, Award, ShieldCheck, Briefcase, Edit } from 'lucide-react';
 import type { UserProfile, Badge } from '@/types';
+import { useAuth } from '@/hooks/use-auth';
+import { PREDEFINED_AVATARS } from '@/constants';
+import { cn } from '@/lib/utils';
+
 
 const profileFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Invalid email address." }),
   phone: z.string().min(10, { message: "Phone number must be at least 10 digits." }),
+  imageUrl: z.string().optional(),
 });
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
-// Mock user data - in a real app, this would come from auth/backend
-const MOCK_USER_DATA: UserProfile = {
-  name: "Aspirant User",
-  email: "aspirant@example.com",
-  phone: "9876543210",
-  awardedBadges: [], // Will be populated from localStorage for demo
-};
 
 export default function ProfilePage() {
   const { toast } = useToast();
-  const [userProfile, setUserProfile] = useState<UserProfile>(MOCK_USER_DATA);
+  const { currentUser, login: updateAuthContextUser } = useAuth(); 
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [selectedAvatarForForm, setSelectedAvatarForForm] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    // For demo: Try to load awarded badges from localStorage (set by admin page)
-    const mockUserProfileKey = `mockUserProfile_${MOCK_USER_DATA.email}`;
-    const storedProfile = localStorage.getItem(mockUserProfileKey);
-    if (storedProfile) {
-      const parsedProfile = JSON.parse(storedProfile);
-      setUserProfile(prev => ({
-        ...prev,
-        name: parsedProfile.name || prev.name, // Keep existing form if name not in stored
-        email: parsedProfile.email || prev.email,
-        phone: parsedProfile.phone || prev.phone,
-        awardedBadges: parsedProfile.awardedBadges || []
-      }));
+    if (currentUser) {
+      const mockUserProfileKey = `mockUserProfile_${currentUser.email}`;
+      const storedProfile = localStorage.getItem(mockUserProfileKey);
+      if (storedProfile) {
+        const parsedProfile: UserProfile = JSON.parse(storedProfile);
+        setUserProfile(parsedProfile);
+        setSelectedAvatarForForm(parsedProfile.imageUrl || PREDEFINED_AVATARS[0].url);
+      } else {
+        // Initialize from currentUser if no localStorage profile (e.g., first time after signup)
+        const initialProfile: UserProfile = {
+          name: currentUser.name,
+          email: currentUser.email,
+          phone: '', // Or some default
+          imageUrl: currentUser.imageUrl || PREDEFINED_AVATARS[0].url,
+          awardedBadges: [],
+        };
+        setUserProfile(initialProfile);
+        setSelectedAvatarForForm(initialProfile.imageUrl);
+        localStorage.setItem(mockUserProfileKey, JSON.stringify(initialProfile));
+      }
     }
-  }, []);
+  }, [currentUser]);
 
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
-    values: { // Use `values` instead of `defaultValues` to reflect dynamically loaded profile
+    // values will be set by useEffect below
+  });
+  
+  useEffect(() => {
+    if (userProfile) {
+      form.reset({
         name: userProfile.name,
         email: userProfile.email,
         phone: userProfile.phone,
-    },
-    // defaultValues: MOCK_USER_DATA, // Load user data here
-  });
-  
-  // Update form when userProfile state changes (e.g., badges loaded)
-  useEffect(() => {
-    form.reset({
-      name: userProfile.name,
-      email: userProfile.email,
-      phone: userProfile.phone,
-    });
+        imageUrl: userProfile.imageUrl,
+      });
+      setSelectedAvatarForForm(userProfile.imageUrl || PREDEFINED_AVATARS[0].url);
+    }
   }, [userProfile, form]);
 
 
   function onSubmit(data: ProfileFormValues) {
-    console.log("Profile updated:", data); // Mock API call
-    
-    // Simulate saving profile and keeping badges
-    const updatedProfile = { ...userProfile, ...data };
-    setUserProfile(updatedProfile);
-    const mockUserProfileKey = `mockUserProfile_${data.email}`;
-    localStorage.setItem(mockUserProfileKey, JSON.stringify(updatedProfile));
+    if (!userProfile || !currentUser) return;
 
+    const updatedProfileData: UserProfile = {
+      ...userProfile,
+      name: data.name,
+      email: data.email, // Assuming email can be changed, though often it's fixed
+      phone: data.phone,
+      imageUrl: selectedAvatarForForm,
+    };
+    
+    setUserProfile(updatedProfileData);
+    localStorage.setItem(`mockUserProfile_${currentUser.email}`, JSON.stringify(updatedProfileData));
+
+    // Update auth context if primary details like name or image changed
+    if (currentUser.name !== updatedProfileData.name || currentUser.imageUrl !== updatedProfileData.imageUrl || currentUser.email !== updatedProfileData.email) {
+        updateAuthContextUser({
+            ...currentUser,
+            name: updatedProfileData.name,
+            email: updatedProfileData.email, // update email in auth if it changed
+            imageUrl: updatedProfileData.imageUrl,
+        });
+    }
+    
     toast({
       title: "Profile Updated",
       description: "Your profile information has been successfully updated.",
     });
+  }
+
+  if (!userProfile) {
+    return <div className="container py-12">Loading profile...</div>;
   }
 
   return (
@@ -97,17 +122,57 @@ export default function ProfilePage() {
       <div className="grid md:grid-cols-3 gap-8 items-start">
         <Card className="md:col-span-2 shadow-lg">
           <CardHeader>
-            <div className="flex items-center gap-4">
-              <UserCircle className="h-12 w-12 text-primary"/>
-              <div>
-                  <CardTitle className="font-headline text-2xl text-primary">Profile Information</CardTitle>
-                  <CardDescription>Update your personal details below.</CardDescription>
-              </div>
+             <div className="flex items-center gap-4">
+                <Image 
+                    src={selectedAvatarForForm || userProfile.imageUrl || PREDEFINED_AVATARS[0].url} 
+                    alt={userProfile.name} 
+                    width={60} 
+                    height={60} 
+                    className="rounded-full border-2 border-primary"
+                    data-ai-hint="user avatar"
+                />
+                <div>
+                    <CardTitle className="font-headline text-2xl text-primary flex items-center">
+                        <Edit className="h-6 w-6 mr-2"/> Edit Profile
+                    </CardTitle>
+                    <CardDescription>Update your personal details and avatar below.</CardDescription>
+                </div>
             </div>
           </CardHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
               <CardContent className="space-y-6">
+                <div className="mb-6">
+                    <FormLabel>Choose Your Avatar</FormLabel>
+                    <div className="mt-2 grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+                    {PREDEFINED_AVATARS.map(avatar => (
+                        <button
+                        key={avatar.id}
+                        type="button"
+                        onClick={() => {
+                            setSelectedAvatarForForm(avatar.url);
+                            form.setValue('imageUrl', avatar.url);
+                        }}
+                        className={cn(
+                            "rounded-full overflow-hidden border-2 transition-all w-16 h-16 sm:w-20 sm:h-20",
+                            selectedAvatarForForm === avatar.url ? "border-primary ring-2 ring-primary" : "border-transparent hover:border-primary/50"
+                        )}
+                        aria-label={`Select avatar ${avatar.id}`}
+                        >
+                        <Image 
+                            src={avatar.url} 
+                            alt={`Avatar ${avatar.id}`} 
+                            width={80} 
+                            height={80}
+                            className="aspect-square object-cover"
+                            data-ai-hint={avatar.hint} 
+                        />
+                        </button>
+                    ))}
+                    </div>
+                     <FormField control={form.control} name="imageUrl" render={() => <FormMessage />} /> 
+                </div>
+
                 <FormField
                   control={form.control}
                   name="name"
@@ -207,4 +272,3 @@ const Anchor = (props: React.SVGProps<SVGSVGElement>) => (
     <path d="M12 22V8"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/><circle cx="12" cy="5" r="3"/>
   </svg>
 );
-

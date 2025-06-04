@@ -5,7 +5,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { PageHeader } from "@/components/core/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MOCK_BOOKINGS, MOCK_SERVICES, MOCK_RESOURCES } from "@/constants";
+import { MOCK_BOOKINGS, MOCK_SERVICES, MOCK_RESOURCES, PREDEFINED_AVATARS } from "@/constants";
 import type { Resource as ResourceType, UserProfile, Badge as BadgeType } from '@/types';
 import { BookingCard } from "@/components/core/booking-card";
 import Link from "next/link";
@@ -23,6 +23,7 @@ const getPurchasedServiceIds = (): string[] => {
 export default function DashboardOverviewPage() {
   const { currentUser } = useAuth();
   const [latestBadge, setLatestBadge] = useState<BadgeType | null>(null);
+  const [userProfileData, setUserProfileData] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     if (currentUser?.email) {
@@ -31,12 +32,22 @@ export default function DashboardOverviewPage() {
       if (storedProfile) {
         try {
           const parsedProfile: UserProfile = JSON.parse(storedProfile);
+          setUserProfileData(parsedProfile); // Store the full profile
           if (parsedProfile.awardedBadges && parsedProfile.awardedBadges.length > 0) {
             setLatestBadge(parsedProfile.awardedBadges[parsedProfile.awardedBadges.length - 1]);
           }
         } catch (error) {
           console.error("Error parsing user profile for badges:", error);
         }
+      } else {
+        // Fallback to currentUser from auth context if no specific profile in localStorage
+         setUserProfileData({
+            name: currentUser.name,
+            email: currentUser.email,
+            phone: '', // Placeholder or fetch if available
+            imageUrl: currentUser.imageUrl || PREDEFINED_AVATARS[0].url,
+            awardedBadges: []
+        });
       }
     }
   }, [currentUser]);
@@ -96,14 +107,14 @@ export default function DashboardOverviewPage() {
             </CardHeader>
             <CardContent className="flex flex-col items-center text-center">
                 <Image
-                    src={currentUser?.imageUrl || "https://placehold.co/80x80.png"}
-                    alt={currentUser?.name || "User Avatar"}
+                    src={userProfileData?.imageUrl || currentUser?.imageUrl || PREDEFINED_AVATARS[0].url}
+                    alt={userProfileData?.name || currentUser?.name || "User Avatar"}
                     width={60}
                     height={60}
                     className="rounded-full mb-2 border-2 border-primary"
-                    data-ai-hint="user avatar placeholder"
+                    data-ai-hint="user avatar"
                 />
-                <p className="text-md font-semibold text-primary">{currentUser?.name || 'User Name'}</p>
+                <p className="text-md font-semibold text-primary">{userProfileData?.name || currentUser?.name || 'User Name'}</p>
                <Link href="/dashboard/profile" className="text-xs text-muted-foreground hover:text-primary flex items-center mt-1">
                 View/Edit Profile <Edit className="ml-1 h-3 w-3"/>
               </Link>
