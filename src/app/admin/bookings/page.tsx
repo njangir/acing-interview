@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 
 import { PageHeader } from "@/components/core/page-header";
@@ -92,7 +92,11 @@ export default function AdminBookingsPage() {
     let bookingUpdated = false;
     const bookingIndex = MOCK_BOOKINGS.findIndex(b => b.id === bookingId);
     if (bookingIndex === -1) return;
-    const bookingToUpdate = MOCK_BOOKINGS[bookingIndex];
+    
+    // It's better to create a new object or deeply clone if nested structures are involved,
+    // but for status and top-level string changes, direct mutation of the item is okay for this mock.
+    const bookingToUpdate = { ...MOCK_BOOKINGS[bookingIndex] };
+
 
     if (action === 'accept') {
       message = `Booking ${bookingId} accepted and user notified.`;
@@ -109,15 +113,15 @@ export default function AdminBookingsPage() {
     } else if (action === 'approve_refund' && bookingToUpdate.paymentStatus === 'paid' && bookingToUpdate.requestedRefund) {
       message = `Refund for booking ${bookingId} approved. Booking cancelled.`;
       bookingToUpdate.status = 'cancelled';
-      bookingToUpdate.paymentStatus = 'pay_later_unpaid'; 
+      bookingToUpdate.paymentStatus = 'pay_later_unpaid'; // Indicate refund processed
       bookingToUpdate.requestedRefund = false; 
       bookingUpdated = true;
     }
     
     if (bookingUpdated) {
-      MOCK_BOOKINGS[bookingIndex] = bookingToUpdate;
+      MOCK_BOOKINGS[bookingIndex] = bookingToUpdate; // Mutate the MOCK_BOOKINGS array
       toast({ title: "Action Successful", description: message });
-      setForceUpdate(prev => prev + 1);
+      setForceUpdate(prev => prev + 1); // Trigger re-render
     }
   };
   
@@ -141,15 +145,14 @@ export default function AdminBookingsPage() {
 
     let bookingsCreatedCount = 0;
     emails.forEach((email, index) => {
-        // Basic email validation, can be improved
         if (!/^\S+@\S+\.\S+$/.test(email)) {
             toast({ title: "Skipped Invalid Email", description: `Skipped "${email}" as it's not a valid email format.`, variant: "destructive" });
             return;
         }
 
         const newBooking: Booking = {
-          id: `admin-booking-${Date.now()}-${index}`, // Unique ID for each booking
-          userName: data.userName, // Same name for all in group
+          id: `admin-booking-${Date.now()}-${index}`,
+          userName: data.userName,
           userEmail: email,
           serviceId: data.serviceId,
           serviceName: selectedService.name,
@@ -204,13 +207,22 @@ export default function AdminBookingsPage() {
     setSelectedBookingForEdit(null);
   }
   
-  const filteredBookings = useMemo(() => {
-    let bookings = [...MOCK_BOOKINGS].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  // Calculate filteredBookings directly on each render
+  const getFilteredBookings = () => {
+    // Sort by date descending first
+    let bookings = [...MOCK_BOOKINGS].sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return dateB - dateA;
+    });
+  
     if (filterServiceId !== 'all') {
       bookings = bookings.filter(booking => booking.serviceId === filterServiceId);
     }
     return bookings;
-  }, [MOCK_BOOKINGS, filterServiceId, forceUpdate]);
+  };
+
+  const currentFilteredBookings = getFilteredBookings();
 
 
   return (
@@ -241,7 +253,7 @@ export default function AdminBookingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>All Bookings</CardTitle>
-          <CardDescription>View and manage all bookings. Showing: {filteredBookings.length}</CardDescription>
+          <CardDescription>View and manage all bookings. Showing: {currentFilteredBookings.length}</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -257,7 +269,7 @@ export default function AdminBookingsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredBookings.length > 0 ? filteredBookings.map((booking) => (
+              {currentFilteredBookings.length > 0 ? currentFilteredBookings.map((booking) => (
                 <TableRow key={booking.id}>
                   <TableCell>
                     <div className="font-medium">{booking.userName}</div>
@@ -273,14 +285,19 @@ export default function AdminBookingsPage() {
                     }
                     className={
                         booking.status === 'upcoming' ? 'bg-blue-100 text-blue-700' :
-                        booking.status === 'pending_approval' ? 'bg-yellow-100 text-yellow-700' : ''
+                        booking.status === 'pending_approval' ? 'bg-yellow-100 text-yellow-700' : 
+                        booking.status === 'cancelled' ? 'bg-red-100 text-red-700 line-through' : ''
                     }>
                       {booking.status.replace('_', ' ').toUpperCase()}
                     </Badge>
                   </TableCell>
                    <TableCell>
                      <Badge variant={booking.paymentStatus === 'paid' ? 'default' : 'secondary'}
-                      className={booking.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}
+                      className={
+                        booking.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 
+                        booking.paymentStatus === 'pay_later_unpaid' ? 'bg-gray-100 text-gray-700 line-through' : 
+                        'bg-orange-100 text-orange-700'
+                      }
                      >
                        {booking.paymentStatus.replace('_', ' ').toUpperCase()}
                      </Badge>
@@ -307,7 +324,7 @@ export default function AdminBookingsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => openEditModal(booking)}>
+                          <DropdownMenuItem onClick={() => openEditModal(booking)} disabled={booking.status === 'cancelled'}>
                                 <Edit className="mr-2 h-4 w-4 text-blue-500" /> Edit / Reschedule
                           </DropdownMenuItem>
                           {booking.status === 'pending_approval' && (
@@ -641,6 +658,3 @@ export default function AdminBookingsPage() {
     </>
   );
 }
-
-
-    
