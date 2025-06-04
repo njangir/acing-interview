@@ -82,18 +82,18 @@ export default function AdminOverviewPage() {
         {ADMIN_DASHBOARD_NAV_LINKS.filter(link => link.href !== '/admin').map((link) => {
           const Icon = link.icon;
           return (
-            <Card key={link.href} className="shadow-lg hover:shadow-xl transition-shadow">
+            <Card key={link.href} className="shadow-lg hover:shadow-xl transition-shadow flex flex-col">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-lg font-medium font-headline text-primary">{link.label}</CardTitle>
                 <Icon className="h-6 w-6 text-accent" />
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex-grow">
                 <CardDescription>Manage {link.label.toLowerCase()}.</CardDescription>
               </CardContent>
               <CardFooter>
-                <Button asChild variant="outline" className="w-full">
+                <Button asChild variant="outline" className="w-full whitespace-normal h-auto">
                   <Link href={link.href}>
-                    Go to {link.label} <ArrowRight className="ml-2 h-4 w-4" />
+                    Go to {link.label} <ArrowRight className="ml-2 h-4 w-4 flex-shrink-0" />
                   </Link>
                 </Button>
               </CardFooter>
@@ -104,3 +104,4 @@ export default function AdminOverviewPage() {
     </>
   );
 }
+
