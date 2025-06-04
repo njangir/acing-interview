@@ -38,7 +38,7 @@ export function Header() {
 
   if (isDashboardPath && isLoggedIn) {
     mobileNavLinks = DASHBOARD_NAV_LINKS.map(link => ({...link, label: link.label.replace("My ", "")})); // Slightly adjust labels
-    mobileNavTitle = "Aspirant HQ Menu";
+    mobileNavTitle = "Officer Candidate HQ Menu";
   } else if (isAdminPath && isAdmin) {
     mobileNavLinks = ADMIN_DASHBOARD_NAV_LINKS;
     mobileNavTitle = "Admin Command Menu";
@@ -60,24 +60,24 @@ export function Header() {
               {link.label}
             </Link>
           ))}
-          {isLoggedIn && !isDashboardPath && !isAdminPath && ( 
+          {isLoggedIn && pathname !== '/dashboard' && !isAdminPath && ( 
              <Link
               href="/dashboard"
               className="text-sm font-medium text-foreground/70 transition-colors hover:text-foreground"
             >
-              Aspirant HQ
+              Officer Candidate HQ
             </Link>
           )}
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-2">
           {isLoggedIn ? (
             <>
-              {currentUser && <span className="text-sm text-muted-foreground hidden sm:inline">Aspirant {currentUser.name.split(' ')[0]}</span>}
-              {!isDashboardPath && (
+              {currentUser && <span className="text-sm text-muted-foreground hidden sm:inline">Officer Candidate {currentUser.name.split(' ')[0]}</span>}
+              {pathname !== '/dashboard' && !isAdminPath && ( // Show HQ link if not on main dashboard and not admin
                 <Button asChild variant="ghost" size="sm" className="hidden sm:flex">
                     <Link href="/dashboard">
                     <LayoutDashboard className="mr-2 h-4 w-4" />
-                    Aspirant HQ
+                    Officer Candidate HQ
                     </Link>
                 </Button>
               )}
@@ -146,7 +146,7 @@ export function Header() {
                   );
                 })}
 
-                {(!isDashboardPath && !isAdminPath) && isLoggedIn && (
+                {(!isDashboardPath || pathname !== '/dashboard') && !isAdminPath && isLoggedIn && (
                   <>
                     <hr className="my-2"/>
                     <Link
@@ -155,7 +155,7 @@ export function Header() {
                       onClick={() => setIsSheetOpen(false)}
                     >
                       <LayoutDashboard className="h-5 w-5" />
-                      Aspirant HQ
+                      Officer Candidate HQ
                     </Link>
                   </>
                 )}

@@ -84,8 +84,8 @@ export default function DashboardOverviewPage() {
   return (
     <>
       <PageHeader
-        title={`Reporting for duty, Aspirant ${currentUser?.name?.split(' ')[0] || 'User'}!`}
-        description="Review your mission objectives, access training materials, and track your progress, Aspirant."
+        title={`Reporting for duty, Officer Candidate ${currentUser?.name?.split(' ')[0] || 'User'}!`}
+        description="Review your mission objectives, access training materials, and track your progress."
       />
       <div className="space-y-8">
 
