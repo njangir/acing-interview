@@ -64,7 +64,7 @@ export default function PaymentPage() {
           setBookingDetails(JSON.parse(storedBookingDetails));
         } else {
           setError("Booking slot information not found.");
-          router.push(`/book/${serviceId}/slots`); // Redirect if slot info missing
+          router.push(`/book/${serviceId}/slots`); 
           return;
         }
 
@@ -73,7 +73,7 @@ export default function PaymentPage() {
           setUserDetails(JSON.parse(storedUserDetails));
         } else {
           setError("User details not found.");
-           router.push(`/book/${serviceId}/slots`); // Redirect if user info missing (should be set by slot page for logged in)
+           router.push(`/book/${serviceId}/slots`); 
           return;
         }
     }
@@ -89,23 +89,11 @@ export default function PaymentPage() {
       return;
     }
     
-    const newBookingId = `booking-${Date.now()}`;
-    const meetingLink = `https://meet.google.com/mock-link-${Math.random().toString(36).substring(2, 9)}`;
-    
-    const confirmationPayload = {
-        serviceName: service.name,
-        serviceId: service.id,
-        date: bookingDetails.date,
-        time: bookingDetails.time,
-        userName: userDetails.name,
-        userEmail: userDetails.email, 
-        meetingLink: meetingLink,
-    };
-
     let paymentSuccess = true;
-    let newBookingStatus: Booking['status'] = 'upcoming';
-    let newPaymentStatus: Booking['paymentStatus'] = 'paid';
-    let transactionId: string | null = "mock_txn_" + Date.now();
+    let newBookingStatus: Booking['status'];
+    let newPaymentStatus: Booking['paymentStatus'];
+    let transactionId: string | null = null;
+    let finalMeetingLink: string = '';
 
     if (paymentOption === 'payNow') {
       await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate payment processing
@@ -113,9 +101,29 @@ export default function PaymentPage() {
 
       if (paymentSuccess) {
         newPaymentStatus = 'paid';
+        transactionId = "mock_txn_" + Date.now();
+
+        if (bookingIdFromQuery) { // Paying for an existing 'pay_later_pending' booking
+            const bookingIndex = MOCK_BOOKINGS.findIndex(b => b.id === bookingIdFromQuery);
+            if (bookingIndex !== -1) {
+                MOCK_BOOKINGS[bookingIndex].paymentStatus = 'paid';
+                MOCK_BOOKINGS[bookingIndex].transactionId = transactionId;
+                // Status becomes 'accepted', or 'scheduled' if admin already added a link
+                MOCK_BOOKINGS[bookingIndex].status = MOCK_BOOKINGS[bookingIndex].meetingLink ? 'scheduled' : 'accepted';
+                newBookingStatus = MOCK_BOOKINGS[bookingIndex].status;
+                finalMeetingLink = MOCK_BOOKINGS[bookingIndex].meetingLink || '';
+            } else {
+                setError("Could not find the booking to update. Please try again.");
+                setIsLoading(false);
+                return;
+            }
+        } else { // New booking, paid now
+            newBookingStatus = 'accepted'; // Admin needs to provide link
+            finalMeetingLink = ''; // No meeting link generated here
+        }
         toast({
           title: "Payment Successful!",
-          description: "Your booking is confirmed. Redirecting...",
+          description: newBookingStatus === 'accepted' ? "Your booking is paid. Admin will schedule and provide meeting link." : "Your booking is confirmed. Redirecting...",
           variant: "default",
         });
       } else {
@@ -128,54 +136,54 @@ export default function PaymentPage() {
         setIsLoading(false);
         return;
       }
-    } else { // Pay Later
-      if (bookingIdFromQuery) { // Should not happen if UI is correct, but good check
+    } else { // Pay Later (always a new booking)
+      if (bookingIdFromQuery) { 
           setError("Pay Later option is not available for existing bookings being paid now.");
           setIsLoading(false);
           return;
       }
       await new Promise(resolve => setTimeout(resolve, 500));
       newPaymentStatus = 'pay_later_pending';
+      newBookingStatus = 'pending_approval'; // Admin needs to approve
+      finalMeetingLink = ''; // No meeting link
       transactionId = null;
       toast({
         title: "Booking Tentatively Confirmed!",
-        description: "Your slot is reserved. Payment will be due before the session. Redirecting...",
+        description: "Your slot is reserved. Payment will be due before the session if approved. Redirecting...",
         variant: "default",
       });
     }
 
-    // Add to MOCK_BOOKINGS for this session
     if (paymentSuccess) {
-      const newBookingEntry: Booking = {
-        id: newBookingId,
+      if (!bookingIdFromQuery) { // If it's a brand new booking, add it to MOCK_BOOKINGS
+        const newBookingId = `booking-${Date.now()}`;
+        const newBookingEntry: Booking = {
+          id: newBookingId,
+          serviceName: service.name,
+          serviceId: service.id,
+          date: bookingDetails.date,
+          time: bookingDetails.time,
+          userName: userDetails.name,
+          userEmail: currentUser.email,
+          meetingLink: finalMeetingLink, 
+          status: newBookingStatus,
+          paymentStatus: newPaymentStatus,
+          transactionId: transactionId,
+          requestedRefund: false,
+        };
+        MOCK_BOOKINGS.push(newBookingEntry);
+      }
+      // For existing bookings, MOCK_BOOKINGS was updated directly in the 'payNow' block.
+
+      localStorage.setItem('confirmationDetails', JSON.stringify({
         serviceName: service.name,
-        serviceId: service.id,
         date: bookingDetails.date,
         time: bookingDetails.time,
         userName: userDetails.name,
-        userEmail: currentUser.email, // Ensure it's the logged-in user's email
-        meetingLink: meetingLink,
-        status: newBookingStatus,
-        paymentStatus: newPaymentStatus,
-        transactionId: transactionId,
-        requestedRefund: false,
-      };
-      
-      if (bookingIdFromQuery) { // Paying for an existing 'pay_later_pending' booking
-        const bookingIndex = MOCK_BOOKINGS.findIndex(b => b.id === bookingIdFromQuery);
-        if (bookingIndex !== -1) {
-            MOCK_BOOKINGS[bookingIndex].paymentStatus = 'paid';
-            MOCK_BOOKINGS[bookingIndex].transactionId = transactionId;
-            MOCK_BOOKINGS[bookingIndex].status = 'upcoming'; // Ensure status is upcoming
-        }
-      } else { // New booking
-        MOCK_BOOKINGS.push(newBookingEntry);
-      }
-
-      localStorage.setItem('confirmationDetails', JSON.stringify({
-        ...confirmationPayload,
+        meetingLink: finalMeetingLink,
         transactionId: transactionId,
         paymentStatus: newPaymentStatus,
+        status: newBookingStatus, // Pass the actual booking status
       }));
       router.push(`/book/confirmation`);
     }
@@ -190,7 +198,7 @@ export default function PaymentPage() {
           <XCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error} Please start the booking process again from the service selection or slot page.</AlertDescription>
-           <Button onClick={() => router.push('/book')} className="mt-4">Go to Services</Button>
+           <Button onClick={() => router.push('/services')} className="mt-4">Go to Services</Button>
         </Alert>
       </div>
     );
@@ -227,18 +235,17 @@ export default function PaymentPage() {
             <RadioGroup 
                 onValueChange={(value: PaymentOption) => setPaymentOption(value)} 
                 className="space-y-2"
-                value={bookingIdFromQuery ? 'payNow' : paymentOption} // Default to payNow if it's an existing booking
-                // defaultValue="payNow" // removed defaultValue to rely on value
+                value={bookingIdFromQuery ? 'payNow' : paymentOption} 
             >
               <Label className="font-semibold text-md">Payment Options:</Label>
               <div className="flex items-center space-x-2 p-3 border rounded-md hover:border-primary transition-colors">
                 <RadioGroupItem value="payNow" id="payNow" disabled={bookingIdFromQuery && MOCK_BOOKINGS.find(b=>b.id===bookingIdFromQuery)?.paymentStatus === 'paid'} />
                 <Label htmlFor="payNow" className="flex-1 cursor-pointer">Pay Now & Confirm Slot</Label>
               </div>
-              {!bookingIdFromQuery && ( // Only show Pay Later for brand new bookings
+              {!bookingIdFromQuery && ( 
                 <div className="flex items-center space-x-2 p-3 border rounded-md hover:border-primary transition-colors">
                     <RadioGroupItem value="payLater" id="payLater" />
-                    <Label htmlFor="payLater" className="flex-1 cursor-pointer">Pay Later (Tentative Slot)</Label>
+                    <Label htmlFor="payLater" className="flex-1 cursor-pointer">Pay Later (Tentative, Requires Approval)</Label>
                 </div>
               )}
             </RadioGroup>
@@ -248,7 +255,7 @@ export default function PaymentPage() {
                 <Info className="h-4 w-4 !text-accent" />
                 <AlertTitle className="!text-accent">Important Notice</AlertTitle>
                 <AlertDescription className="!text-accent/80">
-                  Slots booked with 'Pay Later' are tentative. If another user books the same slot with advance payment, the slot will be allocated to them. We recommend paying in advance to secure your spot. Payment will be due before your scheduled session.
+                  Slots booked with 'Pay Later' are tentative and require admin approval. If approved, payment will be due before your scheduled session to fully confirm your booking.
                 </AlertDescription>
               </Alert>
             )}
@@ -282,7 +289,7 @@ export default function PaymentPage() {
                 <CheckCircle className="mr-2 h-4 w-4" />
               )}
               {isLoading ? 'Processing...' : 
-                paymentOption === 'payNow' ? `Pay ₹${service.price} Securely` : 'Confirm Booking (Pay Later)'
+                paymentOption === 'payNow' ? `Pay ₹${service.price} Securely` : 'Request Booking (Pay Later)'
               }
             </Button>
           </CardFooter>
