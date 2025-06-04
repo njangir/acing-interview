@@ -23,7 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { MOCK_BOOKINGS, MOCK_SERVICES } from "@/constants";
 import type { Booking } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck, PlusCircle, CalendarIcon, Edit, Filter } from 'lucide-react';
+import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck, PlusCircle, CalendarIcon, Edit, Filter, InfoIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { format, parse } from 'date-fns';
@@ -111,7 +111,7 @@ export default function AdminBookingsPage() {
     } else if (action === 'approve_refund' && bookingToUpdate.paymentStatus === 'paid' && bookingToUpdate.requestedRefund) {
       message = `Refund for booking ${bookingId} approved. Booking cancelled.`;
       bookingToUpdate.status = 'cancelled';
-      bookingToUpdate.paymentStatus = 'pay_later_unpaid';
+      bookingToUpdate.paymentStatus = 'pay_later_unpaid'; 
       bookingToUpdate.requestedRefund = false;
       bookingUpdated = true;
     }
@@ -209,7 +209,7 @@ export default function AdminBookingsPage() {
     let bookings = [...MOCK_BOOKINGS].sort((a, b) => {
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
-      return dateB - dateA;
+      return dateB - dateA; // Sort by most recent first
     });
 
     if (filterServiceId !== 'all') {
@@ -255,6 +255,7 @@ export default function AdminBookingsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Booking / Txn ID</TableHead>
                 <TableHead>User</TableHead>
                 <TableHead>Service</TableHead>
                 <TableHead>Date & Time</TableHead>
@@ -268,6 +269,12 @@ export default function AdminBookingsPage() {
               {currentFilteredBookings.length > 0 ? currentFilteredBookings.map((booking) => (
                 <TableRow key={booking.id}>
                   <TableCell>
+                    <div className="font-medium text-xs">{booking.id}</div>
+                    {booking.paymentStatus === 'paid' && booking.transactionId && (
+                        <div className="text-xs text-muted-foreground mt-1">Txn: {booking.transactionId}</div>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <div className="font-medium">{booking.userName}</div>
                     <div className="text-sm text-muted-foreground">{booking.userEmail}</div>
                   </TableCell>
@@ -279,12 +286,12 @@ export default function AdminBookingsPage() {
                             booking.status === 'pending_approval' ? 'secondary' :
                             booking.status === 'upcoming' ? 'default' :
                             booking.status === 'completed' ? 'outline' :
-                            'destructive' // Default to destructive for cancelled
+                            'destructive' 
                         }
                         className={cn(
                             booking.status === 'upcoming' && 'bg-blue-100 text-blue-700',
                             booking.status === 'pending_approval' && 'bg-yellow-100 text-yellow-700',
-                            booking.status === 'cancelled' && 'line-through opacity-75' // Rely on destructive variant for color
+                            booking.status === 'cancelled' && 'bg-red-100 text-red-700 line-through opacity-75'
                         )}
                     >
                         {booking.status.replace('_', ' ').toUpperCase()}
@@ -294,7 +301,7 @@ export default function AdminBookingsPage() {
                      <Badge variant={booking.paymentStatus === 'paid' ? 'default' : 'secondary'}
                       className={cn(
                         booking.paymentStatus === 'paid' && 'bg-green-100 text-green-700',
-                        booking.paymentStatus === 'pay_later_unpaid' && 'bg-gray-200 text-gray-600 line-through opacity-75',
+                        booking.paymentStatus === 'pay_later_unpaid' && 'bg-gray-100 text-gray-700 line-through opacity-75',
                         booking.paymentStatus === 'pay_later_pending' && 'bg-orange-100 text-orange-700'
                       )}
                      >
@@ -323,7 +330,10 @@ export default function AdminBookingsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => openEditModal(booking)} disabled={booking.status === 'cancelled'}>
+                          <DropdownMenuItem 
+                            onClick={() => openEditModal(booking)} 
+                            disabled={booking.status === 'cancelled'}
+                          >
                                 <Edit className="mr-2 h-4 w-4 text-blue-500" /> Edit / Reschedule
                           </DropdownMenuItem>
                           {booking.status === 'pending_approval' && (
@@ -338,7 +348,7 @@ export default function AdminBookingsPage() {
                            )}
                            {booking.status === 'upcoming' && (
                             <DropdownMenuItem onClick={() => handleAdminAction(booking.id, 'complete')}>
-                                Mark as Completed
+                               <CalendarClock className="mr-2 h-4 w-4 text-purple-500" /> Mark as Completed
                             </DropdownMenuItem>
                            )}
                           <DropdownMenuSeparator />
@@ -377,7 +387,7 @@ export default function AdminBookingsPage() {
                   </TableCell>
                 </TableRow>
               )) : (
-                 <TableRow><TableCell colSpan={7} className="text-center h-24">No bookings found matching the criteria.</TableCell></TableRow>
+                 <TableRow><TableCell colSpan={8} className="text-center h-24">No bookings found matching the criteria.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -660,3 +670,4 @@ export default function AdminBookingsPage() {
     </>
   );
 }
+
