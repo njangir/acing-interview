@@ -6,13 +6,14 @@ import { PageHeader } from "@/components/core/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MOCK_BOOKINGS, MOCK_SERVICES, MOCK_RESOURCES, PREDEFINED_AVATARS } from "@/constants";
-import type { Resource as ResourceType, UserProfile, Badge as BadgeType } from '@/types';
+import type { Resource as ResourceType, UserProfile, Badge as BadgeType, Booking } from '@/types';
 import { BookingCard } from "@/components/core/booking-card";
 import Link from "next/link";
 import Image from 'next/image';
-import { CalendarCheck, BookOpen, UserCircle, Edit, Award, Star } from "lucide-react";
-import { useAuth } from '@/hooks/use-auth'; 
+import { CalendarCheck, BookOpen, Edit, Award, Star, TrendingUp } from "lucide-react";
+import { useAuth } from '@/hooks/use-auth';
 import { WeeklyScheduleView } from '@/components/core/weekly-schedule-view';
+import { UserSkillsChart } from '@/components/core/user-skills-chart';
 
 
 const getPurchasedServiceIds = (): string[] => {
@@ -60,8 +61,16 @@ export default function DashboardOverviewPage() {
   const upcomingBookings = useMemo(() => {
     return userBookings.filter(b => b.status === 'upcoming' || b.status === 'pending_approval' || b.status === 'scheduled' || b.status === 'accepted');
   }, [userBookings]);
+  
+  const completedBookingsWithFeedback = useMemo(() => {
+    return userBookings.filter(
+      (booking): booking is Booking & { detailedFeedback: NonNullable<Booking['detailedFeedback']> } =>
+        booking.status === 'completed' && Array.isArray(booking.detailedFeedback) && booking.detailedFeedback.length > 0
+    );
+  }, [userBookings]);
 
-  const recentService = MOCK_SERVICES[0]; 
+
+  const recentService = MOCK_SERVICES[0];
 
   const accessibleResourcesCount = useMemo(() => {
     const purchasedServiceIds = getPurchasedServiceIds();
@@ -79,7 +88,7 @@ export default function DashboardOverviewPage() {
         description="Manage your bookings, access resources, and track your progress."
       />
       <div className="space-y-8">
-        
+
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
           <Card className="shadow xl:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -158,7 +167,13 @@ export default function DashboardOverviewPage() {
             title="My Weekly Schedule"
           />
         )}
-        
+
+        {currentUser && (
+          <div className="mt-8">
+            <UserSkillsChart completedBookingsWithFeedback={completedBookingsWithFeedback} />
+          </div>
+        )}
+
         <div>
           <h2 className="text-2xl font-semibold mb-4 font-headline text-primary mt-8">Next Upcoming Session</h2>
           {upcomingBookings.length > 0 ? (
@@ -174,7 +189,7 @@ export default function DashboardOverviewPage() {
             </Card>
           )}
         </div>
-        
+
         {recentService && (
           <div>
             <h2 className="text-2xl font-semibold mb-4 font-headline text-primary mt-8">Quick Actions</h2>

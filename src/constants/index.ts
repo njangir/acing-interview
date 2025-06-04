@@ -193,6 +193,7 @@ export const MOCK_BOOKINGS: Booking[] = [
         { skill: 'Confidence Level', rating: 'Good', comments: 'Showed good confidence, can be more assertive in group tasks.' },
         { skill: 'Problem Solving Ability', rating: 'Excellent', comments: 'Approached problems logically and found creative solutions.' },
         { skill: 'General Awareness', rating: 'Satisfactory', comments: 'Needs to brush up on recent national events.' },
+        { skill: 'Officer-Like Qualities (OLQs)', rating: 'Outstanding' },
     ],
   },
   {
@@ -210,6 +211,27 @@ export const MOCK_BOOKINGS: Booking[] = [
     detailedFeedback: [
       { skill: 'AFCAT Exam Knowledge', rating: 'Good', comments: 'Understands the syllabus well.' },
       { skill: 'Time Management Strategy', rating: 'Satisfactory', comments: 'Needs to practice more timed tests.' },
+      { skill: 'Problem Solving Ability', rating: 'Very Good'},
+    ],
+  },
+  {
+    id: 'booking7',
+    serviceName: 'SSB Mock Interview',
+    serviceId: 'ssb-mock-interview',
+    date: getFutureDate(-10),
+    time: '09:00 AM',
+    userName: "Aspirant TestUser",
+    userEmail: "aspirant@example.com",
+    meetingLink: 'https://meet.google.com/aspirant-mock-ssb',
+    status: 'completed',
+    paymentStatus: 'paid',
+    transactionId: 'txn_aspirant_ssb_007',
+    reportUrl: '/resources/mock_feedback_aspirant_007.pdf',
+    detailedFeedback: [
+        { skill: 'Communication Skills', rating: 'Good' },
+        { skill: 'Officer-Like Qualities (OLQs)', rating: 'Very Good' },
+        { skill: 'Confidence Level', rating: 'Excellent' },
+        { skill: 'Group Interaction', rating: 'Satisfactory' },
     ],
   },
 ];
@@ -413,12 +435,24 @@ export const PREDEFINED_SKILLS: string[] = [
 ];
 
 export const SKILL_RATINGS: string[] = [
-    "Needs Significant Improvement",
-    "Needs Improvement",
-    "Satisfactory",
-    "Good",
-    "Very Good",
-    "Excellent",
-    "Outstanding",
+    "Needs Significant Improvement", // 1
+    "Needs Improvement",             // 2
+    "Satisfactory",                  // 3
+    "Good",                          // 4
+    "Very Good",                     // 5
+    "Excellent",                     // 6
+    "Outstanding",                   // 7
 ];
 
+export const SKILL_RATING_VALUES: Record<string, number> = {
+  "Needs Significant Improvement": 1,
+  "Needs Improvement": 2,
+  "Satisfactory": 3,
+  "Good": 4,
+  "Very Good": 5,
+  "Excellent": 6,
+  "Outstanding": 7,
+};
+
+export const MAX_SKILL_RATING_VALUE = 7;
+export const TARGET_SKILL_RATING_VALUE = 4; // Represents "Good"
