@@ -50,18 +50,20 @@ export default function LoginPage() {
         description: 'Welcome back, Admin! Redirecting...',
       });
       router.push(redirectUrl.startsWith('/admin') ? redirectUrl : '/admin');
-    } else if (data.email === 'user@example.com' && data.password === 'userpass') { // Simple regular user check
-       login({ email: data.email, name: 'Regular User', isAdmin: false });
+    } else if ((data.email === 'user@example.com' || data.email === 'aspirant@example.com') && data.password === 'userpass') { // Regular user or aspirant
+       const userName = data.email === 'aspirant@example.com' ? 'Aspirant TestUser' : 'Regular User';
+       login({ email: data.email, name: userName, isAdmin: false });
        toast({
         title: 'Login Successful (Mock)',
-        description: 'Welcome back! Redirecting to dashboard...',
+        description: 'Welcome back! Redirecting...',
       });
-      router.push(redirectUrl.startsWith('/admin') ? '/dashboard' : redirectUrl); // Prevent non-admin to admin redirect
+      // Prevent non-admin to admin redirect, allow aspirant to go to dashboard (or original redirect)
+      router.push(redirectUrl.startsWith('/admin') ? '/dashboard' : redirectUrl);
     }
      else {
       toast({
         title: 'Login Failed',
-        description: 'Invalid email or password. Mock users: user@example.com (userpass) or admin@example.com (adminpass)',
+        description: 'Invalid email or password. Mock users: user@example.com or aspirant@example.com (userpass) or admin@example.com (adminpass)',
         variant: 'destructive',
       });
     }
@@ -77,7 +79,7 @@ export default function LoginPage() {
           <CardTitle className="text-2xl font-headline text-primary">Welcome Back</CardTitle>
           <CardDescription>
             Enter your credentials to access your account. <br/>
-            (Try user@example.com / userpass OR admin@example.com / adminpass)
+            (Try user@example.com, aspirant@example.com / userpass OR admin@example.com / adminpass)
           </CardDescription>
         </CardHeader>
         <Form {...form}>
