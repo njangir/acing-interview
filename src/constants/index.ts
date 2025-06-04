@@ -179,14 +179,21 @@ export const MOCK_BOOKINGS: Booking[] = [
     id: 'booking5',
     serviceName: 'Personal Counselling Session',
     serviceId: 'personal-counselling-session',
-    date: getFutureDate(1),
+    date: getFutureDate(-2), // Set to a past date for 'completed' status
     time: '04:00 PM',
-    userName: "Priya Desai",
-    userEmail: "aspirant@example.com",
+    userName: "Priya Desai", // Keeping user as Priya Desai
+    userEmail: "aspirant@example.com", // User for testing
     meetingLink: 'https://meet.google.com/123-456-789',
-    status: 'scheduled',
+    status: 'completed', // Changed to completed
     paymentStatus: 'paid',
     transactionId: 'txn_priya_counsel_02',
+    reportUrl: '/resources/mock_feedback_priya_01.pdf', // Added report URL
+    detailedFeedback: [ // Added detailed feedback
+        { skill: 'Communication Skills', rating: 'Very Good', comments: 'Clear and concise in responses.' },
+        { skill: 'Confidence Level', rating: 'Good', comments: 'Showed good confidence, can be more assertive in group tasks.' },
+        { skill: 'Problem Solving Ability', rating: 'Excellent', comments: 'Approached problems logically and found creative solutions.' },
+        { skill: 'General Awareness', rating: 'Satisfactory', comments: 'Needs to brush up on recent national events.' },
+    ],
   },
   {
     id: 'booking6',
@@ -339,7 +346,7 @@ export const MOCK_USER_MESSAGES: UserMessage[] = [
 
 export const MOCK_USER_PROFILE_FOR_CONTACT: UserProfile = {
   name: "Test User",
-  email: "testuser@example.com",
+  email: "aspirant@example.com", // Changed to aspirant@example.com for consistency
   phone: "1234567890",
   imageUrl: PREDEFINED_AVATARS[0].url, // Default avatar
   awardedBadges: [],
@@ -414,3 +421,4 @@ export const SKILL_RATINGS: string[] = [
     "Excellent",
     "Outstanding",
 ];
+
