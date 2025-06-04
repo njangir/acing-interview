@@ -1,19 +1,52 @@
+
+'use client';
+
+import { useMemo } from 'react';
 import { PageHeader } from "@/components/core/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MOCK_BOOKINGS, MOCK_SERVICES } from "@/constants";
+import { MOCK_BOOKINGS, MOCK_SERVICES, MOCK_RESOURCES } from "@/constants";
+import type { Resource as ResourceType } from '@/types';
 import { BookingCard } from "@/components/core/booking-card";
 import Link from "next/link";
 import { CalendarCheck, BookOpen, UserCircle, Edit } from "lucide-react";
+import { useAuth } from '@/hooks/use-auth'; // Import useAuth
+
+// Mock function to simulate fetching user's purchased services
+// In a real app, this would come from a backend based on user authentication
+const getPurchasedServiceIds = (): string[] => {
+  // For demo, assume user has purchased the first two services + general
+  return [MOCK_SERVICES[0]?.id, MOCK_SERVICES[1]?.id, 'general'].filter(Boolean) as string[];
+};
+
 
 export default function DashboardOverviewPage() {
-  const upcomingBookings = MOCK_BOOKINGS.filter(b => b.status === 'upcoming');
-  const recentService = MOCK_SERVICES[0]; // Mock recent service
+  const { currentUser } = useAuth();
+
+  const userBookings = useMemo(() => {
+    if (!currentUser) return [];
+    return MOCK_BOOKINGS.filter(b => b.userEmail === currentUser.email);
+  }, [currentUser]);
+
+  const upcomingBookings = useMemo(() => {
+    return userBookings.filter(b => b.status === 'upcoming' || b.status === 'pending_approval');
+  }, [userBookings]);
+
+  const recentService = MOCK_SERVICES[0]; // Mock recent service, can be made dynamic
+
+  const accessibleResourcesCount = useMemo(() => {
+    const purchasedServiceIds = getPurchasedServiceIds();
+    const filtered = MOCK_RESOURCES.filter(resource =>
+      purchasedServiceIds.includes(resource.serviceCategory)
+    );
+    return filtered.length;
+  }, []);
+
 
   return (
     <>
       <PageHeader
-        title="Welcome to Your Dashboard"
+        title={`Welcome back, ${currentUser?.name?.split(' ')[0] || 'User'}!`}
         description="Manage your bookings, access resources, and track your progress."
       />
       <div className="space-y-8">
@@ -31,12 +64,12 @@ export default function DashboardOverviewPage() {
           </Card>
           <Card className="shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Resources Accessed</CardTitle>
+              <CardTitle className="text-sm font-medium">Resources Available</CardTitle>
               <BookOpen className="h-5 w-5 text-accent" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">0 {/* Mock Value */}</div>
-              <p className="text-xs text-muted-foreground">premium resources available</p>
+              <div className="text-2xl font-bold text-primary">{accessibleResourcesCount}</div>
+              <p className="text-xs text-muted-foreground">premium resources accessible</p>
             </CardContent>
           </Card>
            <Card className="shadow">
@@ -57,10 +90,10 @@ export default function DashboardOverviewPage() {
         <div>
           <h2 className="text-2xl font-semibold mb-4 font-headline text-primary">Next Upcoming Session</h2>
           {upcomingBookings.length > 0 ? (
-            <BookingCard booking={upcomingBookings[0]} />
+            <BookingCard booking={upcomingBookings.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0]} />
           ) : (
             <Card>
-              <CardContent className="pt-6">
+              <CardContent className="pt-6 text-center">
                 <p className="text-muted-foreground">No upcoming bookings.</p>
                 <Button asChild className="mt-4 bg-accent hover:bg-accent/90 text-accent-foreground">
                   <Link href="/book">Book a New Session</Link>
@@ -87,7 +120,7 @@ export default function DashboardOverviewPage() {
                         <Link href={`/dashboard/resources?service=${recentService.id}`}>Go to Resources</Link>
                     </Button>
                     <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                        <Link href={`/book?serviceId=${recentService.id}`}>Book {recentService.name} Again</Link>
+                        <Link href={`/book/${recentService.id}/slots`}>Book {recentService.name} Again</Link>
                     </Button>
                  </div>
               </CardContent>
