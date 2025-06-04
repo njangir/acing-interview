@@ -72,12 +72,14 @@ export interface MentorProfileData {
 
 export interface UserMessage {
   id: string;
-  userName: string;
-  userEmail: string;
+  userName: string; // Name of the user who initiated or is part of the conversation
+  userEmail: string; // Email of the user, used as a conversation key
   subject: string;
   messageBody: string;
   timestamp: Date;
-  status: 'new' | 'read' | 'replied';
+  status: 'new' | 'read' | 'replied' | 'closed'; // Status can apply to individual message or conversation
+  senderType: 'user' | 'admin'; // Who sent THIS specific message
+  adminName?: string; // Name of admin if senderType is 'admin'
 }
 
 export interface Badge {
@@ -96,3 +98,4 @@ export interface UserProfile {
   phone: string;
   awardedBadges: Badge[];
 }
+

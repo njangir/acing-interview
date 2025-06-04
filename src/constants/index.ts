@@ -300,7 +300,19 @@ export const MOCK_USER_MESSAGES: UserMessage[] = [
     subject: 'Question about GTO tasks',
     messageBody: 'Hello, I had a quick question regarding the GTO tasks for the SSB mock interview. Could you please elaborate on what to expect?',
     timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-    status: 'new',
+    status: 'read', // This message from user was read by admin
+    senderType: 'user',
+  },
+  {
+    id: 'msg1-reply1',
+    userName: 'Rohan Sharma', // Keep original user context for grouping
+    userEmail: 'aspirant@example.com', // Same userEmail to group conversation
+    subject: 'Re: Question about GTO tasks', // Admin's reply subject
+    messageBody: 'Hi Rohan, GTO tasks typically include group discussions, group planning exercises, progressive group tasks, etc. We cover these in detail during the mock interview. Let me know if you have specific concerns!',
+    timestamp: new Date(Date.now() - 1.9 * 24 * 60 * 60 * 1000), // A bit after Rohan's message
+    status: 'replied', // This message itself is a reply from admin
+    senderType: 'admin',
+    adminName: 'Admin Team',
   },
   {
     id: 'msg2',
@@ -309,7 +321,8 @@ export const MOCK_USER_MESSAGES: UserMessage[] = [
     subject: 'Reschedule Counselling Session',
     messageBody: 'Is it possible to reschedule my counselling session from next Tuesday to Wednesday? Please let me know.',
     timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
-    status: 'read',
+    status: 'new', // This message is new from user
+    senderType: 'user',
   },
 ];
 
@@ -387,4 +400,3 @@ export const SKILL_RATINGS: string[] = [
     "Excellent",
     "Outstanding",
 ];
-
