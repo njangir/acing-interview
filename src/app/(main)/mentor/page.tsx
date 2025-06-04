@@ -69,7 +69,7 @@ export default function MentorProfilePage() {
                 </blockquote>
                 <div className="text-center md:text-right pt-4">
                   <Button size="lg" asChild className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-md transform hover:scale-105 transition-transform duration-300">
-                    <Link href="/book">Book a Session with {MENTOR_PROFILE.name.split(' ')[0]}</Link>
+                    <Link href="/services">Book a Session with {MENTOR_PROFILE.name.split(' ')[0]}</Link>
                   </Button>
                 </div>
               </CardContent>

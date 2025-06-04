@@ -96,7 +96,7 @@ export default function DashboardOverviewPage() {
               <CardContent className="pt-6 text-center">
                 <p className="text-muted-foreground">No upcoming bookings.</p>
                 <Button asChild className="mt-4 bg-accent hover:bg-accent/90 text-accent-foreground">
-                  <Link href="/book">Book a New Session</Link>
+                  <Link href="/services">Book a New Session</Link>
                 </Button>
               </CardContent>
             </Card>

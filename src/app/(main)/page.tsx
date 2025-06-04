@@ -24,7 +24,7 @@ export default function HomePage() {
             </p>
             <div className="animate-subtle-appear" style={{ animationDelay: '0.5s' }}>
               <Button size="lg" asChild className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg transform hover:scale-105 transition-transform duration-300">
-                <Link href="/book">Book Your Interview Now</Link>
+                <Link href="/services">Book Your Interview Now</Link>
               </Button>
             </div>
           </div>
@@ -105,7 +105,7 @@ export default function HomePage() {
             Don't leave your dream to chance. Invest in yourself and get the best preparation for your SSB interview.
           </p>
           <Button size="lg" asChild className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg transform hover:scale-105 transition-transform duration-300">
-            <Link href="/book">Schedule Your Mock Interview Today</Link>
+            <Link href="/services">Schedule Your Mock Interview Today</Link>
           </Button>
         </div>
       </section>
