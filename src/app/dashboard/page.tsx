@@ -10,12 +10,11 @@ import type { Resource as ResourceType } from '@/types';
 import { BookingCard } from "@/components/core/booking-card";
 import Link from "next/link";
 import { CalendarCheck, BookOpen, UserCircle, Edit } from "lucide-react";
-import { useAuth } from '@/hooks/use-auth'; // Import useAuth
+import { useAuth } from '@/hooks/use-auth'; 
+import { WeeklyScheduleView } from '@/components/core/weekly-schedule-view'; // Added import
 
-// Mock function to simulate fetching user's purchased services
-// In a real app, this would come from a backend based on user authentication
+
 const getPurchasedServiceIds = (): string[] => {
-  // For demo, assume user has purchased the first two services + general
   return [MOCK_SERVICES[0]?.id, MOCK_SERVICES[1]?.id, 'general'].filter(Boolean) as string[];
 };
 
@@ -32,7 +31,7 @@ export default function DashboardOverviewPage() {
     return userBookings.filter(b => b.status === 'upcoming' || b.status === 'pending_approval');
   }, [userBookings]);
 
-  const recentService = MOCK_SERVICES[0]; // Mock recent service, can be made dynamic
+  const recentService = MOCK_SERVICES[0]; 
 
   const accessibleResourcesCount = useMemo(() => {
     const purchasedServiceIds = getPurchasedServiceIds();
@@ -50,7 +49,7 @@ export default function DashboardOverviewPage() {
         description="Manage your bookings, access resources, and track your progress."
       />
       <div className="space-y-8">
-        {/* Quick Stats or Summary */}
+        
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <Card className="shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -86,9 +85,17 @@ export default function DashboardOverviewPage() {
           </Card>
         </div>
 
-        {/* Upcoming Bookings Preview */}
+        {currentUser && (
+          <WeeklyScheduleView
+            allBookings={MOCK_BOOKINGS}
+            currentUserEmail={currentUser.email}
+            title="My Weekly Schedule"
+          />
+        )}
+
+        
         <div>
-          <h2 className="text-2xl font-semibold mb-4 font-headline text-primary">Next Upcoming Session</h2>
+          <h2 className="text-2xl font-semibold mb-4 font-headline text-primary mt-8">Next Upcoming Session</h2>
           {upcomingBookings.length > 0 ? (
             <BookingCard booking={upcomingBookings.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0]} />
           ) : (
@@ -103,10 +110,10 @@ export default function DashboardOverviewPage() {
           )}
         </div>
 
-        {/* Quick Access to Resources or Rebook */}
+        
         {recentService && (
           <div>
-            <h2 className="text-2xl font-semibold mb-4 font-headline text-primary">Quick Actions</h2>
+            <h2 className="text-2xl font-semibold mb-4 font-headline text-primary mt-8">Quick Actions</h2>
             <Card className="shadow">
               <CardHeader>
                 <CardTitle className="text-lg font-headline text-primary/90">Explore {recentService.name} Resources</CardTitle>

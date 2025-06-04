@@ -1,20 +1,21 @@
 
-'use client'; // Add this line to ensure client-side rendering for hooks
+'use client'; 
 
-import { useMemo } from 'react'; // Import useMemo
+import { useMemo } from 'react'; 
 import { PageHeader } from "@/components/core/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ADMIN_DASHBOARD_NAV_LINKS, MOCK_BOOKINGS, MOCK_USER_MESSAGES, MOCK_SERVICES } from "@/constants";
 import { ArrowRight, BellRing, TrendingUp, MessagesSquare, Star } from "lucide-react";
+import { WeeklyScheduleView } from '@/components/core/weekly-schedule-view'; // Added import
 
 export default function AdminOverviewPage() {
   const newBookingRequests = useMemo(() => MOCK_BOOKINGS.filter(b => b.status === 'pending_approval').length, []);
   
   const totalSales = useMemo(() => MOCK_BOOKINGS.reduce((acc, booking) => {
     if (booking.paymentStatus === 'paid') {
-      const service = MOCK_SERVICES.find(s => s.id === booking.serviceId); // Match by ID
+      const service = MOCK_SERVICES.find(s => s.id === booking.serviceId); 
       if (service) {
         return acc + service.price;
       }
@@ -23,7 +24,7 @@ export default function AdminOverviewPage() {
   }, 0), []);
 
   const newMessagesCount = useMemo(() => MOCK_USER_MESSAGES.filter(m => m.status === 'new').length, []);
-  const averageRating = "4.7/5 Stars"; // Placeholder
+  const averageRating = "4.7/5 Stars"; 
 
   return (
     <>
@@ -32,7 +33,7 @@ export default function AdminOverviewPage() {
         description="Welcome to the admin panel. Get quick insights and manage your application's operations from here."
       />
       
-      {/* Quick Insights Section */}
+      
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
         <Card className="shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -76,8 +77,14 @@ export default function AdminOverviewPage() {
         </Card>
       </div>
 
-      {/* Navigation Links Section */}
-      <h2 className="text-2xl font-semibold mb-4 font-headline text-primary">Admin Sections</h2>
+      <WeeklyScheduleView
+        allBookings={MOCK_BOOKINGS}
+        title="Admin - Weekly Bookings Overview"
+        showUserName={true}
+      />
+
+      
+      <h2 className="text-2xl font-semibold mb-4 mt-8 font-headline text-primary">Admin Sections</h2>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {ADMIN_DASHBOARD_NAV_LINKS.filter(link => link.href !== '/admin').map((link) => {
           const Icon = link.icon;
