@@ -1,6 +1,6 @@
 
 import type { Service, Testimonial, Booking, Resource, MentorProfileData, UserMessage, Badge, UserProfile } from '@/types';
-import { Shield, Video, FileText, Link as LinkIcon, CalendarDays, Users, UserSquare2, ListChecks, Edit3, UploadCloud, BookCopy, MessageSquare, UserCog, CalendarPlus, MailQuestion, MessagesSquare, Award, Edit2Icon, DownloadCloud } from 'lucide-react';
+import { Shield, Video, FileText, Link as LinkIcon, CalendarDays, Users, UserSquare2, ListChecks, Edit3, UploadCloud, BookCopy, MessageSquare, UserCog, CalendarPlus, MailQuestion, MessagesSquare, Award, Edit2Icon, DownloadCloud, Sparkles } from 'lucide-react';
 
 const today = new Date();
 export function getFutureDate(daysToAdd: number): string {
@@ -113,7 +113,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     userName: "Ananya Sharma",
     userEmail: "ananya.sharma@example.com",
     meetingLink: 'https://meet.google.com/xyz-abc-pqr',
-    status: 'upcoming',
+    status: 'scheduled', // Changed from upcoming
     paymentStatus: 'paid',
     transactionId: 'txn_ananya_ssb_mock_01',
     requestedRefund: false,
@@ -145,7 +145,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     time: '03:00 PM',
     userName: "Nisha Patel",
     userEmail: "nisha.patel@example.com",
-    meetingLink: 'https://meet.google.com/mno-pqr-stu',
+    meetingLink: '', // Admin needs to set this
     status: 'pending_approval',
     paymentStatus: 'pay_later_pending',
     transactionId: null,
@@ -158,8 +158,8 @@ export const MOCK_BOOKINGS: Booking[] = [
     time: '11:00 AM',
     userName: "Rajesh Kumar",
     userEmail: "rajesh.kumar@example.com",
-    meetingLink: 'https://meet.google.com/uvw-xyz-123',
-    status: 'upcoming',
+    meetingLink: '', // Admin needs to set this
+    status: 'accepted', // Example of accepted, awaiting link
     paymentStatus: 'pay_later_pending',
     transactionId: null,
     requestedRefund: true,
@@ -174,7 +174,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     userName: "Priya Desai",
     userEmail: "aspirant@example.com",
     meetingLink: 'https://meet.google.com/123-456-789',
-    status: 'upcoming',
+    status: 'scheduled', // Changed from upcoming
     paymentStatus: 'paid',
     transactionId: 'txn_priya_counsel_02',
   },
@@ -255,6 +255,7 @@ export const ADMIN_DASHBOARD_NAV_LINKS = [
   { href: '/admin/testimonials', label: 'Approve Testimonials', icon: MessageSquare },
   { href: '/admin/mentor-profile', label: 'Update Mentor Profile', icon: UserCog },
   { href: '/admin/messages', label: 'User Messages', icon: MessagesSquare },
+  { href: '/admin/badges', label: 'Manage Badges', icon: Award },
   { href: '/admin/export-reports', label: 'Export Reports', icon: DownloadCloud },
 ];
 
@@ -300,7 +301,7 @@ export const MOCK_USER_MESSAGES: UserMessage[] = [
     subject: 'Question about GTO tasks',
     messageBody: 'Hello, I had a quick question regarding the GTO tasks for the SSB mock interview. Could you please elaborate on what to expect?',
     timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-    status: 'read', // This message from user was read by admin
+    status: 'replied', // This message from user was read and replied by admin
     senderType: 'user',
   },
   {
@@ -400,3 +401,4 @@ export const SKILL_RATINGS: string[] = [
     "Excellent",
     "Outstanding",
 ];
+
