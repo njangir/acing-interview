@@ -6,7 +6,7 @@ import { Logo } from '@/components/icons/logo';
 import { useAuth } from '@/hooks/use-auth';
 
 export function Footer() {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn } = useAuth(); // isLoggedIn derived from currentUser
 
   return (
     <footer className="border-t bg-card text-card-foreground">

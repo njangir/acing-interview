@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { MOCK_SERVICES } from "@/constants";
 import type { Service } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Edit, Trash2, Upload } from 'lucide-react';
+import { PlusCircle, Edit, Trash2 } from 'lucide-react'; // Removed Upload
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import Image from 'next/image';
 
@@ -26,6 +26,7 @@ const initialServiceFormState: Omit<Service, 'id' | 'features'> & { features: st
   features: '',
   image: '',
   dataAiHint: '',
+  defaultForce: 'General',
 };
 
 export default function AdminServicesPage() {
@@ -48,6 +49,7 @@ export default function AdminServicesPage() {
         features: currentService.features.join(', '),
         image: currentService.image || '',
         dataAiHint: currentService.dataAiHint || '',
+        defaultForce: currentService.defaultForce || 'General',
       });
       setImagePreview(currentService.image || null);
     } else {
@@ -69,7 +71,7 @@ export default function AdminServicesPage() {
       setImagePreview(URL.createObjectURL(file));
     } else {
       setSelectedFile(null);
-      setImagePreview(currentService?.image || null); // Revert to original if file selection is cleared
+      setImagePreview(currentService?.image || null); 
     }
   };
 
@@ -88,10 +90,7 @@ export default function AdminServicesPage() {
     
     let imageUrl = formData.image;
     if (selectedFile) {
-      // Simulate upload: In a real app, upload selectedFile to storage and get URL
-      // For now, use a placeholder or filename.
-      // We'll use the selectedFile.name as a mock URL.
-      imageUrl = `https://placehold.co/600x400.png?text=Uploaded+${selectedFile.name.substring(0,10)}`; 
+      imageUrl = `https://placehold.co/600x400.png?text=New+${selectedFile.name.substring(0,10)}`; 
       console.log("Simulating upload of:", selectedFile.name);
     }
 
@@ -100,8 +99,9 @@ export default function AdminServicesPage() {
       ...formData,
       id: currentService?.id || `service-${Date.now()}`, 
       features: formData.features.split(',').map(f => f.trim()).filter(f => f), 
-      image: imageUrl || 'https://placehold.co/600x400.png', // Default if no image provided
+      image: imageUrl || 'https://placehold.co/600x400.png', 
       dataAiHint: formData.dataAiHint || 'service related',
+      price: Number(formData.price), // Ensure price is a number
     };
 
     if (currentService) {
@@ -111,7 +111,6 @@ export default function AdminServicesPage() {
       setServices(prev => [...prev, serviceToSave]);
       toast({ title: "Service Added", description: `${serviceToSave.name} has been added.` });
     }
-    // MOCK_SERVICES = services; // This would update the constant in a real state management scenario or backend
     console.log("Saving service (simulated):", serviceToSave);
     setIsModalOpen(false);
   };
@@ -120,7 +119,6 @@ export default function AdminServicesPage() {
     setServices(prev => prev.filter(s => s.id !== serviceId));
     toast({ title: "Service Deleted", description: `Service has been deleted.`});
     console.log("Deleting service:", serviceId);
-    // MOCK_SERVICES = services.filter(s => s.id !== serviceId);
   };
 
   return (

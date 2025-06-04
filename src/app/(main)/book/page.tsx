@@ -1,3 +1,4 @@
+
 import { PageHeader } from "@/components/core/page-header";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,8 +24,8 @@ export default function BookServiceSelectionPage() {
                     <Image 
                       src={service.image} 
                       alt={service.name} 
-                      layout="fill" 
-                      objectFit="cover" 
+                      fill={true}
+                      style={{ objectFit: "cover" }}
                       data-ai-hint={service.dataAiHint || 'service related'}
                     />
                   </div>

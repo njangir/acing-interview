@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface AuthUser {
@@ -14,13 +14,13 @@ interface AuthContextType {
   currentUser: AuthUser | null;
   isLoggedIn: boolean;
   isAdmin: boolean;
-  login: (user: AuthUser) => void;
+  login: (user?: AuthUser) => void; // Made user optional to handle mock signup
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const router = useRouter();
 
@@ -28,7 +28,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const storedUser = localStorage.getItem('currentUserAFIA');
     if (storedUser) {
       try {
-        setCurrentUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        setCurrentUser(parsedUser);
       } catch (e) {
         console.error("Error parsing stored user data", e);
         localStorage.removeItem('currentUserAFIA');
@@ -36,9 +37,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = useCallback((user: AuthUser) => {
-    localStorage.setItem('currentUserAFIA', JSON.stringify(user));
-    setCurrentUser(user);
+  const login = useCallback((user?: AuthUser) => { // Updated to accept optional user
+    if (user) {
+      localStorage.setItem('currentUserAFIA', JSON.stringify(user));
+      setCurrentUser(user);
+    } else {
+      // Handle generic login for signup (no specific user data yet, or default)
+      const mockUser: AuthUser = { email: 'user@example.com', name: 'New User', isAdmin: false };
+      localStorage.setItem('currentUserAFIA', JSON.stringify(mockUser));
+      setCurrentUser(mockUser);
+    }
   }, []);
 
   const logout = useCallback(() => {

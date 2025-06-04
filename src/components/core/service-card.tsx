@@ -1,3 +1,4 @@
+
 import type { Service } from '@/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,8 +19,8 @@ export function ServiceCard({ service }: ServiceCardProps) {
             <Image 
               src={service.image} 
               alt={service.name} 
-              layout="fill" 
-              objectFit="cover" 
+              fill={true}
+              style={{ objectFit: "cover" }}
               data-ai-hint={service.dataAiHint || 'service related'}
             />
           </div>

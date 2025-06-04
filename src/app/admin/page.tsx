@@ -1,4 +1,7 @@
 
+'use client'; // Add this line to ensure client-side rendering for hooks
+
+import { useMemo } from 'react'; // Import useMemo
 import { PageHeader } from "@/components/core/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,20 +10,20 @@ import { ADMIN_DASHBOARD_NAV_LINKS, MOCK_BOOKINGS, MOCK_USER_MESSAGES, MOCK_SERV
 import { ArrowRight, BellRing, TrendingUp, MessagesSquare, Star } from "lucide-react";
 
 export default function AdminOverviewPage() {
-  const newBookingRequests = MOCK_BOOKINGS.filter(b => b.status === 'pending_approval').length;
+  const newBookingRequests = useMemo(() => MOCK_BOOKINGS.filter(b => b.status === 'pending_approval').length, []);
   
-  const totalSales = MOCK_BOOKINGS.reduce((acc, booking) => {
+  const totalSales = useMemo(() => MOCK_BOOKINGS.reduce((acc, booking) => {
     if (booking.paymentStatus === 'paid') {
-      const service = MOCK_SERVICES.find(s => s.name === booking.serviceName);
+      const service = MOCK_SERVICES.find(s => s.id === booking.serviceId); // Match by ID
       if (service) {
         return acc + service.price;
       }
     }
     return acc;
-  }, 0);
+  }, 0), []);
 
-  const newMessagesCount = MOCK_USER_MESSAGES.filter(m => m.status === 'new').length;
-  const averageRating = "4.7/5 Stars"; // Placeholder as rating system is not implemented
+  const newMessagesCount = useMemo(() => MOCK_USER_MESSAGES.filter(m => m.status === 'new').length, []);
+  const averageRating = "4.7/5 Stars"; // Placeholder
 
   return (
     <>

@@ -1,14 +1,14 @@
 
 'use client';
 
-import React from 'react'; // Added this line
+import React from 'react'; 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
-import { Menu, LogIn, UserPlus, ShieldCheck, LayoutDashboard, LogOut, Home, Briefcase, UserCircle, BookCheck, Award, MessageSquare } from 'lucide-react'; // Added icons
+import { Menu, LogIn, UserPlus, ShieldCheck, LayoutDashboard, LogOut, Home, Briefcase, UserCircle, BookCheck, Award, MessageSquare } from 'lucide-react'; 
 import { Logo } from '@/components/icons/logo';
 import { useAuth } from '@/hooks/use-auth';
-import { usePathname } from 'next/navigation'; // To close sheet on navigation
+import { usePathname } from 'next/navigation'; 
 
 const navLinks = [
   { href: '/', label: 'Home', icon: Home },
@@ -19,12 +19,13 @@ const navLinks = [
 ];
 
 export function Header() {
-  const { isLoggedIn, logout } = useAuth();
+  const { currentUser, logout, isAdmin } = useAuth(); // Use currentUser and isAdmin
+  const isLoggedIn = !!currentUser; // Determine isLoggedIn based on currentUser
   const pathname = usePathname();
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
 
   React.useEffect(() => {
-    setIsSheetOpen(false); // Close sheet on pathname change
+    setIsSheetOpen(false); 
   }, [pathname]);
 
   return (
@@ -55,6 +56,7 @@ export function Header() {
         <div className="flex flex-1 items-center justify-end space-x-2">
           {isLoggedIn ? (
             <>
+              {currentUser && <span className="text-sm text-muted-foreground hidden sm:inline">Hi, {currentUser.name.split(' ')[0]}!</span>}
               <Button asChild variant="ghost" size="sm" className="hidden sm:flex">
                 <Link href="/dashboard">
                   <LayoutDashboard className="mr-2 h-4 w-4" />
@@ -82,11 +84,13 @@ export function Header() {
               </Button>
             </>
           )}
-           <Button asChild variant="outline" size="sm" className="hidden lg:flex border-primary text-primary hover:bg-primary/10 ml-2">
-            <Link href="/admin">
-              <ShieldCheck className="mr-2 h-4 w-4" /> Admin
-            </Link>
-          </Button>
+           {isAdmin && ( // Show Admin button only if user is admin
+             <Button asChild variant="outline" size="sm" className="hidden lg:flex border-primary text-primary hover:bg-primary/10 ml-2">
+                <Link href="/admin">
+                  <ShieldCheck className="mr-2 h-4 w-4" /> Admin
+                </Link>
+              </Button>
+           )}
         </div>
         <div className="md:hidden ml-2">
           <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
@@ -126,13 +130,15 @@ export function Header() {
                     Dashboard
                   </Link>
                 )}
-                 <Link
-                    href="/admin"
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary mt-4 border-t pt-4"
-                    onClick={() => setIsSheetOpen(false)}
-                  >
-                    <ShieldCheck className="h-5 w-5" /> Admin Panel
-                  </Link>
+                 {isAdmin && ( // Show Admin link in sheet only if user is admin
+                   <Link
+                      href="/admin"
+                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary mt-4 border-t pt-4"
+                      onClick={() => setIsSheetOpen(false)}
+                    >
+                      <ShieldCheck className="h-5 w-5" /> Admin Panel
+                    </Link>
+                 )}
               </nav>
             </SheetContent>
           </Sheet>
