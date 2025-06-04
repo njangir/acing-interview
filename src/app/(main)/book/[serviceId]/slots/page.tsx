@@ -10,7 +10,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { MOCK_SERVICES, AVAILABLE_SLOTS } from "@/constants";
 import type { Service } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Ban } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 
 export default function SlotSelectionPage() {
@@ -18,13 +18,14 @@ export default function SlotSelectionPage() {
   const router = useRouter();
   const serviceId = params.serviceId as string;
   const { currentUser } = useAuth();
-  
+
   const [service, setService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isServiceBookable, setIsServiceBookable] = useState(true);
 
   useEffect(() => {
     if (currentUser === undefined) { // Auth state still loading
@@ -40,8 +41,10 @@ export default function SlotSelectionPage() {
     const currentService = MOCK_SERVICES.find(s => s.id === serviceId);
     if (currentService) {
       setService(currentService);
+      setIsServiceBookable(currentService.isBookable === undefined ? true : currentService.isBookable);
     } else {
       setError("Service not found.");
+      setIsServiceBookable(false); // If service not found, it's not bookable
     }
   }, [serviceId, currentUser, router]);
 
@@ -59,26 +62,27 @@ export default function SlotSelectionPage() {
       return;
     }
     if (!currentUser) {
-        // This should ideally be caught by the useEffect redirect, but as a safeguard
         router.push(`/login?redirect=/book/${serviceId}/slots`);
         return;
     }
+    if (!isServiceBookable) {
+        setError("Bookings for this service are currently disabled.");
+        return;
+    }
 
-    localStorage.setItem('bookingDetails', JSON.stringify({ 
-        serviceId, 
-        date: selectedDate.toISOString().split('T')[0], 
-        time: selectedTime 
+    localStorage.setItem('bookingDetails', JSON.stringify({
+        serviceId,
+        date: selectedDate.toISOString().split('T')[0],
+        time: selectedTime
     }));
-    
-    // Pre-fill userDetails from currentUser for logged-in users
+
     const userDetailsToStore = {
       name: currentUser.name,
       email: currentUser.email,
-      phone: currentUser.phone || "", // Assuming phone might not always be present in AuthUser
-      // examApplied and previousAttempts are skipped as per the new flow
+      phone: currentUser.phone || "",
     };
     localStorage.setItem('userDetails', JSON.stringify(userDetailsToStore));
-    
+
     router.push(`/book/${serviceId}/payment`);
   };
 
@@ -102,9 +106,32 @@ export default function SlotSelectionPage() {
       </div>
     );
   }
-  
+
   if (!service) {
     return <div className="container py-12">Loading service details...</div>;
+  }
+
+  if (!isServiceBookable) {
+    return (
+      <>
+        <PageHeader
+            title={`Book: ${service.name}`}
+            description="Select an available date and time slot for your session."
+        />
+        <div className="container py-12">
+            <Alert variant="destructive">
+            <Ban className="h-4 w-4" />
+            <AlertTitle>Bookings Closed</AlertTitle>
+            <AlertDescription>
+                We are sorry, but bookings for "{service.name}" are currently disabled. Please check back later or contact support for more information.
+            </AlertDescription>
+            </Alert>
+             <div className="mt-6 text-center">
+                <Button onClick={() => router.push('/services')} variant="outline">View Other Services</Button>
+            </div>
+        </div>
+      </>
+    );
   }
 
   return (
@@ -114,7 +141,7 @@ export default function SlotSelectionPage() {
         description="Select an available date and time slot for your session."
       />
       <div className="container py-12">
-        {error && !selectedDate && !selectedTime && ( // Show general error if no selection yet
+        {error && !selectedDate && !selectedTime && (
           <Alert variant="destructive" className="mb-6">
             <XCircle className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
@@ -133,7 +160,7 @@ export default function SlotSelectionPage() {
                 selected={selectedDate}
                 onSelect={setSelectedDate}
                 className="rounded-md border"
-                disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1)) || !AVAILABLE_SLOTS[date.toISOString().split('T')[0]]} // Disable past dates and dates with no slots
+                disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1)) || !AVAILABLE_SLOTS[date.toISOString().split('T')[0]]}
               />
             </div>
             <div>
@@ -154,7 +181,7 @@ export default function SlotSelectionPage() {
               ) : (
                 <p className="text-muted-foreground">{selectedDate ? "No slots available for this date." : "Please select a date to see available times."}</p>
               )}
-               {error && (selectedDate || selectedTime) && ( // Show error related to selection
+               {error && (selectedDate || selectedTime) && (
                 <Alert variant="destructive" className="mt-4">
                   <XCircle className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>
@@ -164,9 +191,9 @@ export default function SlotSelectionPage() {
           </CardContent>
         </Card>
         <div className="max-w-3xl mx-auto mt-8 text-center">
-          <Button 
-            size="lg" 
-            onClick={handleProceed} 
+          <Button
+            size="lg"
+            onClick={handleProceed}
             disabled={!selectedDate || !selectedTime || isLoading}
             className="bg-accent hover:bg-accent/90 text-accent-foreground"
           >

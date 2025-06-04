@@ -20,6 +20,7 @@ export const MOCK_SERVICES: Service[] = [
     image: 'https://placehold.co/600x400.png',
     dataAiHint: 'interview meeting',
     defaultForce: 'General',
+    isBookable: true,
   },
   {
     id: 'personal-counselling-session',
@@ -31,6 +32,7 @@ export const MOCK_SERVICES: Service[] = [
     image: 'https://placehold.co/600x400.png',
     dataAiHint: 'counseling support',
     defaultForce: 'General',
+    isBookable: true,
   },
   {
     id: 'afcat-exam-guidance',
@@ -42,6 +44,7 @@ export const MOCK_SERVICES: Service[] = [
     image: 'https://placehold.co/600x400.png',
     dataAiHint: 'exam preparation',
     defaultForce: 'Air Force',
+    isBookable: false, // Example of a non-bookable service
   },
 ];
 
@@ -49,7 +52,7 @@ export const MOCK_TESTIMONIALS: Testimonial[] = [
   {
     id: 't1',
     name: 'Rohan Sharma',
-    userEmail: 'aspirant@example.com', 
+    userEmail: 'aspirant@example.com',
     batch: 'NDA Aspirant',
     story: "The mock interview was incredibly realistic and the feedback helped me identify my weak areas. Cleared SSB in my first attempt!",
     imageUrl: 'https://placehold.co/100x100.png',
@@ -105,7 +108,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     id: 'booking1',
     serviceName: 'SSB Mock Interview',
     serviceId: 'ssb-mock-interview',
-    date: getFutureDate(3), 
+    date: getFutureDate(3),
     time: '10:00 AM',
     userName: "Ananya Sharma",
     userEmail: "ananya.sharma@example.com",
@@ -119,7 +122,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     id: 'booking2',
     serviceName: 'Personal Counselling Session',
     serviceId: 'personal-counselling-session',
-    date: '2024-07-10', 
+    date: '2024-07-10',
     time: '02:00 PM',
     userName: "Vikram Singh",
     userEmail: "vikram.singh@example.com",
@@ -141,7 +144,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     date: getFutureDate(5),
     time: '03:00 PM',
     userName: "Nisha Patel",
-    userEmail: "nisha.patel@example.com", 
+    userEmail: "nisha.patel@example.com",
     meetingLink: 'https://meet.google.com/mno-pqr-stu',
     status: 'pending_approval',
     paymentStatus: 'pay_later_pending',
@@ -156,7 +159,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     userName: "Rajesh Kumar",
     userEmail: "rajesh.kumar@example.com",
     meetingLink: 'https://meet.google.com/uvw-xyz-123',
-    status: 'upcoming', 
+    status: 'upcoming',
     paymentStatus: 'pay_later_pending',
     transactionId: null,
     requestedRefund: true,
@@ -166,7 +169,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     id: 'booking5',
     serviceName: 'Personal Counselling Session',
     serviceId: 'personal-counselling-session',
-    date: getFutureDate(1), 
+    date: getFutureDate(1),
     time: '04:00 PM',
     userName: "Priya Desai",
     userEmail: "aspirant@example.com",
@@ -179,10 +182,10 @@ export const MOCK_BOOKINGS: Booking[] = [
     id: 'booking6',
     serviceName: 'AFCAT Exam Guidance',
     serviceId: 'afcat-exam-guidance',
-    date: '2024-07-12', 
+    date: '2024-07-12',
     time: '11:00 AM',
-    userName: "Amit Patel", 
-    userEmail: "amit.patel@example.com", 
+    userName: "Amit Patel",
+    userEmail: "amit.patel@example.com",
     meetingLink: 'https://meet.google.com/amit-afcat-link',
     status: 'completed',
     paymentStatus: 'paid',
@@ -228,7 +231,7 @@ export const MOCK_RESOURCES: Resource[] = [
     type: 'link',
     url: 'https://www.indiandefensenews.in/',
     description: 'Stay updated with the latest in defence.',
-    serviceCategory: 'general', 
+    serviceCategory: 'general',
     icon: LinkIcon,
   }
 ];
@@ -263,7 +266,7 @@ export const AVAILABLE_SLOTS: Record<string, string[]> = {
   [getFutureDate(15)]: ["09:00 AM", "11:00 AM"],
   [getFutureDate(20)]: ["10:00 AM", "11:00 AM", "02:00 PM", "03:00 PM", "04:00 PM"],
   [getFutureDate(21)]: ["09:00 AM", "10:00 AM", "11:00 AM", "01:00 PM", "02:00 PM"],
-  [getFutureDate(60)]: ["10:00 AM", "11:00 AM", "12:00 PM"], 
+  [getFutureDate(60)]: ["10:00 AM", "11:00 AM", "12:00 PM"],
   [getFutureDate(61)]: ["02:00 PM", "03:00 PM", "04:00 PM"],
   [getFutureDate(3)]: ["09:00 AM", "10:00 AM", "11:00 AM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM"],
   [getFutureDate(1)]: ["02:00 PM", "03:00 PM", "04:00 PM"],
@@ -384,3 +387,4 @@ export const SKILL_RATINGS: string[] = [
     "Excellent",
     "Outstanding",
 ];
+

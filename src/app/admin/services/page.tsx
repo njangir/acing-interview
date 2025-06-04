@@ -10,10 +10,12 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogD
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from "@/components/ui/switch";
+import { Badge } from '@/components/ui/badge';
 import { MOCK_SERVICES } from "@/constants";
 import type { Service } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Edit, Trash2 } from 'lucide-react'; // Removed Upload
+import { PlusCircle, Edit, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import Image from 'next/image';
 
@@ -27,6 +29,7 @@ const initialServiceFormState: Omit<Service, 'id' | 'features'> & { features: st
   image: '',
   dataAiHint: '',
   defaultForce: 'General',
+  isBookable: true,
 };
 
 export default function AdminServicesPage() {
@@ -50,6 +53,7 @@ export default function AdminServicesPage() {
         image: currentService.image || '',
         dataAiHint: currentService.dataAiHint || '',
         defaultForce: currentService.defaultForce || 'General',
+        isBookable: currentService.isBookable === undefined ? true : currentService.isBookable,
       });
       setImagePreview(currentService.image || null);
     } else {
@@ -63,7 +67,7 @@ export default function AdminServicesPage() {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: name === 'price' ? parseFloat(value) || 0 : value }));
   };
-  
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -71,7 +75,7 @@ export default function AdminServicesPage() {
       setImagePreview(URL.createObjectURL(file));
     } else {
       setSelectedFile(null);
-      setImagePreview(currentService?.image || null); 
+      setImagePreview(currentService?.image || null);
     }
   };
 
@@ -87,38 +91,59 @@ export default function AdminServicesPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     let imageUrl = formData.image;
     if (selectedFile) {
-      imageUrl = `https://placehold.co/600x400.png?text=New+${selectedFile.name.substring(0,10)}`; 
+      imageUrl = `https://placehold.co/600x400.png?text=New+${selectedFile.name.substring(0,10)}`;
       console.log("Simulating upload of:", selectedFile.name);
     }
 
 
     const serviceToSave: Service = {
       ...formData,
-      id: currentService?.id || `service-${Date.now()}`, 
-      features: formData.features.split(',').map(f => f.trim()).filter(f => f), 
-      image: imageUrl || 'https://placehold.co/600x400.png', 
+      id: currentService?.id || `service-${Date.now()}`,
+      features: formData.features.split(',').map(f => f.trim()).filter(f => f),
+      image: imageUrl || 'https://placehold.co/600x400.png',
       dataAiHint: formData.dataAiHint || 'service related',
-      price: Number(formData.price), // Ensure price is a number
+      price: Number(formData.price),
+      isBookable: formData.isBookable,
     };
 
     if (currentService) {
       setServices(prev => prev.map(s => s.id === currentService.id ? serviceToSave : s));
+      MOCK_SERVICES[MOCK_SERVICES.findIndex(s => s.id === currentService.id)] = serviceToSave; // Update mock
       toast({ title: "Service Updated", description: `${serviceToSave.name} has been updated.` });
     } else {
       setServices(prev => [...prev, serviceToSave]);
+      MOCK_SERVICES.push(serviceToSave); // Update mock
       toast({ title: "Service Added", description: `${serviceToSave.name} has been added.` });
     }
     console.log("Saving service (simulated):", serviceToSave);
     setIsModalOpen(false);
   };
-  
+
   const handleDelete = (serviceId: string) => {
     setServices(prev => prev.filter(s => s.id !== serviceId));
+    const serviceIndex = MOCK_SERVICES.findIndex(s => s.id === serviceId); // Update mock
+    if (serviceIndex > -1) MOCK_SERVICES.splice(serviceIndex, 1);
     toast({ title: "Service Deleted", description: `Service has been deleted.`});
     console.log("Deleting service:", serviceId);
+  };
+
+  const handleBookingToggle = (serviceId: string, currentIsBookable?: boolean) => {
+    const newIsBookable = !(currentIsBookable === undefined ? true : currentIsBookable);
+    const updatedServices = services.map(s =>
+      s.id === serviceId ? { ...s, isBookable: newIsBookable } : s
+    );
+    setServices(updatedServices);
+    const mockServiceIndex = MOCK_SERVICES.findIndex(s => s.id === serviceId);
+    if (mockServiceIndex > -1) {
+      MOCK_SERVICES[mockServiceIndex].isBookable = newIsBookable;
+    }
+    toast({
+      title: "Booking Status Updated",
+      description: `Bookings for this service are now ${newIsBookable ? 'ENABLED' : 'DISABLED'}.`,
+    });
   };
 
   return (
@@ -143,19 +168,33 @@ export default function AdminServicesPage() {
                 <TableHead>Thumbnail</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Price</TableHead>
-                <TableHead>Duration</TableHead>
+                <TableHead>Booking Status</TableHead>
+                <TableHead>Toggle Bookings</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {services.map((service) => (
+              {services.map((service) => {
+                const isBookable = service.isBookable === undefined ? true : service.isBookable;
+                return (
                 <TableRow key={service.id}>
                   <TableCell>
                     <Image src={service.image || "https://placehold.co/80x60.png"} alt={service.name} width={80} height={60} className="rounded-md object-cover" data-ai-hint={service.dataAiHint || "service"}/>
                   </TableCell>
                   <TableCell className="font-medium">{service.name}</TableCell>
                   <TableCell>₹{service.price}</TableCell>
-                  <TableCell>{service.duration}</TableCell>
+                  <TableCell>
+                    <Badge variant={isBookable ? 'default' : 'destructive'} className={isBookable ? 'bg-green-500' : ''}>
+                      {isBookable ? 'Open' : 'Closed'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Switch
+                      checked={isBookable}
+                      onCheckedChange={() => handleBookingToggle(service.id, service.isBookable)}
+                      aria-label={isBookable ? 'Disable bookings' : 'Enable bookings'}
+                    />
+                  </TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button variant="outline" size="sm" onClick={() => handleEdit(service)}>
                       <Edit className="h-4 w-4" />
@@ -181,7 +220,7 @@ export default function AdminServicesPage() {
                     </AlertDialog>
                   </TableCell>
                 </TableRow>
-              ))}
+              )})}
             </TableBody>
           </Table>
           {services.length === 0 && (
@@ -234,6 +273,16 @@ export default function AdminServicesPage() {
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="dataAiHint" className="text-right">AI Hint</Label>
                 <Input id="dataAiHint" name="dataAiHint" value={formData.dataAiHint} onChange={handleInputChange} className="col-span-3" placeholder="e.g., meeting, study" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="isBookable" className="text-right">Bookings Enabled</Label>
+                <div className="col-span-3 flex items-center">
+                   <Switch
+                    id="isBookable"
+                    checked={formData.isBookable}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isBookable: checked }))}
+                  />
+                </div>
               </div>
             </div>
             <DialogFooter>

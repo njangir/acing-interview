@@ -11,38 +11,40 @@ export interface Service {
   image?: string;
   dataAiHint?: string;
   defaultForce?: 'Air Force' | 'Army' | 'Navy' | 'General';
+  isBookable?: boolean; // New field
 }
 
 export interface Testimonial {
   id: string;
   name: string;
-  userEmail?: string; 
+  userEmail?: string;
   batch?: string;
   story: string;
   imageUrl?: string;
   dataAiHint?: string;
-  serviceTaken: string; 
-  serviceId?: string; 
-  submissionStatus?: 'aspirant' | 'selected_cleared'; 
-  status: 'pending' | 'approved' | 'rejected'; 
+  serviceTaken: string;
+  serviceId?: string;
+  submissionStatus?: 'aspirant' | 'selected_cleared';
+  status: 'pending' | 'approved' | 'rejected';
 }
 
 export interface Booking {
   id:string;
   serviceName: string;
-  serviceId: string; 
+  serviceId: string;
   date: string; // YYYY-MM-DD
   time: string; // e.g., 10:00 AM
-  userName: string; 
-  userEmail: string; 
+  userName: string;
+  userEmail: string;
   meetingLink: string;
-  status: 'upcoming' | 'completed' | 'cancelled' | 'pending_approval'; 
-  paymentStatus: 'paid' | 'pay_later_pending' | 'pay_later_unpaid'; 
+  status: 'upcoming' | 'completed' | 'cancelled' | 'pending_approval';
+  paymentStatus: 'paid' | 'pay_later_pending' | 'pay_later_unpaid';
   reportUrl?: string;
   userFeedback?: string;
-  requestedRefund?: boolean; 
-  refundReason?: string; 
-  transactionId?: string | null; // Added for sales report
+  requestedRefund?: boolean;
+  refundReason?: string;
+  transactionId?: string | null;
+  detailedFeedback?: { skill: string; rating: string; comments?: string }[];
 }
 
 export interface Resource {
@@ -51,7 +53,7 @@ export interface Resource {
   type: 'video' | 'document' | 'link';
   url: string;
   description?: string;
-  serviceCategory: string; 
+  serviceCategory: string;
   icon?: LucideIcon;
 }
 
@@ -64,8 +66,8 @@ export interface MentorProfileData {
   experience: string[];
   philosophy: string;
   quote: string;
-  contactEmail: string; 
-  contactPhone: string; 
+  contactEmail: string;
+  contactPhone: string;
 }
 
 export interface UserMessage {
