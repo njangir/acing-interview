@@ -1,48 +1,57 @@
 
-      
 'use client';
 
-import React from 'react'; 
+import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
-import { Menu, LogIn, UserPlus, ShieldCheck, LayoutDashboard, LogOut, Home, Briefcase, UserCircle, BookCheck, Award, MessageSquare } from 'lucide-react'; 
+import { Menu, LogIn, UserPlus, ShieldCheck, LayoutDashboard, LogOut, Home, Briefcase, UserCircle, BookCheck, Award, MessageSquare } from 'lucide-react';
 import { Logo } from '@/components/icons/logo';
 import { useAuth } from '@/hooks/use-auth';
-import { usePathname } from 'next/navigation'; 
-import { DASHBOARD_NAV_LINKS, ADMIN_DASHBOARD_NAV_LINKS } from '@/constants'; // Import dashboard and admin nav links
-import { cn } from '@/lib/utils'; // Import the cn utility
+import { usePathname } from 'next/navigation';
+import { DASHBOARD_NAV_LINKS, ADMIN_DASHBOARD_NAV_LINKS } from '@/constants';
+import { cn } from '@/lib/utils';
 
 const navLinks = [
   { href: '/', label: 'Home Base', icon: Home },
-  { href: '/services', label: 'Training Ops', icon: Briefcase }, 
+  { href: '/services', label: 'Training Ops', icon: Briefcase },
   { href: '/mentor', label: 'Your Mentor', icon: Award },
   { href: '/testimonials', label: 'Success Stories', icon: MessageSquare },
 ];
 
 export function Header() {
-  const { currentUser, logout, isAdmin } = useAuth(); 
-  const isLoggedIn = !!currentUser; 
+  const { currentUser, logout, isAdmin } = useAuth();
+  const isLoggedIn = !!currentUser;
   const pathname = usePathname();
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
 
   React.useEffect(() => {
-    setIsSheetOpen(false); 
+    setIsSheetOpen(false);
   }, [pathname]);
 
   const isDashboardPath = pathname.startsWith('/dashboard');
   const isAdminPath = pathname.startsWith('/admin');
 
-  let mobileNavLinks = navLinks;
+  // Determine mobile navigation links and title
+  const baseNavLinks = navLinks;
+  let effectiveMobileNavLinks = [...baseNavLinks];
   let mobileNavTitle = "Field Menu";
 
-  if (isDashboardPath && isLoggedIn) {
-    mobileNavLinks = DASHBOARD_NAV_LINKS.map(link => ({...link, label: link.label.replace("My ", "")})); // Slightly adjust labels
-    mobileNavTitle = "Officer Candidate HQ Menu";
-  } else if (isAdminPath && isAdmin) {
-    mobileNavLinks = ADMIN_DASHBOARD_NAV_LINKS;
+  if (isLoggedIn && !isAdmin) {
+    if (isDashboardPath) {
+      // User is on a dashboard page, show dashboard specific navigation
+      effectiveMobileNavLinks = DASHBOARD_NAV_LINKS.map(link => ({...link, label: link.label.replace("My ", "")}));
+      mobileNavTitle = "Officer Candidate HQ Menu";
+    } else {
+      // User is logged in, not admin, and not on a dashboard page. Add dashboard link to general nav.
+      effectiveMobileNavLinks.push({ href: '/dashboard', label: 'Officer Candidate HQ', icon: LayoutDashboard });
+    }
+  } else if (isAdmin && isAdminPath) {
+    // Admin is on an admin page, show admin specific navigation
+    effectiveMobileNavLinks = ADMIN_DASHBOARD_NAV_LINKS;
     mobileNavTitle = "Admin Command Menu";
   }
+  // If user is admin but not on admin path, or not logged in, effectiveMobileNavLinks remains baseNavLinks.
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -55,15 +64,21 @@ export function Header() {
             <Link
               key={link.href}
               href={link.href}
-              className="text-sm font-medium text-foreground/70 transition-colors hover:text-foreground"
+              className={cn(
+                "text-sm font-medium text-foreground/70 transition-colors hover:text-foreground",
+                pathname === link.href && "text-primary font-semibold"
+              )}
             >
               {link.label}
             </Link>
           ))}
-          {isLoggedIn && pathname !== '/dashboard' && !isAdminPath && ( 
+          {isLoggedIn && !isAdmin && (
              <Link
               href="/dashboard"
-              className="text-sm font-medium text-foreground/70 transition-colors hover:text-foreground"
+              className={cn(
+                "text-sm font-medium text-foreground/70 transition-colors hover:text-foreground",
+                (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) && "text-primary font-semibold"
+              )}
             >
               Officer Candidate HQ
             </Link>
@@ -73,14 +88,7 @@ export function Header() {
           {isLoggedIn ? (
             <>
               {currentUser && <span className="text-sm text-muted-foreground hidden sm:inline">Officer Candidate {currentUser.name.split(' ')[0]}</span>}
-              {pathname !== '/dashboard' && !isAdminPath && ( // Show HQ link if not on main dashboard and not admin
-                <Button asChild variant="ghost" size="sm" className="hidden sm:flex">
-                    <Link href="/dashboard">
-                    <LayoutDashboard className="mr-2 h-4 w-4" />
-                    Officer Candidate HQ
-                    </Link>
-                </Button>
-              )}
+              {/* Redundant Officer Candidate HQ Button removed from here */}
               <Button variant="outline" size="sm" onClick={logout}>
                 <LogOut className="mr-0 sm:mr-2 h-4 w-4" />
                 <span className="hidden sm:inline">Log Out</span>
@@ -102,7 +110,7 @@ export function Header() {
               </Button>
             </>
           )}
-           {isAdmin && !isAdminPath && ( 
+           {isAdmin && !isAdminPath && (
              <Button asChild variant="outline" size="sm" className="hidden lg:flex border-primary text-primary hover:bg-primary/10 ml-2">
                 <Link href="/admin">
                   <ShieldCheck className="mr-2 h-4 w-4" /> Admin Command
@@ -124,19 +132,23 @@ export function Header() {
                 <Link href="/" className="flex items-center gap-2 text-lg font-semibold mb-4" onClick={() => setIsSheetOpen(false)}>
                   <Logo />
                 </Link>
-                
-                {mobileNavTitle !== "Field Menu" && (
+
+                {mobileNavTitle !== "Field Menu" && (!isLoggedIn || isAdmin || isDashboardPath) && ( // Show title if specific menu
                     <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">{mobileNavTitle}</h3>
                 )}
 
-                {mobileNavLinks.map((link) => {
+                {effectiveMobileNavLinks.map((link) => {
                   const LinkIcon = link.icon;
+                  // For mobile nav, active if it's the exact path, or if it's a dashboard/admin root and current path starts with it.
+                  const isActive = pathname === link.href ||
+                                   (link.href === '/dashboard' && isDashboardPath) ||
+                                   (link.href === '/admin' && isAdminPath);
                   return (
                     <Link
                       key={link.href}
                       href={link.href}
                       className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
-                                    pathname === link.href && "bg-primary/10 text-primary"
+                                    isActive && "bg-primary/10 text-primary"
                       )}
                       onClick={() => setIsSheetOpen(false)}
                     >
@@ -146,23 +158,11 @@ export function Header() {
                   );
                 })}
 
-                {(!isDashboardPath || pathname !== '/dashboard') && !isAdminPath && isLoggedIn && (
-                  <>
-                    <hr className="my-2"/>
-                    <Link
-                      href="/dashboard"
-                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
-                      onClick={() => setIsSheetOpen(false)}
-                    >
-                      <LayoutDashboard className="h-5 w-5" />
-                      Officer Candidate HQ
-                    </Link>
-                  </>
-                )}
-                 {isAdmin && (
+                 {isAdmin && ( // Always show Admin Command link at the bottom for admins if they are not already in admin section
                     <Link
                         href="/admin"
-                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary mt-2 border-t pt-3"
+                        className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary mt-2 border-t pt-3",
+                                      isAdminPath && "bg-primary/10 text-primary")}
                         onClick={() => setIsSheetOpen(false)}
                         >
                         <ShieldCheck className="h-5 w-5" /> Admin Command
