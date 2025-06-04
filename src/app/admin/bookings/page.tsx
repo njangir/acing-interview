@@ -20,7 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { MOCK_BOOKINGS, MOCK_SERVICES } from "@/constants"; 
+import { MOCK_BOOKINGS, MOCK_SERVICES } from "@/constants";
 import type { Booking } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck, PlusCircle, CalendarIcon, Edit, Filter } from 'lucide-react';
@@ -51,7 +51,7 @@ type EditBookingFormValues = z.infer<typeof editBookingFormSchema>;
 
 export default function AdminBookingsPage() {
   const { toast } = useToast();
-  const [forceUpdate, setForceUpdate] = useState(0); 
+  const [forceUpdate, setForceUpdate] = useState(0);
   const [selectedBookingForEdit, setSelectedBookingForEdit] = useState<Booking | null>(null);
   const [isEditBookingModalOpen, setIsEditBookingModalOpen] = useState(false);
   const [isCreateBookingModalOpen, setIsCreateBookingModalOpen] = useState(false);
@@ -92,9 +92,7 @@ export default function AdminBookingsPage() {
     let bookingUpdated = false;
     const bookingIndex = MOCK_BOOKINGS.findIndex(b => b.id === bookingId);
     if (bookingIndex === -1) return;
-    
-    // It's better to create a new object or deeply clone if nested structures are involved,
-    // but for status and top-level string changes, direct mutation of the item is okay for this mock.
+
     const bookingToUpdate = { ...MOCK_BOOKINGS[bookingIndex] };
 
 
@@ -113,18 +111,18 @@ export default function AdminBookingsPage() {
     } else if (action === 'approve_refund' && bookingToUpdate.paymentStatus === 'paid' && bookingToUpdate.requestedRefund) {
       message = `Refund for booking ${bookingId} approved. Booking cancelled.`;
       bookingToUpdate.status = 'cancelled';
-      bookingToUpdate.paymentStatus = 'pay_later_unpaid'; // Indicate refund processed
-      bookingToUpdate.requestedRefund = false; 
+      bookingToUpdate.paymentStatus = 'pay_later_unpaid';
+      bookingToUpdate.requestedRefund = false;
       bookingUpdated = true;
     }
-    
+
     if (bookingUpdated) {
-      MOCK_BOOKINGS[bookingIndex] = bookingToUpdate; // Mutate the MOCK_BOOKINGS array
+      MOCK_BOOKINGS[bookingIndex] = bookingToUpdate;
       toast({ title: "Action Successful", description: message });
-      setForceUpdate(prev => prev + 1); // Trigger re-render
+      setForceUpdate(prev => prev + 1);
     }
   };
-  
+
   const openEditModal = (booking: Booking) => {
     setSelectedBookingForEdit(booking);
     setIsEditBookingModalOpen(true);
@@ -164,10 +162,10 @@ export default function AdminBookingsPage() {
           transactionId: data.paymentStatus === 'paid' ? `admin_txn_${Date.now()}-${index}` : null,
           requestedRefund: false,
         };
-        MOCK_BOOKINGS.unshift(newBooking); 
+        MOCK_BOOKINGS.unshift(newBooking);
         bookingsCreatedCount++;
     });
-    
+
     if (bookingsCreatedCount > 0) {
         setForceUpdate(prev => prev + 1);
         toast({
@@ -192,7 +190,7 @@ export default function AdminBookingsPage() {
       ...MOCK_BOOKINGS[bookingIndex],
       date: format(data.date, 'yyyy-MM-dd'),
       time: data.time,
-      meetingLink: data.meetingLink || MOCK_BOOKINGS[bookingIndex].meetingLink, 
+      meetingLink: data.meetingLink || MOCK_BOOKINGS[bookingIndex].meetingLink,
       status: data.status,
       paymentStatus: data.paymentStatus,
     };
@@ -206,16 +204,14 @@ export default function AdminBookingsPage() {
     setIsEditBookingModalOpen(false);
     setSelectedBookingForEdit(null);
   }
-  
-  // Calculate filteredBookings directly on each render
+
   const getFilteredBookings = () => {
-    // Sort by date descending first
     let bookings = [...MOCK_BOOKINGS].sort((a, b) => {
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
       return dateB - dateA;
     });
-  
+
     if (filterServiceId !== 'all') {
       bookings = bookings.filter(booking => booking.serviceId === filterServiceId);
     }
@@ -278,26 +274,29 @@ export default function AdminBookingsPage() {
                   <TableCell>{booking.serviceName}</TableCell>
                   <TableCell>{new Date(booking.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} - {booking.time}</TableCell>
                   <TableCell>
-                    <Badge variant={
-                        booking.status === 'pending_approval' ? 'secondary' : 
-                        booking.status === 'upcoming' ? 'default' : 
-                        booking.status === 'completed' ? 'outline' : 'destructive'
-                    }
-                    className={
-                        booking.status === 'upcoming' ? 'bg-blue-100 text-blue-700' :
-                        booking.status === 'pending_approval' ? 'bg-yellow-100 text-yellow-700' : 
-                        booking.status === 'cancelled' ? 'bg-red-100 text-red-700 line-through' : ''
-                    }>
-                      {booking.status.replace('_', ' ').toUpperCase()}
+                     <Badge
+                        variant={
+                            booking.status === 'pending_approval' ? 'secondary' :
+                            booking.status === 'upcoming' ? 'default' :
+                            booking.status === 'completed' ? 'outline' :
+                            'destructive' // Default to destructive for cancelled
+                        }
+                        className={cn(
+                            booking.status === 'upcoming' && 'bg-blue-100 text-blue-700',
+                            booking.status === 'pending_approval' && 'bg-yellow-100 text-yellow-700',
+                            booking.status === 'cancelled' && 'line-through opacity-75' // Rely on destructive variant for color
+                        )}
+                    >
+                        {booking.status.replace('_', ' ').toUpperCase()}
                     </Badge>
                   </TableCell>
                    <TableCell>
                      <Badge variant={booking.paymentStatus === 'paid' ? 'default' : 'secondary'}
-                      className={
-                        booking.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 
-                        booking.paymentStatus === 'pay_later_unpaid' ? 'bg-gray-100 text-gray-700 line-through' : 
-                        'bg-orange-100 text-orange-700'
-                      }
+                      className={cn(
+                        booking.paymentStatus === 'paid' && 'bg-green-100 text-green-700',
+                        booking.paymentStatus === 'pay_later_unpaid' && 'bg-gray-200 text-gray-600 line-through opacity-75',
+                        booking.paymentStatus === 'pay_later_pending' && 'bg-orange-100 text-orange-700'
+                      )}
                      >
                        {booking.paymentStatus.replace('_', ' ').toUpperCase()}
                      </Badge>
@@ -345,8 +344,11 @@ export default function AdminBookingsPage() {
                           <DropdownMenuSeparator />
                            <AlertDialog>
                             <AlertDialogTrigger asChild>
-                               <DropdownMenuItem 
-                                 className={`text-red-600 hover:!text-red-600 ${booking.status === 'cancelled' ? 'opacity-50 cursor-not-allowed' : '' }`}
+                               <DropdownMenuItem
+                                 className={cn(
+                                     "text-red-600 hover:!text-red-600",
+                                     booking.status === 'cancelled' && 'opacity-50 cursor-not-allowed'
+                                  )}
                                  disabled={booking.status === 'cancelled'}
                                  onSelect={(e) => { if (booking.status === 'cancelled') e.preventDefault();}}
                                 >
@@ -381,10 +383,10 @@ export default function AdminBookingsPage() {
           </Table>
         </CardContent>
       </Card>
-      
+
       <Dialog open={isEditBookingModalOpen} onOpenChange={(isOpen) => {
         setIsEditBookingModalOpen(isOpen);
-        if (!isOpen) setSelectedBookingForEdit(null); 
+        if (!isOpen) setSelectedBookingForEdit(null);
       }}>
         <DialogContent className="sm:max-w-lg">
             <DialogHeader>
