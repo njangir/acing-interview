@@ -5,18 +5,19 @@ import type { Booking } from '@/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Video, FileText, DollarSign, AlertTriangle, MessageSquare, RotateCcw, Edit2 } from 'lucide-react';
+import { Calendar, Video, FileText, DollarSign, AlertTriangle, MessageSquare, RotateCcw, Edit2, Star as StarIcon, ClipboardCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogDescription as DialogDesc, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"; 
+import { Dialog, DialogContent, DialogDescription as DialogDesc, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface BookingCardProps {
   booking: Booking;
-  onBookingUpdate?: (updatedBooking: Booking) => void; 
+  onBookingUpdate?: (updatedBooking: Booking) => void;
 }
 
 export function BookingCard({ booking: initialBooking, onBookingUpdate }: BookingCardProps) {
@@ -27,9 +28,11 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
   const [refundReason, setRefundReason] = useState('');
   const [isRefundEligible, setIsRefundEligible] = useState(false);
+  const [isViewFeedbackModalOpen, setIsViewFeedbackModalOpen] = useState(false);
+
 
   useEffect(() => {
-    setBooking(initialBooking); 
+    setBooking(initialBooking);
   }, [initialBooking]);
 
   const formattedDate = new Date(booking.date).toLocaleDateString('en-GB', {
@@ -42,12 +45,12 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
   const isPayLaterPending = booking.paymentStatus === 'pay_later_pending' || booking.paymentStatus === 'pay_later_unpaid';
 
   useEffect(() => {
-    if (booking.status === 'upcoming') {
+    if (booking.status === 'scheduled' || booking.status === 'accepted') { // Check for 'scheduled' or 'accepted' which are upcoming
       const bookingDateTime = new Date(booking.date);
       const [timePart, ampm] = booking.time.split(' ');
       let [hours, minutes] = timePart.split(':').map(Number);
       if (ampm === 'PM' && hours < 12) hours += 12;
-      if (ampm === 'AM' && hours === 12) hours = 0; 
+      if (ampm === 'AM' && hours === 12) hours = 0;
       bookingDateTime.setHours(hours, minutes, 0, 0);
 
       const now = new Date();
@@ -78,13 +81,13 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
       return;
     }
     console.log("Refund requested for booking:", booking.id, "Reason:", refundReason);
-    
+
     const updatedBooking: Booking = { ...booking, requestedRefund: true, refundReason };
-    setBooking(updatedBooking); 
+    setBooking(updatedBooking);
     if (onBookingUpdate) {
-      onBookingUpdate(updatedBooking); 
+      onBookingUpdate(updatedBooking);
     }
-    
+
     toast({
       title: "Refund Request Submitted",
       description: `Your request for booking ${booking.serviceName} has been received. Reason: ${refundReason}. Admin will review it.`,
@@ -102,15 +105,15 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
           <CardTitle className="font-headline text-lg text-primary">{booking.serviceName}</CardTitle>
           <div className="flex flex-col items-end gap-1">
             <Badge variant={
-                booking.status === 'upcoming' ? 'default' : 
-                booking.status === 'completed' ? 'secondary' : 
+                booking.status === 'scheduled' || booking.status === 'accepted' ? 'default' :
+                booking.status === 'completed' ? 'secondary' :
                 booking.status === 'cancelled' ? 'destructive' :
-                'outline' 
+                'outline'
             }
             className={
-                booking.status === 'upcoming' ? 'bg-green-600 text-white' : 
-                booking.status === 'pending_approval' ? 'bg-yellow-500 text-black' : 
-                booking.status === 'cancelled' ? 'bg-red-600 text-white' : 
+                (booking.status === 'scheduled' || booking.status === 'accepted') ? 'bg-green-600 text-white' :
+                booking.status === 'pending_approval' ? 'bg-yellow-500 text-black' :
+                booking.status === 'cancelled' ? 'bg-red-600 text-white' :
                 booking.status === 'completed' ? 'bg-gray-500 text-white' : ''
             }>
               {booking.status.replace('_', ' ').toUpperCase()}
@@ -128,18 +131,23 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {booking.status === 'upcoming' && isPayLaterPending && (
+        {(booking.status === 'scheduled' || booking.status === 'accepted') && isPayLaterPending && (
           <div className="flex items-start p-3 mb-3 text-sm rounded-md bg-yellow-50 border border-yellow-200 text-yellow-700">
             <AlertTriangle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
             <span>Your payment is pending. Please complete it before the session to confirm your spot and activate the meeting link.</span>
           </div>
         )}
-        {booking.status === 'upcoming' && isPaid && !booking.requestedRefund && (
+        {booking.status === 'scheduled' && isPaid && !booking.requestedRefund && (
           <p className="text-sm text-muted-foreground">
             Your session is confirmed! Meeting link will be active shortly before the session.
           </p>
         )}
-        {booking.status === 'upcoming' && booking.requestedRefund && (
+        {booking.status === 'accepted' && isPaid && !booking.requestedRefund && (
+          <p className="text-sm text-muted-foreground">
+            Payment confirmed! Admin will schedule your session and provide the meeting link soon.
+          </p>
+        )}
+        {(booking.status === 'scheduled' || booking.status === 'accepted') && booking.requestedRefund && (
           <Alert variant="default" className="mb-3 border-orange-500 text-orange-700 bg-orange-50">
             <AlertTriangle className="h-4 w-4 !text-orange-600"/>
             <AlertTitle className="!text-orange-700">Refund Requested</AlertTitle>
@@ -155,12 +163,12 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
         )}
         {booking.status === 'completed' && booking.reportUrl && (
           <p className="text-sm text-muted-foreground">
-            Your feedback report is available for download.
+            Your feedback report is available for download. Mentor feedback can be viewed below.
           </p>
         )}
          {booking.status === 'completed' && !booking.reportUrl && (
           <p className="text-sm text-muted-foreground">
-            Session completed. Feedback report will be available soon.
+            Session completed. Feedback report and detailed mentor feedback will be available soon.
           </p>
         )}
         {booking.status === 'cancelled' && (
@@ -169,18 +177,18 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
       </CardContent>
       <CardFooter className="flex flex-wrap justify-between items-center gap-2">
         <div className="flex flex-wrap gap-2">
-          {booking.status === 'upcoming' && isPayLaterPending && (
+          {(booking.status === 'scheduled' || booking.status === 'accepted') && isPayLaterPending && (
             <Button asChild variant="default" size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground">
-              <Link href={`/book/${booking.serviceId}/payment?bookingId=${booking.id}`}> 
+              <Link href={`/book/${booking.serviceId}/payment?bookingId=${booking.id}`}>
                 <DollarSign className="mr-2 h-4 w-4" /> Complete Payment
               </Link>
             </Button>
           )}
-          {booking.status === 'upcoming' && (
-            <Button 
-              asChild 
-              variant="outline" 
-              size="sm" 
+          {booking.status === 'scheduled' && booking.meetingLink && (
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
               className={`border-primary text-primary hover:bg-primary/10 ${(!isPaid || booking.requestedRefund) ? 'opacity-60 cursor-not-allowed' : ''}`}
               disabled={!isPaid || !!booking.requestedRefund}
               title={!isPaid ? "Complete payment to join meeting" : booking.requestedRefund ? "Refund request pending" : "Join Meeting"}
@@ -190,7 +198,7 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
               </a>
             </Button>
           )}
-          {booking.status === 'upcoming' && isPaid && isRefundEligible && !booking.requestedRefund && (
+          {(booking.status === 'scheduled' || booking.status === 'accepted') && isPaid && isRefundEligible && !booking.requestedRefund && (
             <Dialog open={isRefundModalOpen} onOpenChange={setIsRefundModalOpen}>
                 <DialogTrigger asChild>
                     <Button variant="outline" size="sm" className="border-destructive text-destructive hover:bg-destructive/10">
@@ -217,8 +225,8 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
                     </div>
                     <DialogFooter>
                     <Button variant="outline" onClick={() => setIsRefundModalOpen(false)}>Cancel</Button>
-                    <Button 
-                        onClick={handleRefundRequestSubmit} 
+                    <Button
+                        onClick={handleRefundRequestSubmit}
                         disabled={!refundReason.trim()}
                         className="bg-destructive hover:bg-destructive/90"
                     >
@@ -244,7 +252,7 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
                 </DialogHeader>
                 <div className="py-4">
                   <Label htmlFor="feedbackText" className="sr-only">Your Feedback</Label>
-                  <Textarea 
+                  <Textarea
                     id="feedbackText"
                     value={feedbackText}
                     onChange={(e) => setFeedbackText(e.target.value)}
@@ -266,10 +274,46 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
               </Link>
             </Button>
           )}
+          {booking.status === 'completed' && booking.detailedFeedback && booking.detailedFeedback.length > 0 && (
+            <Dialog open={isViewFeedbackModalOpen} onOpenChange={setIsViewFeedbackModalOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <ClipboardCheck className="mr-2 h-4 w-4" /> View Mentor Feedback
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Mentor Feedback: {booking.serviceName}</DialogTitle>
+                  <DialogDesc>
+                    Session Date: {formattedDate}
+                  </DialogDesc>
+                </DialogHeader>
+                <ScrollArea className="max-h-[60vh] p-1 pr-3 custom-scrollbar">
+                  <div className="space-y-4 py-4">
+                    {booking.detailedFeedback.map((fb, index) => (
+                      <div key={index} className="border-b pb-2 last:border-b-0">
+                        <h4 className="font-semibold text-sm text-primary">{fb.skill}</h4>
+                        <p className="text-sm text-foreground">Rating: <span className="font-medium">{fb.rating}</span></p>
+                        {fb.comments && (
+                          <p className="text-xs text-muted-foreground mt-1">Comments: {fb.comments}</p>
+                        )}
+                      </div>
+                    ))}
+                    {booking.detailedFeedback.length === 0 && (
+                        <p className="text-sm text-muted-foreground">No detailed skill feedback provided for this session.</p>
+                    )}
+                  </div>
+                </ScrollArea>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsViewFeedbackModalOpen(false)}>Close</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
          {booking.status !== 'cancelled' && (
             <Button asChild variant="link" size="sm" className="text-primary justify-end mt-2 sm:mt-0">
-                <Link href={`/book/${booking.serviceId}/slots`}> 
+                <Link href={`/book/${booking.serviceId}/slots`}>
                 Re-book Service
                 </Link>
             </Button>
@@ -278,3 +322,4 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
     </Card>
   );
 }
+
