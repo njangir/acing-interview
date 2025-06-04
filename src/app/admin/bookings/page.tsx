@@ -1,7 +1,11 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
+
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,32 +13,59 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription as DialogDesc, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { MOCK_BOOKINGS } from "@/constants"; 
-import type { Booking } from '@/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { MOCK_BOOKINGS, MOCK_SERVICES, AVAILABLE_SLOTS } from "@/constants"; 
+import type { Booking, Service } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck } from 'lucide-react';
+import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck, PlusCircle, CalendarIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+
+const createBookingFormSchema = z.object({
+  userEmail: z.string().email({ message: "Invalid email address." }),
+  userName: z.string().min(2, { message: "User name must be at least 2 characters." }),
+  serviceId: z.string({ required_error: "Please select a service." }),
+  date: z.date({ required_error: "Please select a date." }),
+  time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9] (AM|PM)$/i, { message: "Invalid time format (e.g., 10:00 AM)." }),
+  paymentStatus: z.enum(['paid', 'pay_later_pending'], { required_error: "Please select a payment status." }),
+  meetingLink: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
+});
+
+type CreateBookingFormValues = z.infer<typeof createBookingFormSchema>;
 
 export default function AdminBookingsPage() {
   const { toast } = useToast();
-  // We will use MOCK_BOOKINGS directly in the render.
-  // This state is to force re-render after an admin action.
   const [, setForceUpdate] = useState(0); 
-
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [rescheduleReason, setRescheduleReason] = useState('');
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
+  const [isCreateBookingModalOpen, setIsCreateBookingModalOpen] = useState(false);
+
+  const createBookingForm = useForm<CreateBookingFormValues>({
+    resolver: zodResolver(createBookingFormSchema),
+    defaultValues: {
+      userEmail: '',
+      userName: '',
+      serviceId: undefined,
+      date: undefined,
+      time: '',
+      paymentStatus: undefined,
+      meetingLink: '',
+    },
+  });
 
   const handleAction = (bookingId: string, action: 'accept' | 'cancel' | 'complete' | 'approve_refund') => {
     let message = '';
     let bookingUpdated = false;
-
     const bookingIndex = MOCK_BOOKINGS.findIndex(b => b.id === bookingId);
     if (bookingIndex === -1) return;
-
     const bookingToUpdate = MOCK_BOOKINGS[bookingIndex];
 
     if (action === 'accept') {
@@ -60,18 +91,16 @@ export default function AdminBookingsPage() {
     if (bookingUpdated) {
       MOCK_BOOKINGS[bookingIndex] = bookingToUpdate;
       toast({ title: "Action Successful", description: message });
-      setForceUpdate(prev => prev + 1); // Force re-render
+      setForceUpdate(prev => prev + 1);
     }
   };
 
   const handleRescheduleSubmit = () => {
     if (!selectedBooking || !rescheduleReason) return;
-    // Simulate reschedule logic
-    console.log(`Reschedule booking ${selectedBooking.id}. Reason: ${rescheduleReason}. New date/time would be handled here.`);
+    console.log(`Reschedule booking ${selectedBooking.id}. Reason: ${rescheduleReason}.`);
     toast({ title: "Reschedule Requested", description: `Reschedule for booking ${selectedBooking.id} initiated. User will be notified. Reason: ${rescheduleReason}` });
     setRescheduleReason('');
     setIsRescheduleModalOpen(false);
-    // Potentially update MOCK_BOOKINGS and setForceUpdate if reschedule changes status/data
   };
   
   const openRescheduleModal = (booking: Booking) => {
@@ -79,16 +108,51 @@ export default function AdminBookingsPage() {
     setIsRescheduleModalOpen(true);
   }
 
-  // Render directly from MOCK_BOOKINGS to always get the latest data
-  const currentBookings = [...MOCK_BOOKINGS].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  function onCreateBookingSubmit(data: CreateBookingFormValues) {
+    const selectedService = MOCK_SERVICES.find(s => s.id === data.serviceId);
+    if (!selectedService) {
+      toast({ title: "Error", description: "Selected service not found.", variant: "destructive" });
+      return;
+    }
 
+    const newBooking: Booking = {
+      id: `admin-booking-${Date.now()}`,
+      userName: data.userName,
+      userEmail: data.userEmail,
+      serviceId: data.serviceId,
+      serviceName: selectedService.name,
+      date: format(data.date, 'yyyy-MM-dd'),
+      time: data.time,
+      paymentStatus: data.paymentStatus,
+      status: data.paymentStatus === 'paid' ? 'upcoming' : 'pending_approval',
+      meetingLink: data.meetingLink || `https://meet.google.com/mock-admin-${Math.random().toString(36).substring(2, 9)}`,
+      transactionId: data.paymentStatus === 'paid' ? `admin_txn_${Date.now()}` : null,
+      requestedRefund: false,
+    };
+
+    MOCK_BOOKINGS.unshift(newBooking); // Add to the beginning of the array
+    setForceUpdate(prev => prev + 1);
+    toast({
+      title: "Booking Created",
+      description: `Booking for ${data.userName} for ${selectedService.name} has been created.`,
+    });
+    setIsCreateBookingModalOpen(false);
+    createBookingForm.reset();
+  }
+
+  const currentBookings = [...MOCK_BOOKINGS].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
     <>
       <PageHeader
         title="Manage Booking Requests"
-        description="Review, accept, reschedule, or cancel booking requests."
+        description="Review, accept, reschedule, cancel, or create new booking requests."
       />
+       <div className="mb-6 text-right">
+        <Button onClick={() => setIsCreateBookingModalOpen(true)}>
+          <PlusCircle className="mr-2 h-4 w-4" /> Create New Booking
+        </Button>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>All Bookings</CardTitle>
@@ -177,7 +241,7 @@ export default function AdminBookingsPage() {
                                <DropdownMenuItem 
                                  className={`text-red-600 hover:!text-red-600 ${booking.status === 'cancelled' ? 'opacity-50 cursor-not-allowed' : '' }`}
                                  disabled={booking.status === 'cancelled'}
-                                 onSelect={(e) => { if (booking.status === 'cancelled') e.preventDefault();}} // Prevent opening if cancelled
+                                 onSelect={(e) => { if (booking.status === 'cancelled') e.preventDefault();}}
                                 >
                                 <XCircle className="mr-2 h-4 w-4" /> Cancel Booking
                               </DropdownMenuItem>
@@ -237,7 +301,6 @@ export default function AdminBookingsPage() {
                     placeholder="Reason for rescheduling (e.g., mentor unavailability, propose new slots)"
                     />
                 </div>
-                {/* Add fields for new date/time selection here if implementing full reschedule */}
             </div>
             <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsRescheduleModalOpen(false)}>Cancel</Button>
@@ -245,6 +308,149 @@ export default function AdminBookingsPage() {
             </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={isCreateBookingModalOpen} onOpenChange={(isOpen) => {
+        setIsCreateBookingModalOpen(isOpen);
+        if (!isOpen) createBookingForm.reset();
+      }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create New Booking</DialogTitle>
+            <DialogDesc>Manually create a booking for a user.</DialogDesc>
+          </DialogHeader>
+          <Form {...createBookingForm}>
+            <form onSubmit={createBookingForm.handleSubmit(onCreateBookingSubmit)} className="space-y-4 py-4">
+              <FormField
+                control={createBookingForm.control}
+                name="userName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>User Name</FormLabel>
+                    <FormControl><Input placeholder="Full Name" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={createBookingForm.control}
+                name="userEmail"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>User Email</FormLabel>
+                    <FormControl><Input type="email" placeholder="user@example.com" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={createBookingForm.control}
+                name="serviceId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Service</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a service" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {MOCK_SERVICES.map((service) => (
+                          <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={createBookingForm.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1))}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={createBookingForm.control}
+                name="time"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Time</FormLabel>
+                    <FormControl><Input placeholder="e.g., 02:00 PM" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={createBookingForm.control}
+                name="paymentStatus"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payment Status</FormLabel>
+                     <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select payment status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="paid">Paid</SelectItem>
+                        <SelectItem value="pay_later_pending">Pay Later Pending</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={createBookingForm.control}
+                name="meetingLink"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Meeting Link (Optional)</FormLabel>
+                    <FormControl><Input placeholder="https://meet.google.com/..." {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsCreateBookingModalOpen(false)}>Cancel</Button>
+                <Button type="submit">Create Booking</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
+
