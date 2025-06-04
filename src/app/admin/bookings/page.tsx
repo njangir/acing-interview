@@ -23,10 +23,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { MOCK_BOOKINGS, MOCK_SERVICES } from "@/constants";
 import type { Booking } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck, PlusCircle, CalendarIcon, Edit, Filter, InfoIcon } from 'lucide-react';
+import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck, PlusCircle, CalendarIcon, Edit, Filter, InfoIcon, Video } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { format, parse } from 'date-fns';
+import Link from 'next/link';
 
 const createBookingFormSchema = z.object({
   userEmails: z.string().min(1, { message: "At least one email address is required." }),
@@ -111,7 +112,7 @@ export default function AdminBookingsPage() {
     } else if (action === 'approve_refund' && bookingToUpdate.paymentStatus === 'paid' && bookingToUpdate.requestedRefund) {
       message = `Refund for booking ${bookingId} approved. Booking cancelled.`;
       bookingToUpdate.status = 'cancelled';
-      bookingToUpdate.paymentStatus = 'pay_later_unpaid'; 
+      bookingToUpdate.paymentStatus = 'pay_later_unpaid';
       bookingToUpdate.requestedRefund = false;
       bookingUpdated = true;
     }
@@ -286,7 +287,7 @@ export default function AdminBookingsPage() {
                             booking.status === 'pending_approval' ? 'secondary' :
                             booking.status === 'upcoming' ? 'default' :
                             booking.status === 'completed' ? 'outline' :
-                            'destructive' 
+                            'destructive'
                         }
                         className={cn(
                             booking.status === 'upcoming' && 'bg-blue-100 text-blue-700',
@@ -330,8 +331,15 @@ export default function AdminBookingsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem 
-                            onClick={() => openEditModal(booking)} 
+                           {booking.status === 'upcoming' && booking.meetingLink && (
+                                <DropdownMenuItem asChild>
+                                    <Link href={booking.meetingLink} target="_blank" rel="noopener noreferrer" className="flex items-center">
+                                        <Video className="mr-2 h-4 w-4 text-green-500" /> Join Meeting
+                                    </Link>
+                                </DropdownMenuItem>
+                            )}
+                          <DropdownMenuItem
+                            onClick={() => openEditModal(booking)}
                             disabled={booking.status === 'cancelled'}
                           >
                                 <Edit className="mr-2 h-4 w-4 text-blue-500" /> Edit / Reschedule
@@ -670,4 +678,3 @@ export default function AdminBookingsPage() {
     </>
   );
 }
-
