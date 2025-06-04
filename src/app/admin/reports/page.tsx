@@ -53,16 +53,12 @@ export default function AdminReportsPage() {
       setSkillRatingsData({});
     }
 
-    // Calculate current average skills for the selected user
     if (selectedBookingDetails?.userEmail) {
       const userEmail = selectedBookingDetails.userEmail;
-      // Consider all bookings of the user that are completed and have feedback,
-      // *excluding* the current one IF we are only setting initial values.
-      // For displaying context, we want the average *before* this session's potential new feedback.
       const userPreviousCompletedBookingsWithFeedback = MOCK_BOOKINGS.filter(
         b => b.userEmail === userEmail &&
              b.status === 'completed' &&
-             b.id !== selectedBookingDetails.id && // Exclude current booking for "prior average"
+             b.id !== selectedBookingDetails.id && 
              b.detailedFeedback && b.detailedFeedback.length > 0
       );
 
@@ -80,22 +76,6 @@ export default function AdminReportsPage() {
         });
       });
       
-      // If the current selected booking already has feedback (i.e., admin is viewing/editing it),
-      // include its ratings in the "current average" context as well.
-      if (selectedBookingDetails.detailedFeedback && selectedBookingDetails.detailedFeedback.length > 0) {
-          selectedBookingDetails.detailedFeedback.forEach(fb => {
-              if (PREDEFINED_SKILLS.includes(fb.skill) && SKILL_RATING_VALUES[fb.rating]) {
-                // This logic can be tricky: if we are "editing" feedback, we want average of others.
-                // If viewing before "first submission" for this session, this block shouldn't add.
-                // For now, to show "current state", include this session's saved feedback.
-                // A more precise "average of OTHERS" would filter out selectedBookingDetails.id always.
-                // Let's calculate average of all *other* sessions.
-                // The logic above (userPreviousCompletedBookingsWithFeedback) already excludes current one.
-              }
-          });
-      }
-
-
       const calculatedAverages: Record<string, { averageRatingValue: number; ratingCount: number }> = {};
       PREDEFINED_SKILLS.forEach(skill => {
         calculatedAverages[skill] = {
@@ -130,7 +110,7 @@ export default function AdminReportsPage() {
       });
       return;
     }
-     if (!reportFile && !selectedBookingDetails?.reportUrl) { // Require file if no report exists
+     if (!reportFile && !selectedBookingDetails?.reportUrl) { 
       toast({
         title: "Missing Report",
         description: "Please upload a report PDF file or ensure one is already linked.",
@@ -139,12 +119,11 @@ export default function AdminReportsPage() {
       return;
     }
 
-
     const assignedBadge = MOCK_BADGES.find(b => b.id === selectedBadgeId);
     const feedbackToSave = PREDEFINED_SKILLS.map(skill => ({
       skill,
-      rating: skillRatingsData[skill] || 'Satisfactory', // Default if not rated, or handle as error
-      comments: '', // Add UI for per-skill comments if needed
+      rating: skillRatingsData[skill] || 'Satisfactory', 
+      comments: '', 
     }));
 
     console.log({
@@ -162,7 +141,7 @@ export default function AdminReportsPage() {
       if (reportFile) {
         MOCK_BOOKINGS[bookingIndex].reportUrl = `/resources/mock_feedback_${selectedBookingId}_${reportFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}.pdf`;
       }
-      MOCK_BOOKINGS[bookingIndex].userFeedback = comments; // Save overall comments
+      MOCK_BOOKINGS[bookingIndex].userFeedback = comments; 
     }
 
     if (assignedBadge && selectedBookingDetails) {
@@ -212,7 +191,7 @@ export default function AdminReportsPage() {
                 setSelectedBadgeId(''); 
                 setSkillRatingsData({});
                 setComments(MOCK_BOOKINGS.find(b => b.id === value)?.userFeedback || '');
-                setReportFile(null); // Reset file input when booking changes
+                setReportFile(null); 
                 const fileInput = document.getElementById('reportFile') as HTMLInputElement;
                 if (fileInput) fileInput.value = '';
               }}>
@@ -296,7 +275,7 @@ export default function AdminReportsPage() {
                         <SelectValue placeholder="Choose a badge to assign..." />
                         </SelectTrigger>
                         <SelectContent>
-                        <SelectItem value="">No Badge</SelectItem> {/* Changed placeholder value to empty string */}
+                        <SelectItem value="no-badge">No Badge</SelectItem>
                         {availableBadges.map(badge => (
                             <SelectItem key={badge.id} value={badge.id}>
                             {badge.force !== "General" && <span className='text-xs text-muted-foreground mr-1'>[{badge.force}]</span>} {badge.name} - {badge.rankName}
