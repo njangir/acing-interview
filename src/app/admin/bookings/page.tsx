@@ -44,7 +44,7 @@ const editBookingFormSchema = z.object({
   date: z.date({ required_error: "Please select a date." }),
   time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9] (AM|PM)$/i, { message: "Invalid time format (e.g., 10:00 AM)." }),
   meetingLink: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
-  status: z.enum(['upcoming', 'completed', 'cancelled', 'pending_approval'], { required_error: "Please select a booking status." }),
+  status: z.enum(['pending_approval', 'accepted', 'scheduled', 'completed', 'cancelled'], { required_error: "Please select a booking status." }),
   paymentStatus: z.enum(['paid', 'pay_later_pending', 'pay_later_unpaid'], { required_error: "Please select a payment status." }),
 });
 type EditBookingFormValues = z.infer<typeof editBookingFormSchema>;
@@ -77,11 +77,17 @@ export default function AdminBookingsPage() {
 
   useEffect(() => {
     if (selectedBookingForEdit) {
+      let currentStatus = selectedBookingForEdit.status;
+      // Map 'upcoming' to 'scheduled' or 'accepted' based on link for edit form
+      if (currentStatus === 'upcoming') {
+        currentStatus = selectedBookingForEdit.meetingLink ? 'scheduled' : 'accepted';
+      }
+
       editBookingForm.reset({
         date: parse(selectedBookingForEdit.date, 'yyyy-MM-dd', new Date()),
         time: selectedBookingForEdit.time,
         meetingLink: selectedBookingForEdit.meetingLink || '',
-        status: selectedBookingForEdit.status,
+        status: currentStatus as EditBookingFormValues['status'], // Cast as it's now validated
         paymentStatus: selectedBookingForEdit.paymentStatus,
       });
     }
@@ -96,10 +102,9 @@ export default function AdminBookingsPage() {
 
     const bookingToUpdate = { ...MOCK_BOOKINGS[bookingIndex] };
 
-
     if (action === 'accept') {
-      message = `Booking ${bookingId} accepted and user notified.`;
-      bookingToUpdate.status = 'upcoming';
+      message = `Booking ${bookingId} accepted. User will be notified. Please add meeting link to schedule.`;
+      bookingToUpdate.status = 'accepted'; // Changed from 'upcoming'
       bookingUpdated = true;
     } else if (action === 'cancel') {
       message = `Booking ${bookingId} cancelled and user notified.`;
@@ -112,8 +117,8 @@ export default function AdminBookingsPage() {
     } else if (action === 'approve_refund' && bookingToUpdate.paymentStatus === 'paid' && bookingToUpdate.requestedRefund) {
       message = `Refund for booking ${bookingId} approved. Booking cancelled.`;
       bookingToUpdate.status = 'cancelled';
-      bookingToUpdate.paymentStatus = 'pay_later_unpaid';
-      bookingToUpdate.requestedRefund = false;
+      bookingToUpdate.paymentStatus = 'pay_later_unpaid'; // Mark as unpaid/refunded
+      bookingToUpdate.requestedRefund = false; // Reset refund request
       bookingUpdated = true;
     }
 
@@ -148,6 +153,13 @@ export default function AdminBookingsPage() {
             toast({ title: "Skipped Invalid Email", description: `Skipped "${email}" as it's not a valid email format.`, variant: "destructive" });
             return;
         }
+        
+        let initialStatus: Booking['status'];
+        if (data.paymentStatus === 'paid') {
+            initialStatus = data.meetingLink ? 'scheduled' : 'accepted';
+        } else {
+            initialStatus = 'pending_approval';
+        }
 
         const newBooking: Booking = {
           id: `admin-booking-${Date.now()}-${index}`,
@@ -158,8 +170,8 @@ export default function AdminBookingsPage() {
           date: format(data.date, 'yyyy-MM-dd'),
           time: data.time,
           paymentStatus: data.paymentStatus,
-          status: data.paymentStatus === 'paid' ? 'upcoming' : 'pending_approval',
-          meetingLink: data.meetingLink || `https://meet.google.com/mock-admin-${Math.random().toString(36).substring(2, 9)}`,
+          status: initialStatus,
+          meetingLink: data.meetingLink || (initialStatus === 'scheduled' ? `https://meet.google.com/mock-admin-${Math.random().toString(36).substring(2, 9)}` : ''),
           transactionId: data.paymentStatus === 'paid' ? `admin_txn_${Date.now()}-${index}` : null,
           requestedRefund: false,
         };
@@ -187,12 +199,35 @@ export default function AdminBookingsPage() {
       return;
     }
 
+    const bookingToUpdate = MOCK_BOOKINGS[bookingIndex];
+    let newStatus = data.status; // Status chosen by admin in the dropdown
+
+    if (data.meetingLink) {
+      // If a link is provided, and admin chose 'accepted' or 'pending_approval', upgrade to 'scheduled'
+      if (newStatus === 'accepted' || newStatus === 'pending_approval') {
+        newStatus = 'scheduled';
+      }
+    } else {
+      // If no link is provided, and admin chose 'scheduled', downgrade to 'accepted'
+      // unless it's being completed or cancelled
+      if (newStatus === 'scheduled' && data.status !== 'completed' && data.status !== 'cancelled') {
+        newStatus = 'accepted';
+      }
+    }
+     // If status was 'upcoming' (old value, now mapped in useEffect to accepted/scheduled)
+    // and now has a link, ensure it's 'scheduled'. If no link, 'accepted'.
+    // This handles the direct selection from dropdown.
+    if (data.status === 'upcoming') { // Should not happen with new dropdown but as fallback
+        newStatus = data.meetingLink ? 'scheduled' : 'accepted';
+    }
+
+
     const updatedBooking: Booking = {
-      ...MOCK_BOOKINGS[bookingIndex],
+      ...bookingToUpdate,
       date: format(data.date, 'yyyy-MM-dd'),
       time: data.time,
-      meetingLink: data.meetingLink || MOCK_BOOKINGS[bookingIndex].meetingLink,
-      status: data.status,
+      meetingLink: data.meetingLink || '', 
+      status: newStatus,
       paymentStatus: data.paymentStatus,
     };
 
@@ -200,7 +235,7 @@ export default function AdminBookingsPage() {
     setForceUpdate(prev => prev + 1);
     toast({
       title: "Booking Updated",
-      description: `Booking for ${updatedBooking.userName} has been successfully updated.`,
+      description: `Booking for ${updatedBooking.userName} has been successfully updated. Status: ${updatedBooking.status}.`,
     });
     setIsEditBookingModalOpen(false);
     setSelectedBookingForEdit(null);
@@ -208,9 +243,12 @@ export default function AdminBookingsPage() {
 
   const getFilteredBookings = () => {
     let bookings = [...MOCK_BOOKINGS].sort((a, b) => {
+      // Prioritize pending_approval, then by date
+      if (a.status === 'pending_approval' && b.status !== 'pending_approval') return -1;
+      if (b.status === 'pending_approval' && a.status !== 'pending_approval') return 1;
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
-      return dateB - dateA; // Sort by most recent first
+      return dateB - dateA; // Sort by most recent first for other statuses
     });
 
     if (filterServiceId !== 'all') {
@@ -285,13 +323,15 @@ export default function AdminBookingsPage() {
                      <Badge
                         variant={
                             booking.status === 'pending_approval' ? 'secondary' :
-                            booking.status === 'upcoming' ? 'default' :
+                            booking.status === 'accepted' ? 'outline' :
+                            booking.status === 'scheduled' ? 'default' :
                             booking.status === 'completed' ? 'outline' :
                             'destructive'
                         }
                         className={cn(
-                            booking.status === 'upcoming' && 'bg-blue-100 text-blue-700',
+                            booking.status === 'scheduled' && 'bg-blue-100 text-blue-700',
                             booking.status === 'pending_approval' && 'bg-yellow-100 text-yellow-700',
+                            booking.status === 'accepted' && 'bg-orange-100 text-orange-700',
                             booking.status === 'cancelled' && 'bg-red-100 text-red-700 line-through opacity-75'
                         )}
                     >
@@ -331,7 +371,7 @@ export default function AdminBookingsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                           {booking.status === 'upcoming' && booking.meetingLink && (
+                           {booking.status === 'scheduled' && booking.meetingLink && (
                                 <DropdownMenuItem asChild>
                                     <Link href={booking.meetingLink} target="_blank" rel="noopener noreferrer" className="flex items-center">
                                         <Video className="mr-2 h-4 w-4 text-green-500" /> Join Meeting
@@ -340,21 +380,21 @@ export default function AdminBookingsPage() {
                             )}
                           <DropdownMenuItem
                             onClick={() => openEditModal(booking)}
-                            disabled={booking.status === 'cancelled'}
+                            disabled={booking.status === 'cancelled' || booking.status === 'completed'}
                           >
-                                <Edit className="mr-2 h-4 w-4 text-blue-500" /> Edit / Reschedule
+                                <Edit className="mr-2 h-4 w-4 text-blue-500" /> Edit / Schedule
                           </DropdownMenuItem>
                           {booking.status === 'pending_approval' && (
                             <DropdownMenuItem onClick={() => handleAdminAction(booking.id, 'accept')}>
-                              <CheckCircle className="mr-2 h-4 w-4 text-green-500" /> Accept
+                              <CheckCircle className="mr-2 h-4 w-4 text-green-500" /> Accept Request
                             </DropdownMenuItem>
                           )}
-                           {booking.status === 'upcoming' && booking.paymentStatus === 'paid' && booking.requestedRefund &&(
+                           {booking.status !== 'cancelled' && booking.status !== 'completed' && booking.paymentStatus === 'paid' && booking.requestedRefund &&(
                              <DropdownMenuItem onClick={() => handleAdminAction(booking.id, 'approve_refund')} className="text-green-600 hover:!text-green-600">
                                 <ShieldCheck className="mr-2 h-4 w-4" /> Approve Refund
                               </DropdownMenuItem>
                            )}
-                           {booking.status === 'upcoming' && (
+                           {(booking.status === 'scheduled' || booking.status === 'accepted') && (
                             <DropdownMenuItem onClick={() => handleAdminAction(booking.id, 'complete')}>
                                <CalendarClock className="mr-2 h-4 w-4 text-purple-500" /> Mark as Completed
                             </DropdownMenuItem>
@@ -480,6 +520,9 @@ export default function AdminBookingsPage() {
                         <FormLabel>Meeting Link</FormLabel>
                         <FormControl><Input type="url" placeholder="https://meet.google.com/..." {...field} /></FormControl>
                         <FormMessage />
+                        {selectedBookingForEdit.status === 'accepted' && !field.value && (
+                             <p className="text-xs text-orange-600 mt-1">Provide a meeting link to change status to 'Scheduled'.</p>
+                        )}
                       </FormItem>
                     )}
                   />
@@ -495,7 +538,8 @@ export default function AdminBookingsPage() {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="pending_approval">Pending Approval</SelectItem>
-                            <SelectItem value="upcoming">Upcoming</SelectItem>
+                            <SelectItem value="accepted">Accepted (Needs Link)</SelectItem>
+                            <SelectItem value="scheduled">Scheduled (Link Added)</SelectItem>
                             <SelectItem value="completed">Completed</SelectItem>
                             <SelectItem value="cancelled">Cancelled</SelectItem>
                           </SelectContent>
@@ -678,3 +722,5 @@ export default function AdminBookingsPage() {
     </>
   );
 }
+
+    
