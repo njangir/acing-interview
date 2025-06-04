@@ -1,25 +1,77 @@
 
 'use client';
-// Removed useMemo as MOCK_BOOKINGS is mutated directly
+
+import { useState, useEffect } from 'react'; // Added useState, useEffect
 import { PageHeader } from "@/components/core/page-header";
 import { BookingCard } from "@/components/core/booking-card";
 import { MOCK_BOOKINGS } from "@/constants";
-import type { Booking } from '@/types'; // Import Booking type if not already
+import type { Booking } from '@/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useAuth } from '@/hooks/use-auth';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Shield } from 'lucide-react';
+import { parse } from 'date-fns'; // Added import
+import { useToast } from '@/hooks/use-toast'; // Added import
+
+// Helper function to get full Date object from booking date and time
+const getBookingDateTime = (bookingDate: string, bookingTime: string): Date => {
+  const [timePart, ampm] = bookingTime.split(' ');
+  let [hours, minutes] = timePart.split(':').map(Number);
+  if (ampm === 'PM' && hours < 12) hours += 12;
+  if (ampm === 'AM' && hours === 12) hours = 0; // Midnight case
+
+  const dateObj = parse(bookingDate, 'yyyy-MM-dd', new Date());
+  dateObj.setHours(hours, minutes, 0, 0);
+  return dateObj;
+};
 
 export default function MyBookingsPage() {
   const { currentUser } = useAuth();
+  const { toast } = useToast(); // Initialize toast
+  const [forceUpdate, setForceUpdate] = useState(0); // For re-rendering after mock data mutation
 
-  // Directly filter MOCK_BOOKINGS on each render to get the latest data
-  // This is suitable for client-side mock data mutation.
+  useEffect(() => {
+    if (!currentUser) return;
+
+    let bookingsWereUpdated = false;
+    const now = new Date().getTime();
+    const oneHourInMs = 60 * 60 * 1000;
+
+    MOCK_BOOKINGS.forEach((booking, index) => {
+      if (
+        booking.userEmail === currentUser.email &&
+        booking.status === 'upcoming' &&
+        booking.paymentStatus === 'pay_later_pending'
+      ) {
+        const bookingDateTime = getBookingDateTime(booking.date, booking.time);
+        // Check if current time is past booking time OR within 1 hour before booking time
+        if (now >= bookingDateTime.getTime() || (bookingDateTime.getTime() - now < oneHourInMs)) {
+          MOCK_BOOKINGS[index] = {
+            ...booking,
+            status: 'cancelled',
+            paymentStatus: 'pay_later_unpaid',
+            // You could add a cancellation reason here, e.g.,
+            // refundReason: "Auto-cancelled: Payment not received before session." 
+          };
+          bookingsWereUpdated = true;
+        }
+      }
+    });
+
+    if (bookingsWereUpdated) {
+      toast({
+        title: "Booking Status Update",
+        description: "One or more 'Pay Later' bookings were automatically cancelled due to pending payment close to the session time.",
+        variant: "default",
+      });
+      setForceUpdate(prev => prev + 1); // Trigger re-render
+    }
+  }, [currentUser, toast]); // Removed MOCK_BOOKINGS from deps as it's mutated
+
   let userBookings: Booking[] = [];
   if (currentUser) {
-    // Ensure we are using the up-to-date MOCK_BOOKINGS array
     userBookings = MOCK_BOOKINGS.filter(b => b.userEmail === currentUser.email);
   }
 
@@ -27,17 +79,10 @@ export default function MyBookingsPage() {
   const pastBookings = userBookings.filter(b => b.status === 'completed' || b.status === 'cancelled');
   
   const handleBookingUpdate = (updatedBooking: Booking) => {
-    // This function can be used to trigger a re-render if needed,
-    // but direct mutation of MOCK_BOOKINGS and standard navigation
-    // should cause this page to re-render and pick up changes.
-    // For instance, if BookingCard itself updated MOCK_BOOKINGS and we needed to force a refresh here.
-    // For now, we'll rely on the re-render from navigation.
     const index = MOCK_BOOKINGS.findIndex(b => b.id === updatedBooking.id);
     if (index !== -1) {
       MOCK_BOOKINGS[index] = updatedBooking;
-      // Force a re-render by updating a dummy state if direct MOCK_BOOKINGS mutation isn't enough
-      // This is a common pattern for forcing updates when external mutable sources are used.
-      // However, for this case, simply re-filtering on render should be sufficient.
+      setForceUpdate(prev => prev + 1); // Force re-render
     }
   };
 
@@ -82,7 +127,7 @@ export default function MyBookingsPage() {
             <div className="text-center py-10">
               <p className="text-muted-foreground mb-4">No upcoming bookings.</p>
               <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                <Link href="/book">Book a Session</Link>
+                <Link href="/services">Book a Session</Link>
               </Button>
             </div>
           )}
