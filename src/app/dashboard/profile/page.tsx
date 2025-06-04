@@ -12,8 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from '@/hooks/use-toast';
-import { UserCircle, Award, ShieldCheck, Briefcase, Edit, Anchor as AnchorIconLucide } from 'lucide-react'; // Renamed Anchor to avoid conflict
+import { UserCircle, Award, ShieldCheck, Briefcase, Edit, Anchor as AnchorIconLucide, VenetianMask, Binary } from 'lucide-react';
 import type { UserProfile, Badge } from '@/types';
 import { useAuth } from '@/hooks/use-auth';
 import { PREDEFINED_AVATARS } from '@/constants';
@@ -23,8 +24,10 @@ import { cn } from '@/lib/utils';
 const profileFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Invalid email address." }),
-  phone: z.string().min(10, { message: "Phone number must be at least 10 digits." }).or(z.literal('')), // Allow empty string initially
+  phone: z.string().min(10, { message: "Phone number must be at least 10 digits." }).or(z.literal('')),
   imageUrl: z.string().optional(),
+  gender: z.enum(['Male', 'Female', 'Other', 'Prefer not to say']).optional(),
+  targetOrganization: z.enum(['Army', 'Navy', 'Air Force', 'Other']).optional(),
 });
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
@@ -32,17 +35,19 @@ type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
 export default function ProfilePage() {
   const { toast } = useToast();
-  const { currentUser, login: updateAuthContextUser } = useAuth(); 
+  const { currentUser, login: updateAuthContextUser } = useAuth();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [selectedAvatarForForm, setSelectedAvatarForForm] = useState<string | undefined>(undefined);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
-    defaultValues: { 
+    defaultValues: {
       name: '',
       email: '',
       phone: '',
-      imageUrl: PREDEFINED_AVATARS[0].url, 
+      imageUrl: PREDEFINED_AVATARS[0].url,
+      gender: undefined,
+      targetOrganization: undefined,
     },
   });
 
@@ -54,49 +59,58 @@ export default function ProfilePage() {
       if (storedProfile) {
         loadedProfile = JSON.parse(storedProfile);
       } else {
+        // Fallback if no profile in localStorage, create a basic one
         loadedProfile = {
           name: currentUser.name,
           email: currentUser.email,
-          phone: '', 
+          phone: '',
           imageUrl: currentUser.imageUrl || PREDEFINED_AVATARS[0].url,
           awardedBadges: [],
+          gender: undefined,
+          targetOrganization: undefined,
         };
+        // Optionally save this default back to localStorage
         localStorage.setItem(mockUserProfileKey, JSON.stringify(loadedProfile));
       }
       setUserProfile(loadedProfile);
       form.reset({
         name: loadedProfile.name,
         email: loadedProfile.email,
-        phone: loadedProfile.phone || '', 
+        phone: loadedProfile.phone || '',
         imageUrl: loadedProfile.imageUrl || PREDEFINED_AVATARS[0].url,
+        gender: loadedProfile.gender,
+        targetOrganization: loadedProfile.targetOrganization,
       });
       setSelectedAvatarForForm(loadedProfile.imageUrl || PREDEFINED_AVATARS[0].url);
     }
-  }, [currentUser, form]); 
+  }, [currentUser, form]);
 
   function onSubmit(data: ProfileFormValues) {
     if (!userProfile || !currentUser) return;
 
     const updatedProfileData: UserProfile = {
-      ...userProfile,
+      ...userProfile, // Preserve awardedBadges and other non-form fields
       name: data.name,
-      email: data.email, 
+      email: data.email,
       phone: data.phone,
       imageUrl: selectedAvatarForForm,
+      gender: data.gender,
+      targetOrganization: data.targetOrganization,
     };
-    
+
     setUserProfile(updatedProfileData);
     localStorage.setItem(`mockUserProfile_${currentUser.email}`, JSON.stringify(updatedProfileData));
 
+    // Update AuthContext if core identifiable info changed
     if (currentUser.name !== updatedProfileData.name || currentUser.imageUrl !== updatedProfileData.imageUrl || currentUser.email !== updatedProfileData.email) {
         updateAuthContextUser({
             ...currentUser,
             name: updatedProfileData.name,
-            email: updatedProfileData.email, 
+            email: updatedProfileData.email,
             imageUrl: updatedProfileData.imageUrl,
         });
     }
-    
+
     toast({
       title: "Profile Updated",
       description: "Your profile information has been successfully updated.",
@@ -110,26 +124,26 @@ export default function ProfilePage() {
   return (
     <>
       <PageHeader
-        title="My Profile & Achievements"
-        description="Manage your personal information, account settings, and view your earned badges."
+        title="My Dossier & Commendations"
+        description="Manage your personal information, operational preferences, and view your earned badges."
       />
       <div className="grid md:grid-cols-3 gap-8 items-start">
         <Card className="md:col-span-2 shadow-lg">
           <CardHeader>
              <div className="flex items-center gap-4">
-                <Image 
-                    src={selectedAvatarForForm || userProfile.imageUrl || PREDEFINED_AVATARS[0].url} 
-                    alt={userProfile.name} 
-                    width={60} 
-                    height={60} 
+                <Image
+                    src={selectedAvatarForForm || userProfile.imageUrl || PREDEFINED_AVATARS[0].url}
+                    alt={userProfile.name}
+                    width={60}
+                    height={60}
                     className="rounded-full border-2 border-primary"
                     data-ai-hint="user avatar"
                 />
                 <div>
                     <CardTitle className="font-headline text-2xl text-primary flex items-center">
-                        <Edit className="h-6 w-6 mr-2"/> Edit Profile
+                        <Edit className="h-6 w-6 mr-2"/> Edit Dossier
                     </CardTitle>
-                    <CardDescription>Update your personal details and avatar below.</CardDescription>
+                    <CardDescription>Update your personal details and preferences below.</CardDescription>
                 </div>
             </div>
           </CardHeader>
@@ -153,18 +167,18 @@ export default function ProfilePage() {
                         )}
                         aria-label={`Select avatar ${avatar.id}`}
                         >
-                        <Image 
-                            src={avatar.url} 
-                            alt={`Avatar ${avatar.id}`} 
-                            width={80} 
+                        <Image
+                            src={avatar.url}
+                            alt={`Avatar ${avatar.id}`}
+                            width={80}
                             height={80}
                             className="aspect-square object-cover"
-                            data-ai-hint={avatar.hint} 
+                            data-ai-hint={avatar.hint}
                         />
                         </button>
                     ))}
                     </div>
-                     <FormField control={form.control} name="imageUrl" render={() => <FormMessage />} /> 
+                     <FormField control={form.control} name="imageUrl" render={() => <FormMessage />} />
                 </div>
 
                 <FormField
@@ -185,9 +199,9 @@ export default function ProfilePage() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email Address</FormLabel>
+                      <FormLabel>Email Address (Cannot be changed)</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="Your email address" {...field} />
+                        <Input type="email" placeholder="Your email address" {...field} readOnly disabled className="bg-muted/50"/>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -206,6 +220,52 @@ export default function ProfilePage() {
                     </FormItem>
                   )}
                 />
+                <FormField
+                    control={form.control}
+                    name="gender"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Gender</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ''}>
+                        <FormControl>
+                            <SelectTrigger>
+                            <SelectValue placeholder="Select your gender" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            <SelectItem value="Male"><VenetianMask className="inline h-4 w-4 mr-2 text-blue-500"/>Male</SelectItem>
+                            <SelectItem value="Female"><VenetianMask className="inline h-4 w-4 mr-2 text-pink-500"/>Female</SelectItem>
+                            <SelectItem value="Other"><Binary className="inline h-4 w-4 mr-2 text-purple-500"/>Other</SelectItem>
+                            <SelectItem value="Prefer not to say">Prefer not to say</SelectItem>
+                        </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="targetOrganization"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Target Organization</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ''}>
+                        <FormControl>
+                            <SelectTrigger>
+                            <SelectValue placeholder="Select your target organization" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            <SelectItem value="Army"><Briefcase className="inline h-4 w-4 mr-2 text-green-600"/>Indian Army</SelectItem>
+                            <SelectItem value="Navy"><Briefcase className="inline h-4 w-4 mr-2 text-sky-600"/>Indian Navy</SelectItem>
+                            <SelectItem value="Air Force"><Briefcase className="inline h-4 w-4 mr-2 text-blue-500"/>Indian Air Force</SelectItem>
+                            <SelectItem value="Other"><Briefcase className="inline h-4 w-4 mr-2 text-gray-500"/>Other/Undecided</SelectItem>
+                        </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
               </CardContent>
               <CardFooter>
                 <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">Save Changes</Button>
@@ -219,7 +279,7 @@ export default function ProfilePage() {
                  <div className="flex items-center gap-3">
                     <Award className="h-8 w-8 text-accent"/>
                     <div>
-                        <CardTitle className="font-headline text-xl text-primary">My Badges</CardTitle>
+                        <CardTitle className="font-headline text-xl text-primary">My Commendations</CardTitle>
                         <CardDescription>Your earned achievements.</CardDescription>
                     </div>
                 </div>
@@ -229,11 +289,11 @@ export default function ProfilePage() {
                     userProfile.awardedBadges.map((badge: Badge) => (
                         <Card key={badge.id} className="p-4 bg-secondary/50 border-border shadow-sm">
                             <div className="flex items-center gap-3">
-                                <Image 
-                                    src={badge.imageUrl} 
-                                    alt={badge.name} 
-                                    width={60} 
-                                    height={60} 
+                                <Image
+                                    src={badge.imageUrl}
+                                    alt={badge.name}
+                                    width={60}
+                                    height={60}
                                     className="rounded-md border-2 border-accent"
                                     data-ai-hint={badge.dataAiHint}
                                 />
@@ -259,4 +319,3 @@ export default function ProfilePage() {
     </>
   );
 }
-

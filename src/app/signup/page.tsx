@@ -13,16 +13,17 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Logo } from '@/components/icons/logo';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
-import { MailCheck, PhoneCall, ShieldCheck, UserCircle } from 'lucide-react';
+import { MailCheck, PhoneCall, ShieldCheck, UserCircle, VenetianMask, Binary, Briefcase } from 'lucide-react';
 import { PREDEFINED_AVATARS, MOCK_BADGES } from '@/constants';
 import { cn } from '@/lib/utils';
 import type { Badge } from '@/types';
 
-const MOCK_OTP = "123456"; 
+const MOCK_OTP = "123456";
 
 const signupFormSchemaBase = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -30,7 +31,9 @@ const signupFormSchemaBase = z.object({
   phone: z.string().min(10, {message: "Phone number must be at least 10 digits"}),
   password: z.string().min(8, { message: "Password must be at least 8 characters." }),
   confirmPassword: z.string(),
-  imageUrl: z.string().optional(), // For selected avatar
+  gender: z.enum(['Male', 'Female', 'Other', 'Prefer not to say'], { required_error: "Please select your gender." }),
+  targetOrganization: z.enum(['Army', 'Navy', 'Air Force', 'Other'], { required_error: "Please select your target organization." }),
+  imageUrl: z.string().optional(),
   isNotRobot: z.boolean().refine(val => val === true, { message: "Please complete the CAPTCHA." }),
 });
 
@@ -66,6 +69,8 @@ export default function SignupPage() {
       phone: '',
       password: '',
       confirmPassword: '',
+      gender: undefined,
+      targetOrganization: undefined,
       imageUrl: PREDEFINED_AVATARS[0].url,
       isNotRobot: false,
       emailOtp: '',
@@ -103,7 +108,8 @@ export default function SignupPage() {
         setEmailVerified(true);
         toast({ title: 'Email Verified', description: 'Your email has been successfully verified.' });
         if (phoneVerified) setVerificationStep('verified');
-        else setVerificationStep('phoneOtp'); 
+        else if (!phoneOtpSent) setVerificationStep('details'); // Go back to details if phone OTP not yet requested
+        else setVerificationStep('phoneOtp');
       } else {
         form.setError('emailOtp', { type: 'manual', message: 'Invalid OTP. Please try again.' });
       }
@@ -113,7 +119,8 @@ export default function SignupPage() {
         setPhoneVerified(true);
         toast({ title: 'Phone Verified', description: 'Your phone number has been successfully verified.' });
         if (emailVerified) setVerificationStep('verified');
-        else setVerificationStep('emailOtp'); 
+        else if (!emailOtpSent) setVerificationStep('details'); // Go back to details if email OTP not yet requested
+        else setVerificationStep('emailOtp');
       } else {
         form.setError('phoneOtp', { type: 'manual', message: 'Invalid OTP. Please try again.' });
       }
@@ -133,17 +140,18 @@ export default function SignupPage() {
       awardedBadges.push(defaultBadge);
     }
 
-    // Store profile details in localStorage for demo persistence
     const userProfileData = {
         name: data.name,
         email: data.email,
         phone: data.phone,
+        gender: data.gender,
+        targetOrganization: data.targetOrganization,
         imageUrl: selectedAvatar,
         awardedBadges: awardedBadges,
     };
     localStorage.setItem(`mockUserProfile_${data.email}`, JSON.stringify(userProfileData));
 
-    login({email: data.email, name: data.name, isAdmin: false, imageUrl: selectedAvatar }); 
+    login({email: data.email, name: data.name, isAdmin: false, imageUrl: selectedAvatar });
 
     toast({
       title: 'Signup Successful (Mock)',
@@ -152,7 +160,9 @@ export default function SignupPage() {
     router.push('/dashboard');
   }
   
-  const disableDetails = emailOtpSent || phoneOtpSent;
+  const disableDetails = emailOtpSent || phoneOtpSent || emailVerified || phoneVerified;
+  const disableBasicInfo = verificationStep !== 'details' && (emailVerified || phoneVerified);
+
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 p-4">
@@ -161,7 +171,7 @@ export default function SignupPage() {
           <Link href="/" className="inline-block mb-4">
             <Logo />
           </Link>
-          <CardTitle className="text-2xl font-headline text-primary">Create an Account</CardTitle>
+          <CardTitle className="text-2xl font-headline text-primary">Enlist Now</CardTitle>
           <CardDescription>
             Join us to start your journey to ace the SSB interview.
           </CardDescription>
@@ -177,7 +187,7 @@ export default function SignupPage() {
                       key={avatar.id}
                       type="button"
                       onClick={() => {
-                          if(!disableDetails) {
+                          if(!disableBasicInfo) {
                             setSelectedAvatar(avatar.url);
                             form.setValue('imageUrl', avatar.url);
                           }
@@ -185,18 +195,18 @@ export default function SignupPage() {
                       className={cn(
                         "rounded-full overflow-hidden border-2 transition-all w-16 h-16",
                         selectedAvatar === avatar.url ? "border-primary ring-2 ring-primary" : "border-transparent hover:border-primary/50",
-                        disableDetails && "cursor-not-allowed opacity-70"
+                        disableBasicInfo && "cursor-not-allowed opacity-70"
                       )}
-                      disabled={disableDetails}
+                      disabled={disableBasicInfo}
                       aria-label={`Select avatar ${avatar.id}`}
                     >
-                      <Image 
-                        src={avatar.url} 
-                        alt={`Avatar ${avatar.id}`} 
-                        width={64} 
+                      <Image
+                        src={avatar.url}
+                        alt={`Avatar ${avatar.id}`}
+                        width={64}
                         height={64}
                         className="aspect-square object-cover"
-                        data-ai-hint={avatar.hint} 
+                        data-ai-hint={avatar.hint}
                       />
                     </button>
                   ))}
@@ -210,8 +220,54 @@ export default function SignupPage() {
                   <FormItem>
                     <FormLabel>Full Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Your full name" {...field} disabled={disableDetails} />
+                      <Input placeholder="Your full name" {...field} disabled={disableBasicInfo} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="gender"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Gender</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={disableBasicInfo}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select your gender" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Male"><VenetianMask className="inline h-4 w-4 mr-2 text-blue-500"/>Male</SelectItem>
+                        <SelectItem value="Female"><VenetianMask className="inline h-4 w-4 mr-2 text-pink-500"/>Female</SelectItem>
+                        <SelectItem value="Other"><Binary className="inline h-4 w-4 mr-2 text-purple-500"/>Other</SelectItem>
+                        <SelectItem value="Prefer not to say">Prefer not to say</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="targetOrganization"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Target Organization</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={disableBasicInfo}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select your target organization" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Army"><Briefcase className="inline h-4 w-4 mr-2 text-green-600"/>Indian Army</SelectItem>
+                        <SelectItem value="Navy"><Briefcase className="inline h-4 w-4 mr-2 text-sky-600"/>Indian Navy</SelectItem>
+                        <SelectItem value="Air Force"><Briefcase className="inline h-4 w-4 mr-2 text-blue-500"/>Indian Air Force</SelectItem>
+                        <SelectItem value="Other"><Briefcase className="inline h-4 w-4 mr-2 text-gray-500"/>Other/Undecided</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -224,10 +280,10 @@ export default function SignupPage() {
                     <FormLabel>Email</FormLabel>
                     <div className="flex items-center gap-2">
                       <FormControl>
-                        <Input type="email" placeholder="you@example.com" {...field} disabled={emailVerified || disableDetails && !emailOtpSent} />
+                        <Input type="email" placeholder="you@example.com" {...field} disabled={emailVerified || (verificationStep !== 'details' && verificationStep !== 'emailOtp')} />
                       </FormControl>
-                      {!emailVerified && !emailOtpSent && (
-                        <Button type="button" variant="outline" size="sm" onClick={() => handleSendOtp('email')} disabled={emailOtpSent}>
+                      {!emailVerified && verificationStep === 'details' && (
+                        <Button type="button" variant="outline" size="sm" onClick={() => handleSendOtp('email')} disabled={emailOtpSent || emailVerified}>
                           Send OTP
                         </Button>
                       )}
@@ -237,8 +293,8 @@ export default function SignupPage() {
                   </FormItem>
                 )}
               />
-              
-              {emailOtpSent && !emailVerified && (
+
+              {emailOtpSent && !emailVerified && verificationStep === 'emailOtp' && (
                 <FormField
                   control={form.control}
                   name="emailOtp"
@@ -265,10 +321,10 @@ export default function SignupPage() {
                     <FormLabel>Phone Number</FormLabel>
                      <div className="flex items-center gap-2">
                         <FormControl>
-                          <Input type="tel" placeholder="Your 10-digit phone number" {...field} disabled={phoneVerified || disableDetails && !phoneOtpSent} />
+                          <Input type="tel" placeholder="Your 10-digit phone number" {...field} disabled={phoneVerified || (verificationStep !== 'details' && verificationStep !== 'phoneOtp')} />
                         </FormControl>
-                        {!phoneVerified && !phoneOtpSent && (
-                            <Button type="button" variant="outline" size="sm" onClick={() => handleSendOtp('phone')} disabled={phoneOtpSent}>
+                        {!phoneVerified && verificationStep === 'details' && (
+                            <Button type="button" variant="outline" size="sm" onClick={() => handleSendOtp('phone')} disabled={phoneOtpSent || phoneVerified}>
                             Send OTP
                             </Button>
                         )}
@@ -279,7 +335,7 @@ export default function SignupPage() {
                 )}
               />
 
-              {phoneOtpSent && !phoneVerified && (
+              {phoneOtpSent && !phoneVerified && verificationStep === 'phoneOtp' &&(
                  <FormField
                   control={form.control}
                   name="phoneOtp"
@@ -305,7 +361,7 @@ export default function SignupPage() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} disabled={disableDetails} />
+                      <Input type="password" placeholder="••••••••" {...field} disabled={disableBasicInfo} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -318,7 +374,7 @@ export default function SignupPage() {
                   <FormItem>
                     <FormLabel>Confirm Password</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} disabled={disableDetails} />
+                      <Input type="password" placeholder="••••••••" {...field} disabled={disableBasicInfo} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -333,7 +389,7 @@ export default function SignupPage() {
                       <Checkbox
                         checked={field.value}
                         onCheckedChange={field.onChange}
-                        disabled={disableDetails}
+                        disabled={disableBasicInfo}
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
@@ -350,12 +406,12 @@ export default function SignupPage() {
               />
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
                 disabled={!emailVerified || !phoneVerified || !form.formState.isValid}
               >
-                Sign Up
+                Complete Enlistment
               </Button>
               <p className="text-sm text-center text-muted-foreground">
                 Already have an account?{' '}
@@ -370,4 +426,3 @@ export default function SignupPage() {
     </div>
   );
 }
-

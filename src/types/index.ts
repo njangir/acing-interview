@@ -18,7 +18,7 @@ export interface Testimonial {
   id: string;
   name: string;
   userEmail?: string;
-  batch?: string;
+  batch?: string; // Existing field
   story: string;
   imageUrl?: string;
   dataAiHint?: string;
@@ -26,6 +26,9 @@ export interface Testimonial {
   serviceId?: string;
   submissionStatus?: 'aspirant' | 'selected_cleared';
   status: 'pending' | 'approved' | 'rejected';
+  selectedForce?: 'Army' | 'Navy' | 'Air Force'; // New field
+  interviewLocation?: string; // New field
+  numberOfAttempts?: number; // New field
 }
 
 export interface Booking {
@@ -96,6 +99,9 @@ export interface UserProfile {
   name: string;
   email: string;
   phone: string;
-  imageUrl?: string; // Added for avatar
+  imageUrl?: string;
   awardedBadges: Badge[];
+  gender?: 'Male' | 'Female' | 'Other' | 'Prefer not to say'; // New field
+  targetOrganization?: 'Army' | 'Navy' | 'Air Force' | 'Other'; // New field
 }
+
