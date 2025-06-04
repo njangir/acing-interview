@@ -18,8 +18,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { MailCheck, PhoneCall, ShieldCheck, UserCircle } from 'lucide-react';
-import { PREDEFINED_AVATARS } from '@/constants';
+import { PREDEFINED_AVATARS, MOCK_BADGES } from '@/constants';
 import { cn } from '@/lib/utils';
+import type { Badge } from '@/types';
 
 const MOCK_OTP = "123456"; 
 
@@ -126,17 +127,23 @@ export default function SignupPage() {
       return;
     }
     
-    login({email: data.email, name: data.name, isAdmin: false, imageUrl: selectedAvatar }); 
-    
+    const defaultBadge = MOCK_BADGES.find(badge => badge.id === 'commendable_effort');
+    const awardedBadges: Badge[] = [];
+    if (defaultBadge) {
+      awardedBadges.push(defaultBadge);
+    }
+
     // Store profile details in localStorage for demo persistence
     const userProfileData = {
         name: data.name,
         email: data.email,
         phone: data.phone,
         imageUrl: selectedAvatar,
-        awardedBadges: []
+        awardedBadges: awardedBadges,
     };
     localStorage.setItem(`mockUserProfile_${data.email}`, JSON.stringify(userProfileData));
+
+    login({email: data.email, name: data.name, isAdmin: false, imageUrl: selectedAvatar }); 
 
     toast({
       title: 'Signup Successful (Mock)',
@@ -363,3 +370,4 @@ export default function SignupPage() {
     </div>
   );
 }
+
