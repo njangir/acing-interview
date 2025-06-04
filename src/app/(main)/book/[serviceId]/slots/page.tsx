@@ -160,7 +160,12 @@ export default function SlotSelectionPage() {
                 selected={selectedDate}
                 onSelect={setSelectedDate}
                 className="rounded-md border"
-                disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1)) || !AVAILABLE_SLOTS[date.toISOString().split('T')[0]]}
+                disabled={(date) => {
+                  const dateString = date.toISOString().split('T')[0];
+                  const today = new Date();
+                  today.setHours(0,0,0,0); // Compare dates only, not time
+                  return date < today || !AVAILABLE_SLOTS[dateString] || AVAILABLE_SLOTS[dateString]?.length === 0;
+                }}
               />
             </div>
             <div>
@@ -205,3 +210,5 @@ export default function SlotSelectionPage() {
     </>
   );
 }
+
+    

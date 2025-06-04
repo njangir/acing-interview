@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { AVAILABLE_SLOTS } from '@/constants'; // For simulation
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Info, CalendarCheck } from 'lucide-react';
+import { Info, CalendarCheck, CalendarX } from 'lucide-react';
 
 export default function AdminSlotsPage() {
   const { toast } = useToast();
@@ -26,6 +26,10 @@ export default function AdminSlotsPage() {
     let currentTime = new Date(`1970-01-01T${start}:00`);
     const const_endTime = new Date(`1970-01-01T${end}:00`);
 
+    if (currentTime >= const_endTime) {
+      return []; // Start time is not before end time
+    }
+
     while (currentTime < const_endTime) {
       slots.push(currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }));
       currentTime = new Date(currentTime.getTime() + intervalMin * 60000);
@@ -33,29 +37,33 @@ export default function AdminSlotsPage() {
     return slots;
   };
 
-  const handleUpdateAvailability = (dates: Date[], customSlots?: string[]) => {
+  const handleUpdateAvailability = (dates: Date[], customSlots?: string[], actionType: 'set' | 'clear' = 'set') => {
     if (!dates.length) {
       toast({ title: "No Dates Selected", description: "Please select at least one date.", variant: "destructive" });
       return;
     }
 
-    const newSlotsFromUI = customSlots || generateTimeSlots(startTime, endTime, interval);
-    if (!newSlotsFromUI.length) {
-      toast({ title: "Invalid Time Range", description: "End time must be after start time.", variant: "destructive" });
-      return;
-    }
+    let slotsToApply: string[] = [];
+    if (actionType === 'set') {
+      slotsToApply = customSlots || generateTimeSlots(startTime, endTime, interval);
+      if (!slotsToApply.length && !customSlots) { // check if generateTimeSlots returned empty due to invalid range
+        toast({ title: "Invalid Time Range", description: "End time must be after start time, or interval is too large.", variant: "destructive" });
+        return;
+      }
+    } // For 'clear', slotsToApply remains an empty array
 
     const updates: Record<string, string[]> = {};
     dates.forEach(date => {
-      updates[format(date, 'yyyy-MM-dd')] = newSlotsFromUI;
+      const dateString = format(date, 'yyyy-MM-dd');
+      AVAILABLE_SLOTS[dateString] = slotsToApply; // Directly mutate the imported constant for prototype
+      updates[dateString] = slotsToApply;
     });
     
-    // Simulate backend update
-    console.log("Simulating update for AVAILABLE_SLOTS with:", updates);
+    console.log(`Simulating ${actionType === 'set' ? 'update' : 'clearing'} for AVAILABLE_SLOTS with:`, updates);
     
     toast({
-      title: "Availability Updated (Simulated)",
-      description: `Slots for ${dates.length} date(s) have been 'updated'. In a real app, this would be saved to a backend.`,
+      title: `Availability ${actionType === 'set' ? 'Updated' : 'Cleared'} (Simulated)`,
+      description: `Slots for ${dates.length} date(s) have been ${actionType === 'set' ? 'set' : 'cleared'}. In a real app, this would be saved to a backend.`,
     });
   };
 
@@ -64,28 +72,43 @@ export default function AdminSlotsPage() {
        toast({ title: "No Date Selected", description: "Please select a date from the calendar.", variant: "destructive" });
       return;
     }
-    handleUpdateAvailability([selectedDate]);
+    handleUpdateAvailability([selectedDate], undefined, 'set');
+  };
+
+  const handleClearSlotsForDate = () => {
+    if(!selectedDate) {
+      toast({ title: "No Date Selected", description: "Please select a date to clear slots.", variant: "destructive" });
+      return;
+    }
+    handleUpdateAvailability([selectedDate], [], 'clear');
   };
   
-  const handleQuickAction = (type: 'nextWeek' | 'nextWeekend') => {
+  const handleQuickAction = (type: 'nextWeekAvailable' | 'nextWeekendAvailable' | 'nextWeekUnavailable' | 'nextWeekendUnavailable') => {
     const today = new Date();
     const dates: Date[] = [];
-    if (type === 'nextWeek') {
+    let actionType: 'set' | 'clear' = 'set';
+    let slotsDefinition: string[] = [];
+
+    if (type === 'nextWeekAvailable' || type === 'nextWeekUnavailable') {
       let current = startOfWeek(addDays(today, 7), { weekStartsOn: 1 }); // Next Monday
       const end = endOfWeek(addDays(today, 7), { weekStartsOn: 1 }); // Next Sunday
       while(current <= end) {
         dates.push(new Date(current));
         current = addDays(current, 1);
       }
-    } else if (type === 'nextWeekend') {
+      actionType = type === 'nextWeekAvailable' ? 'set' : 'clear';
+      if (actionType === 'set') {
+        slotsDefinition = generateTimeSlots("09:00", "17:00", 60);
+      }
+    } else if (type === 'nextWeekendAvailable' || type === 'nextWeekendUnavailable') {
         dates.push(nextSaturday(today));
         dates.push(nextSunday(today));
+        actionType = type === 'nextWeekendAvailable' ? 'set' : 'clear';
+        if (actionType === 'set') {
+            slotsDefinition = generateTimeSlots("10:00", "16:00", 60);
+        }
     }
-    const customSlots = (type === 'nextWeekend') 
-        ? generateTimeSlots("10:00", "16:00", 60) // 10am-4pm for weekends
-        : generateTimeSlots("09:00", "17:00", 60); // 9am-5pm for weekdays
-
-    handleUpdateAvailability(dates, customSlots);
+    handleUpdateAvailability(dates, actionType === 'set' ? slotsDefinition : [], actionType);
   };
 
 
@@ -93,20 +116,20 @@ export default function AdminSlotsPage() {
     <>
       <PageHeader
         title="Manage Available Slots"
-        description="Set the dates and times when users can book sessions."
+        description="Set the dates and times when users can book sessions, or mark dates as unavailable."
       />
       <Alert className="mb-6 bg-primary/5 text-primary border-primary/20">
         <Info className="h-4 w-4 !text-primary" />
         <AlertTitle>Simulation Notice</AlertTitle>
         <AlertDescription>
-          This page simulates updating available slots. Changes are reflected in the booking calendar for this session only (based on initial constants) and are not permanently stored.
+          This page simulates updating available slots. Changes directly modify the `AVAILABLE_SLOTS` constant for this session and are reflected in the user's booking calendar. These changes are not permanently stored.
         </AlertDescription>
       </Alert>
       <div className="grid md:grid-cols-2 gap-8">
         <Card>
           <CardHeader>
             <CardTitle>Manual Slot Configuration</CardTitle>
-            <CardDescription>Select a date, define time ranges, and add slots.</CardDescription>
+            <CardDescription>Select a date, define time ranges to add slots, or clear existing slots.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
@@ -121,22 +144,25 @@ export default function AdminSlotsPage() {
             </div>
              <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <Label htmlFor="startTime">Start Time</Label>
+                    <Label htmlFor="startTime">Start Time (for setting slots)</Label>
                     <Input id="startTime" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
                 </div>
                 <div>
-                    <Label htmlFor="endTime">End Time</Label>
+                    <Label htmlFor="endTime">End Time (for setting slots)</Label>
                     <Input id="endTime" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
                 </div>
             </div>
             <div>
-                <Label htmlFor="interval">Slot Interval (minutes)</Label>
+                <Label htmlFor="interval">Slot Interval (minutes, for setting slots)</Label>
                 <Input id="interval" type="number" value={interval} onChange={(e) => setIntervalMinutes(parseInt(e.target.value) || 60)} step="15" min="15" />
             </div>
           </CardContent>
-          <CardFooter>
-            <Button onClick={handleMakeDateAvailable} disabled={!selectedDate} className="w-full">
-              <CalendarCheck className="mr-2 h-4 w-4" /> Set Availability for Selected Date
+          <CardFooter className="flex flex-col sm:flex-row gap-2">
+            <Button onClick={handleMakeDateAvailable} disabled={!selectedDate} className="w-full sm:w-auto flex-1">
+              <CalendarCheck className="mr-2 h-4 w-4" /> Set Availability
+            </Button>
+            <Button onClick={handleClearSlotsForDate} disabled={!selectedDate} variant="destructive" className="w-full sm:w-auto flex-1">
+              <CalendarX className="mr-2 h-4 w-4" /> Clear Slots
             </Button>
           </CardFooter>
         </Card>
@@ -144,20 +170,26 @@ export default function AdminSlotsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Rapidly open up common availability patterns.</CardDescription>
+            <CardDescription>Rapidly open up or clear common availability patterns.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-             <Button onClick={() => handleQuickAction('nextWeek')} variant="outline" className="w-full">
+             <Button onClick={() => handleQuickAction('nextWeekAvailable')} variant="outline" className="w-full">
               Make Next 7 Days Available (9am-5pm)
             </Button>
-            <Button onClick={() => handleQuickAction('nextWeekend')} variant="outline" className="w-full">
+            <Button onClick={() => handleQuickAction('nextWeekendAvailable')} variant="outline" className="w-full">
               Make Next Weekend Available (10am-4pm Sat/Sun)
             </Button>
-            {/* More quick actions can be added here */}
+            <hr/>
+            <Button onClick={() => handleQuickAction('nextWeekUnavailable')} variant="outline" className="w-full border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive">
+              Make Next 7 Days Unavailable
+            </Button>
+            <Button onClick={() => handleQuickAction('nextWeekendUnavailable')} variant="outline" className="w-full border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive">
+              Make Next Weekend Unavailable
+            </Button>
           </CardContent>
            <CardFooter>
              <p className="text-xs text-muted-foreground">
-                Quick actions will overwrite existing slots for the specified dates with the defined times.
+                Quick actions will overwrite existing slots for the specified dates with the defined times or clear them entirely.
              </p>
            </CardFooter>
         </Card>
@@ -165,3 +197,5 @@ export default function AdminSlotsPage() {
     </>
   );
 }
+
+    
