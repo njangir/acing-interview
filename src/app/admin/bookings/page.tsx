@@ -23,13 +23,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { MOCK_BOOKINGS, MOCK_SERVICES } from "@/constants"; 
 import type { Booking } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck, PlusCircle, CalendarIcon, Edit } from 'lucide-react';
+import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck, PlusCircle, CalendarIcon, Edit, Filter } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { format, parse } from 'date-fns';
 
 const createBookingFormSchema = z.object({
-  userEmail: z.string().email({ message: "Invalid email address." }),
+  userEmails: z.string().min(1, { message: "At least one email address is required." }),
   userName: z.string().min(2, { message: "User name must be at least 2 characters." }),
   serviceId: z.string({ required_error: "Please select a service." }),
   date: z.date({ required_error: "Please select a date." }),
@@ -55,11 +55,12 @@ export default function AdminBookingsPage() {
   const [selectedBookingForEdit, setSelectedBookingForEdit] = useState<Booking | null>(null);
   const [isEditBookingModalOpen, setIsEditBookingModalOpen] = useState(false);
   const [isCreateBookingModalOpen, setIsCreateBookingModalOpen] = useState(false);
+  const [filterServiceId, setFilterServiceId] = useState<string>('all');
 
   const createBookingForm = useForm<CreateBookingFormValues>({
     resolver: zodResolver(createBookingFormSchema),
     defaultValues: {
-      userEmail: '',
+      userEmails: '',
       userName: '',
       serviceId: undefined,
       date: undefined,
@@ -105,7 +106,7 @@ export default function AdminBookingsPage() {
       message = `Booking ${bookingId} marked as completed.`;
       bookingToUpdate.status = 'completed';
       bookingUpdated = true;
-    } else if (action === 'approve_refund') {
+    } else if (action === 'approve_refund' && bookingToUpdate.paymentStatus === 'paid' && bookingToUpdate.requestedRefund) {
       message = `Refund for booking ${bookingId} approved. Booking cancelled.`;
       bookingToUpdate.status = 'cancelled';
       bookingToUpdate.paymentStatus = 'pay_later_unpaid'; 
@@ -132,29 +133,47 @@ export default function AdminBookingsPage() {
       return;
     }
 
-    const newBooking: Booking = {
-      id: `admin-booking-${Date.now()}`,
-      userName: data.userName,
-      userEmail: data.userEmail,
-      serviceId: data.serviceId,
-      serviceName: selectedService.name,
-      date: format(data.date, 'yyyy-MM-dd'),
-      time: data.time,
-      paymentStatus: data.paymentStatus,
-      status: data.paymentStatus === 'paid' ? 'upcoming' : 'pending_approval',
-      meetingLink: data.meetingLink || `https://meet.google.com/mock-admin-${Math.random().toString(36).substring(2, 9)}`,
-      transactionId: data.paymentStatus === 'paid' ? `admin_txn_${Date.now()}` : null,
-      requestedRefund: false,
-    };
+    const emails = data.userEmails.split(',').map(email => email.trim()).filter(email => email);
+    if (emails.length === 0) {
+        toast({ title: "Error", description: "Please enter at least one valid email.", variant: "destructive" });
+        return;
+    }
 
-    MOCK_BOOKINGS.unshift(newBooking); 
-    setForceUpdate(prev => prev + 1);
-    toast({
-      title: "Booking Created",
-      description: `Booking for ${data.userName} for ${selectedService.name} has been created.`,
+    let bookingsCreatedCount = 0;
+    emails.forEach((email, index) => {
+        // Basic email validation, can be improved
+        if (!/^\S+@\S+\.\S+$/.test(email)) {
+            toast({ title: "Skipped Invalid Email", description: `Skipped "${email}" as it's not a valid email format.`, variant: "destructive" });
+            return;
+        }
+
+        const newBooking: Booking = {
+          id: `admin-booking-${Date.now()}-${index}`, // Unique ID for each booking
+          userName: data.userName, // Same name for all in group
+          userEmail: email,
+          serviceId: data.serviceId,
+          serviceName: selectedService.name,
+          date: format(data.date, 'yyyy-MM-dd'),
+          time: data.time,
+          paymentStatus: data.paymentStatus,
+          status: data.paymentStatus === 'paid' ? 'upcoming' : 'pending_approval',
+          meetingLink: data.meetingLink || `https://meet.google.com/mock-admin-${Math.random().toString(36).substring(2, 9)}`,
+          transactionId: data.paymentStatus === 'paid' ? `admin_txn_${Date.now()}-${index}` : null,
+          requestedRefund: false,
+        };
+        MOCK_BOOKINGS.unshift(newBooking); 
+        bookingsCreatedCount++;
     });
-    setIsCreateBookingModalOpen(false);
-    createBookingForm.reset();
+    
+    if (bookingsCreatedCount > 0) {
+        setForceUpdate(prev => prev + 1);
+        toast({
+          title: `${bookingsCreatedCount > 1 ? 'Group Booking' : 'Booking'} Created`,
+          description: `${bookingsCreatedCount} booking(s) for ${data.userName} for ${selectedService.name} has been created.`,
+        });
+        setIsCreateBookingModalOpen(false);
+        createBookingForm.reset();
+    }
   }
 
   function onEditBookingSubmit(data: EditBookingFormValues) {
@@ -170,7 +189,7 @@ export default function AdminBookingsPage() {
       ...MOCK_BOOKINGS[bookingIndex],
       date: format(data.date, 'yyyy-MM-dd'),
       time: data.time,
-      meetingLink: data.meetingLink || MOCK_BOOKINGS[bookingIndex].meetingLink, // Keep old if new is empty
+      meetingLink: data.meetingLink || MOCK_BOOKINGS[bookingIndex].meetingLink, 
       status: data.status,
       paymentStatus: data.paymentStatus,
     };
@@ -184,8 +203,15 @@ export default function AdminBookingsPage() {
     setIsEditBookingModalOpen(false);
     setSelectedBookingForEdit(null);
   }
+  
+  const filteredBookings = useMemo(() => {
+    let bookings = [...MOCK_BOOKINGS].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    if (filterServiceId !== 'all') {
+      bookings = bookings.filter(booking => booking.serviceId === filterServiceId);
+    }
+    return bookings;
+  }, [MOCK_BOOKINGS, filterServiceId, forceUpdate]);
 
-  const currentBookings = [...MOCK_BOOKINGS].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
     <>
@@ -193,7 +219,21 @@ export default function AdminBookingsPage() {
         title="Manage Booking Requests"
         description="Review, accept, edit, cancel, or create new booking requests."
       />
-       <div className="mb-6 text-right">
+       <div className="mb-6 flex justify-between items-center">
+        <div className="flex items-center gap-2">
+            <Filter className="h-5 w-5 text-muted-foreground" />
+            <Select value={filterServiceId} onValueChange={setFilterServiceId}>
+                <SelectTrigger className="w-full md:w-[250px]">
+                    <SelectValue placeholder="Filter by service..." />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Services</SelectItem>
+                    {MOCK_SERVICES.map(service => (
+                        <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
         <Button onClick={() => setIsCreateBookingModalOpen(true)}>
           <PlusCircle className="mr-2 h-4 w-4" /> Create New Booking
         </Button>
@@ -201,7 +241,7 @@ export default function AdminBookingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>All Bookings</CardTitle>
-          <CardDescription>View and manage all bookings. Current count: {currentBookings.length}</CardDescription>
+          <CardDescription>View and manage all bookings. Showing: {filteredBookings.length}</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -217,7 +257,7 @@ export default function AdminBookingsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {currentBookings.length > 0 ? currentBookings.map((booking) => (
+              {filteredBookings.length > 0 ? filteredBookings.map((booking) => (
                 <TableRow key={booking.id}>
                   <TableCell>
                     <div className="font-medium">{booking.userName}</div>
@@ -275,7 +315,7 @@ export default function AdminBookingsPage() {
                               <CheckCircle className="mr-2 h-4 w-4 text-green-500" /> Accept
                             </DropdownMenuItem>
                           )}
-                           {booking.requestedRefund && booking.status === 'upcoming' && booking.paymentStatus === 'paid' && (
+                           {booking.status === 'upcoming' && booking.paymentStatus === 'paid' && booking.requestedRefund &&(
                              <DropdownMenuItem onClick={() => handleAdminAction(booking.id, 'approve_refund')} className="text-green-600 hover:!text-green-600">
                                 <ShieldCheck className="mr-2 h-4 w-4" /> Approve Refund
                               </DropdownMenuItem>
@@ -318,17 +358,16 @@ export default function AdminBookingsPage() {
                   </TableCell>
                 </TableRow>
               )) : (
-                 <TableRow><TableCell colSpan={7} className="text-center h-24">No bookings found.</TableCell></TableRow>
+                 <TableRow><TableCell colSpan={7} className="text-center h-24">No bookings found matching the criteria.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
       
-      {/* Edit Booking Modal */}
       <Dialog open={isEditBookingModalOpen} onOpenChange={(isOpen) => {
         setIsEditBookingModalOpen(isOpen);
-        if (!isOpen) setSelectedBookingForEdit(null); // Clear selected booking on close
+        if (!isOpen) setSelectedBookingForEdit(null); 
       }}>
         <DialogContent className="sm:max-w-lg">
             <DialogHeader>
@@ -458,7 +497,6 @@ export default function AdminBookingsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Create Booking Modal */}
       <Dialog open={isCreateBookingModalOpen} onOpenChange={(isOpen) => {
         setIsCreateBookingModalOpen(isOpen);
         if (!isOpen) createBookingForm.reset();
@@ -466,7 +504,7 @@ export default function AdminBookingsPage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Create New Booking</DialogTitle>
-            <DialogDesc>Manually create a booking for a user.</DialogDesc>
+            <DialogDesc>Manually create a booking. For group bookings, enter comma-separated emails.</DialogDesc>
           </DialogHeader>
           <Form {...createBookingForm}>
             <form onSubmit={createBookingForm.handleSubmit(onCreateBookingSubmit)} className="space-y-4 py-4">
@@ -476,18 +514,18 @@ export default function AdminBookingsPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>User Name</FormLabel>
-                    <FormControl><Input placeholder="Full Name" {...field} /></FormControl>
+                    <FormControl><Input placeholder="Full Name (will be same for all in group)" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
               <FormField
                 control={createBookingForm.control}
-                name="userEmail"
+                name="userEmails"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>User Email</FormLabel>
-                    <FormControl><Input type="email" placeholder="user@example.com" {...field} /></FormControl>
+                    <FormLabel>User Email(s)</FormLabel>
+                    <FormControl><Textarea placeholder="user@example.com, another@example.com" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -594,7 +632,7 @@ export default function AdminBookingsPage() {
               />
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsCreateBookingModalOpen(false)}>Cancel</Button>
-                <Button type="submit">Create Booking</Button>
+                <Button type="submit">Create Booking(s)</Button>
               </DialogFooter>
             </form>
           </Form>
@@ -603,3 +641,6 @@ export default function AdminBookingsPage() {
     </>
   );
 }
+
+
+    
