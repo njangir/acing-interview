@@ -1,9 +1,10 @@
 
 'use client';
-import { useMemo } from 'react';
+// Removed useMemo as MOCK_BOOKINGS is mutated directly
 import { PageHeader } from "@/components/core/page-header";
 import { BookingCard } from "@/components/core/booking-card";
 import { MOCK_BOOKINGS } from "@/constants";
+import type { Booking } from '@/types'; // Import Booking type if not already
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -14,20 +15,32 @@ import { Shield } from 'lucide-react';
 export default function MyBookingsPage() {
   const { currentUser } = useAuth();
 
-  const userBookings = useMemo(() => {
-    if (!currentUser) return [];
-    // Ensure MOCK_BOOKINGS is a dependency so this recalculates if the component re-renders
-    // and MOCK_BOOKINGS array (in memory) has been updated.
-    return MOCK_BOOKINGS.filter(b => b.userEmail === currentUser.email);
-  }, [currentUser, MOCK_BOOKINGS]);
+  // Directly filter MOCK_BOOKINGS on each render to get the latest data
+  // This is suitable for client-side mock data mutation.
+  let userBookings: Booking[] = [];
+  if (currentUser) {
+    // Ensure we are using the up-to-date MOCK_BOOKINGS array
+    userBookings = MOCK_BOOKINGS.filter(b => b.userEmail === currentUser.email);
+  }
 
-  const upcomingBookings = useMemo(() => {
-    return userBookings.filter(b => b.status === 'upcoming' || b.status === 'pending_approval');
-  }, [userBookings]);
+  const upcomingBookings = userBookings.filter(b => b.status === 'upcoming' || b.status === 'pending_approval');
+  const pastBookings = userBookings.filter(b => b.status === 'completed' || b.status === 'cancelled');
+  
+  const handleBookingUpdate = (updatedBooking: Booking) => {
+    // This function can be used to trigger a re-render if needed,
+    // but direct mutation of MOCK_BOOKINGS and standard navigation
+    // should cause this page to re-render and pick up changes.
+    // For instance, if BookingCard itself updated MOCK_BOOKINGS and we needed to force a refresh here.
+    // For now, we'll rely on the re-render from navigation.
+    const index = MOCK_BOOKINGS.findIndex(b => b.id === updatedBooking.id);
+    if (index !== -1) {
+      MOCK_BOOKINGS[index] = updatedBooking;
+      // Force a re-render by updating a dummy state if direct MOCK_BOOKINGS mutation isn't enough
+      // This is a common pattern for forcing updates when external mutable sources are used.
+      // However, for this case, simply re-filtering on render should be sufficient.
+    }
+  };
 
-  const pastBookings = useMemo(() => {
-    return userBookings.filter(b => b.status === 'completed' || b.status === 'cancelled');
-  }, [userBookings]);
 
   if (!currentUser) {
     return (
@@ -62,7 +75,7 @@ export default function MyBookingsPage() {
           {upcomingBookings.length > 0 ? (
             <div className="space-y-6">
               {upcomingBookings.map(booking => (
-                <BookingCard key={booking.id} booking={booking} />
+                <BookingCard key={booking.id} booking={booking} onBookingUpdate={handleBookingUpdate} />
               ))}
             </div>
           ) : (
@@ -78,7 +91,7 @@ export default function MyBookingsPage() {
           {pastBookings.length > 0 ? (
             <div className="space-y-6">
               {pastBookings.map(booking => (
-                <BookingCard key={booking.id} booking={booking} />
+                <BookingCard key={booking.id} booking={booking} onBookingUpdate={handleBookingUpdate}/>
               ))}
             </div>
           ) : (

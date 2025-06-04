@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react'; // Added useRef
 import { useRouter } from 'next/navigation';
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
@@ -22,9 +22,18 @@ interface ConfirmationDetails {
 export default function BookingConfirmationPage() {
   const router = useRouter();
   const [details, setDetails] = useState<ConfirmationDetails | null>(null);
+  const effectGuard = useRef(false); // To prevent effect from running multiple times in StrictMode
 
   useEffect(() => {
-    // If details are already set in state, don't re-process from localStorage
+    // In StrictMode (development), effects run twice. This guard ensures logic runs once.
+    if (process.env.NODE_ENV === 'development') {
+      if (effectGuard.current) {
+        return; // Already ran, bail out
+      }
+      effectGuard.current = true; // Mark as ran for this mount
+    }
+
+    // If details are already populated in state (e.g., from a previous successful run, HMR), don't re-process.
     if (details) {
       return;
     }
@@ -34,22 +43,26 @@ export default function BookingConfirmationPage() {
       try {
         const parsedDetails = JSON.parse(storedDetails);
         setDetails(parsedDetails);
-        // Clean up local storage items only after successfully setting state
+        // It's crucial to remove these only *after* successfully setting state.
         localStorage.removeItem('bookingDetails');
         localStorage.removeItem('userDetails');
         localStorage.removeItem('confirmationDetails');
       } catch (error) {
         console.error("Error parsing confirmation details from localStorage:", error);
-        // Fallback redirect if parsing fails
-        router.push('/book');
+        router.push('/book'); // Redirect on parse error
       }
     } else {
-      // If no details found in localStorage (and not already in state), redirect.
-      // This might happen if the user directly navigates to this page.
-      console.warn("No confirmationDetails found in localStorage on page load. Redirecting.");
-      router.push('/book');
+      // No details found in localStorage. This typically means the user navigated here directly
+      // or the data wasn't set correctly.
+      console.warn("No confirmationDetails found in localStorage on page load. Redirecting to services.");
+      // We check !details again because setDetails is async, state might not be updated yet in this path.
+      if (!details) {
+         router.push('/book');
+      }
     }
-  }, [router, details]); // Add `details` to dependency array
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router, details]); // `details` in dependency array ensures if it changes externally, effect can react (though guarded by `if(details)`).
+                         // `router` is generally stable.
 
   if (!details) {
     return <div className="container py-12">Loading confirmation...</div>;
