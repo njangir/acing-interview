@@ -20,46 +20,68 @@ import { Badge } from '@/components/ui/badge';
 
 export default function AdminBookingsPage() {
   const { toast } = useToast();
-  const [bookings, setBookings] = useState<Booking[]>(MOCK_BOOKINGS);
+  // We will use MOCK_BOOKINGS directly in the render.
+  // This state is to force re-render after an admin action.
+  const [, setForceUpdate] = useState(0); 
+
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [rescheduleReason, setRescheduleReason] = useState('');
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
 
   const handleAction = (bookingId: string, action: 'accept' | 'cancel' | 'complete' | 'approve_refund') => {
     let message = '';
-    setBookings(prev => prev.map(b => {
-      if (b.id === bookingId) {
-        if (action === 'accept') {
-          message = `Booking ${bookingId} accepted and user notified.`;
-          return {...b, status: 'upcoming'};
-        } else if (action === 'cancel') {
-          message = `Booking ${bookingId} cancelled and user notified.`;
-          return {...b, status: 'cancelled'}; // Keep cancelled bookings for record, or filter out
-        } else if (action === 'complete') {
-          message = `Booking ${bookingId} marked as completed.`;
-          return {...b, status: 'completed'};
-        } else if (action === 'approve_refund') {
-          message = `Refund for booking ${bookingId} approved. Booking cancelled.`;
-          return {...b, status: 'cancelled', paymentStatus: 'pay_later_unpaid', requestedRefund: false }; // Update status
-        }
-      }
-      return b;
-    }));
-    toast({ title: "Action Successful", description: message });
+    let bookingUpdated = false;
+
+    const bookingIndex = MOCK_BOOKINGS.findIndex(b => b.id === bookingId);
+    if (bookingIndex === -1) return;
+
+    const bookingToUpdate = MOCK_BOOKINGS[bookingIndex];
+
+    if (action === 'accept') {
+      message = `Booking ${bookingId} accepted and user notified.`;
+      bookingToUpdate.status = 'upcoming';
+      bookingUpdated = true;
+    } else if (action === 'cancel') {
+      message = `Booking ${bookingId} cancelled and user notified.`;
+      bookingToUpdate.status = 'cancelled';
+      bookingUpdated = true;
+    } else if (action === 'complete') {
+      message = `Booking ${bookingId} marked as completed.`;
+      bookingToUpdate.status = 'completed';
+      bookingUpdated = true;
+    } else if (action === 'approve_refund') {
+      message = `Refund for booking ${bookingId} approved. Booking cancelled.`;
+      bookingToUpdate.status = 'cancelled';
+      bookingToUpdate.paymentStatus = 'pay_later_unpaid'; // Or a dedicated 'refunded' status
+      bookingToUpdate.requestedRefund = false; 
+      bookingUpdated = true;
+    }
+    
+    if (bookingUpdated) {
+      MOCK_BOOKINGS[bookingIndex] = bookingToUpdate;
+      toast({ title: "Action Successful", description: message });
+      setForceUpdate(prev => prev + 1); // Force re-render
+    }
   };
 
   const handleRescheduleSubmit = () => {
     if (!selectedBooking || !rescheduleReason) return;
+    // Simulate reschedule logic
     console.log(`Reschedule booking ${selectedBooking.id}. Reason: ${rescheduleReason}. New date/time would be handled here.`);
     toast({ title: "Reschedule Requested", description: `Reschedule for booking ${selectedBooking.id} initiated. User will be notified. Reason: ${rescheduleReason}` });
     setRescheduleReason('');
     setIsRescheduleModalOpen(false);
+    // Potentially update MOCK_BOOKINGS and setForceUpdate if reschedule changes status/data
   };
   
   const openRescheduleModal = (booking: Booking) => {
     setSelectedBooking(booking);
     setIsRescheduleModalOpen(true);
   }
+
+  // Render directly from MOCK_BOOKINGS to always get the latest data
+  const currentBookings = [...MOCK_BOOKINGS].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
 
   return (
     <>
@@ -70,7 +92,7 @@ export default function AdminBookingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>All Bookings</CardTitle>
-          <CardDescription>View and manage all bookings. Current count: {bookings.length}</CardDescription>
+          <CardDescription>View and manage all bookings. Current count: {currentBookings.length}</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -86,7 +108,7 @@ export default function AdminBookingsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {bookings.length > 0 ? bookings.map((booking) => (
+              {currentBookings.length > 0 ? currentBookings.map((booking) => (
                 <TableRow key={booking.id}>
                   <TableCell>
                     <div className="font-medium">{booking.userName}</div>
@@ -144,7 +166,7 @@ export default function AdminBookingsPage() {
                            <DropdownMenuItem onClick={() => openRescheduleModal(booking)}>
                                 <CalendarClock className="mr-2 h-4 w-4 text-orange-500" /> Reschedule
                             </DropdownMenuItem>
-                           {booking.requestedRefund && booking.status === 'upcoming' && (
+                           {booking.requestedRefund && booking.status === 'upcoming' && booking.paymentStatus === 'paid' && (
                              <DropdownMenuItem onClick={() => handleAction(booking.id, 'approve_refund')} className="text-green-600 hover:!text-green-600">
                                 <ShieldCheck className="mr-2 h-4 w-4" /> Approve Refund
                               </DropdownMenuItem>
@@ -152,7 +174,11 @@ export default function AdminBookingsPage() {
                           <DropdownMenuSeparator />
                            <AlertDialog>
                             <AlertDialogTrigger asChild>
-                               <DropdownMenuItem className="text-red-600 hover:!text-red-600">
+                               <DropdownMenuItem 
+                                 className={`text-red-600 hover:!text-red-600 ${booking.status === 'cancelled' ? 'opacity-50 cursor-not-allowed' : '' }`}
+                                 disabled={booking.status === 'cancelled'}
+                                 onSelect={(e) => { if (booking.status === 'cancelled') e.preventDefault();}} // Prevent opening if cancelled
+                                >
                                 <XCircle className="mr-2 h-4 w-4" /> Cancel Booking
                               </DropdownMenuItem>
                             </AlertDialogTrigger>
@@ -211,6 +237,7 @@ export default function AdminBookingsPage() {
                     placeholder="Reason for rescheduling (e.g., mentor unavailability, propose new slots)"
                     />
                 </div>
+                {/* Add fields for new date/time selection here if implementing full reschedule */}
             </div>
             <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsRescheduleModalOpen(false)}>Cancel</Button>
