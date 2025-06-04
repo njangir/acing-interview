@@ -14,10 +14,10 @@ import { DASHBOARD_NAV_LINKS, ADMIN_DASHBOARD_NAV_LINKS } from '@/constants'; //
 import { cn } from '@/lib/utils'; // Import the cn utility
 
 const navLinks = [
-  { href: '/', label: 'Home', icon: Home },
-  { href: '/services', label: 'Services', icon: Briefcase }, // This is the main entry for booking now
-  { href: '/mentor', label: 'Mentor', icon: Award },
-  { href: '/testimonials', label: 'Testimonials', icon: MessageSquare },
+  { href: '/', label: 'Home Base', icon: Home },
+  { href: '/services', label: 'Training Ops', icon: Briefcase }, 
+  { href: '/mentor', label: 'Your Mentor', icon: Award },
+  { href: '/testimonials', label: 'Success Stories', icon: MessageSquare },
 ];
 
 export function Header() {
@@ -34,14 +34,14 @@ export function Header() {
   const isAdminPath = pathname.startsWith('/admin');
 
   let mobileNavLinks = navLinks;
-  let mobileNavTitle = "Menu";
+  let mobileNavTitle = "Field Menu";
 
   if (isDashboardPath && isLoggedIn) {
-    mobileNavLinks = DASHBOARD_NAV_LINKS;
-    mobileNavTitle = "Dashboard Menu";
+    mobileNavLinks = DASHBOARD_NAV_LINKS.map(link => ({...link, label: link.label.replace("My ", "")})); // Slightly adjust labels
+    mobileNavTitle = "Aspirant HQ Menu";
   } else if (isAdminPath && isAdmin) {
     mobileNavLinks = ADMIN_DASHBOARD_NAV_LINKS;
-    mobileNavTitle = "Admin Menu";
+    mobileNavTitle = "Admin Command Menu";
   }
 
   return (
@@ -60,31 +60,30 @@ export function Header() {
               {link.label}
             </Link>
           ))}
-          {isLoggedIn && !isDashboardPath && !isAdminPath && ( // Show dashboard link only if not already in dashboard/admin section for desktop
+          {isLoggedIn && !isDashboardPath && !isAdminPath && ( 
              <Link
               href="/dashboard"
               className="text-sm font-medium text-foreground/70 transition-colors hover:text-foreground"
             >
-              Dashboard
+              Aspirant HQ
             </Link>
           )}
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-2">
           {isLoggedIn ? (
             <>
-              {currentUser && <span className="text-sm text-muted-foreground hidden sm:inline">Hi, {currentUser.name.split(' ')[0]}!</span>}
-               {/* Show dashboard button on desktop only if not already on a dashboard page */}
+              {currentUser && <span className="text-sm text-muted-foreground hidden sm:inline">Aspirant {currentUser.name.split(' ')[0]}</span>}
               {!isDashboardPath && (
                 <Button asChild variant="ghost" size="sm" className="hidden sm:flex">
                     <Link href="/dashboard">
                     <LayoutDashboard className="mr-2 h-4 w-4" />
-                    Dashboard
+                    Aspirant HQ
                     </Link>
                 </Button>
               )}
               <Button variant="outline" size="sm" onClick={logout}>
                 <LogOut className="mr-0 sm:mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Logout</span>
+                <span className="hidden sm:inline">Log Out</span>
               </Button>
             </>
           ) : (
@@ -92,21 +91,21 @@ export function Header() {
               <Button asChild variant="ghost" size="sm">
                 <Link href="/login">
                   <LogIn className="mr-0 sm:mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Login</span>
+                  <span className="hidden sm:inline">Log In</span>
                 </Link>
               </Button>
               <Button asChild size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
                 <Link href="/signup">
                   <UserPlus className="mr-0 sm:mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Sign Up</span>
+                  <span className="hidden sm:inline">Enlist</span>
                 </Link>
               </Button>
             </>
           )}
-           {isAdmin && !isAdminPath && ( // Show Admin button only if user is admin and not on an admin page
+           {isAdmin && !isAdminPath && ( 
              <Button asChild variant="outline" size="sm" className="hidden lg:flex border-primary text-primary hover:bg-primary/10 ml-2">
                 <Link href="/admin">
-                  <ShieldCheck className="mr-2 h-4 w-4" /> Admin
+                  <ShieldCheck className="mr-2 h-4 w-4" /> Admin Command
                 </Link>
               </Button>
            )}
@@ -126,7 +125,7 @@ export function Header() {
                   <Logo />
                 </Link>
                 
-                {mobileNavTitle !== "Menu" && (
+                {mobileNavTitle !== "Field Menu" && (
                     <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">{mobileNavTitle}</h3>
                 )}
 
@@ -147,7 +146,6 @@ export function Header() {
                   );
                 })}
 
-                {/* Separator and Auth links if not in Dashboard/Admin specific views */}
                 {(!isDashboardPath && !isAdminPath) && isLoggedIn && (
                   <>
                     <hr className="my-2"/>
@@ -157,7 +155,7 @@ export function Header() {
                       onClick={() => setIsSheetOpen(false)}
                     >
                       <LayoutDashboard className="h-5 w-5" />
-                      Dashboard
+                      Aspirant HQ
                     </Link>
                   </>
                 )}
@@ -167,26 +165,25 @@ export function Header() {
                         className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary mt-2 border-t pt-3"
                         onClick={() => setIsSheetOpen(false)}
                         >
-                        <ShieldCheck className="h-5 w-5" /> Admin Panel
+                        <ShieldCheck className="h-5 w-5" /> Admin Command
                     </Link>
                  )}
 
-                 {/* Login/Logout buttons for mobile sheet */}
                  <div className="mt-auto pt-4 border-t">
                     {isLoggedIn ? (
                          <Button variant="outline" size="sm" onClick={() => { logout(); setIsSheetOpen(false);}} className="w-full">
-                            <LogOut className="mr-2 h-4 w-4" /> Logout
+                            <LogOut className="mr-2 h-4 w-4" /> Log Out
                         </Button>
                     ) : (
                         <div className="space-y-2">
                             <Button asChild size="sm" className="w-full">
                                 <Link href="/login" onClick={() => setIsSheetOpen(false)}>
-                                <LogIn className="mr-2 h-4 w-4" /> Login
+                                <LogIn className="mr-2 h-4 w-4" /> Log In
                                 </Link>
                             </Button>
                              <Button asChild size="sm" variant="outline" className="w-full">
                                 <Link href="/signup" onClick={() => setIsSheetOpen(false)}>
-                                <UserPlus className="mr-2 h-4 w-4" /> Sign Up
+                                <UserPlus className="mr-2 h-4 w-4" /> Enlist
                                 </Link>
                             </Button>
                         </div>
@@ -200,7 +197,3 @@ export function Header() {
     </header>
   );
 }
-
-
-    
-

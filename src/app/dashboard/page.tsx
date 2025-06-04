@@ -84,15 +84,15 @@ export default function DashboardOverviewPage() {
   return (
     <>
       <PageHeader
-        title={`Welcome back, ${currentUser?.name?.split(' ')[0] || 'User'}!`}
-        description="Manage your bookings, access resources, and track your progress."
+        title={`Reporting for duty, Aspirant ${currentUser?.name?.split(' ')[0] || 'User'}!`}
+        description="Review your mission objectives, access training materials, and track your progress, Aspirant."
       />
       <div className="space-y-8">
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
           <Card className="shadow xl:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Upcoming Bookings</CardTitle>
+              <CardTitle className="text-sm font-medium">Upcoming Briefings</CardTitle>
               <CalendarCheck className="h-5 w-5 text-accent" />
             </CardHeader>
             <CardContent>
@@ -102,17 +102,17 @@ export default function DashboardOverviewPage() {
           </Card>
           <Card className="shadow xl:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Resources Available</CardTitle>
+              <CardTitle className="text-sm font-medium">Training Manuals</CardTitle>
               <BookOpen className="h-5 w-5 text-accent" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">{accessibleResourcesCount}</div>
-              <p className="text-xs text-muted-foreground">premium resources accessible</p>
+              <p className="text-xs text-muted-foreground">intel resources accessible</p>
             </CardContent>
           </Card>
            <Card className="shadow xl:col-span-1">
             <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">My Profile</CardTitle>
+                <CardTitle className="text-sm font-medium">Your Dossier</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col items-center text-center">
                 <Image
@@ -125,13 +125,13 @@ export default function DashboardOverviewPage() {
                 />
                 <p className="text-md font-semibold text-primary">{userProfileData?.name || currentUser?.name || 'User Name'}</p>
                <Link href="/dashboard/profile" className="text-xs text-muted-foreground hover:text-primary flex items-center mt-1">
-                View/Edit Profile <Edit className="ml-1 h-3 w-3"/>
+                Update Dossier <Edit className="ml-1 h-3 w-3"/>
               </Link>
             </CardContent>
           </Card>
           <Card className="shadow xl:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Latest Achievement</CardTitle>
+              <CardTitle className="text-sm font-medium">Latest Commendation</CardTitle>
               <Award className="h-5 w-5 text-accent" />
             </CardHeader>
             <CardContent className="flex flex-col items-center text-center">
@@ -147,13 +147,13 @@ export default function DashboardOverviewPage() {
                         />
                         <p className="text-md font-semibold text-primary truncate max-w-[150px]" title={latestBadge.name}>{latestBadge.name}</p>
                         <Link href="/dashboard/profile" className="text-xs text-muted-foreground hover:text-primary mt-1">
-                            View All Badges
+                            View All Commendations
                         </Link>
                     </>
                 ) : (
                     <>
                         <Star className="h-10 w-10 text-muted-foreground/50 my-3" />
-                        <p className="text-xs text-muted-foreground">No badges unlocked yet. Keep it up!</p>
+                        <p className="text-xs text-muted-foreground">No commendations earned yet. Keep it up!</p>
                     </>
                 )}
             </CardContent>
@@ -164,7 +164,7 @@ export default function DashboardOverviewPage() {
           <WeeklyScheduleView
             allBookings={MOCK_BOOKINGS}
             currentUserEmail={currentUser.email}
-            title="My Weekly Schedule"
+            title="My Weekly Ops Schedule"
           />
         )}
 
@@ -175,15 +175,15 @@ export default function DashboardOverviewPage() {
         )}
 
         <div>
-          <h2 className="text-2xl font-semibold mb-4 font-headline text-primary mt-8">Next Upcoming Session</h2>
+          <h2 className="text-2xl font-semibold mb-4 font-headline text-primary mt-8">Next Debriefing Session</h2>
           {upcomingBookings.length > 0 ? (
             <BookingCard booking={upcomingBookings.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0]} />
           ) : (
             <Card>
               <CardContent className="pt-6 text-center">
-                <p className="text-muted-foreground">No upcoming bookings.</p>
+                <p className="text-muted-foreground">No upcoming debriefings.</p>
                 <Button asChild className="mt-4 bg-accent hover:bg-accent/90 text-accent-foreground">
-                  <Link href="/services">Book a New Session</Link>
+                  <Link href="/services">Schedule a Session</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -195,18 +195,18 @@ export default function DashboardOverviewPage() {
             <h2 className="text-2xl font-semibold mb-4 font-headline text-primary mt-8">Quick Actions</h2>
             <Card className="shadow">
               <CardHeader>
-                <CardTitle className="text-lg font-headline text-primary/90">Explore {recentService.name} Resources</CardTitle>
+                <CardTitle className="text-lg font-headline text-primary/90">Access {recentService.name} Intel</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground mb-4">
-                  Access exclusive materials related to your recent service.
+                  Access exclusive materials related to your recent training.
                 </p>
                  <div className="flex flex-col sm:flex-row gap-4">
                     <Button asChild variant="outline" className="border-primary text-primary hover:bg-primary/10">
-                        <Link href={`/dashboard/resources?service=${recentService.id}`}>Go to Resources</Link>
+                        <Link href={`/dashboard/resources?service=${recentService.id}`}>Go to Training Materials</Link>
                     </Button>
                     <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                        <Link href={`/book/${recentService.id}/slots`}>Book {recentService.name} Again</Link>
+                        <Link href={`/book/${recentService.id}/slots`}>Re-engage: {recentService.name}</Link>
                     </Button>
                  </div>
               </CardContent>
