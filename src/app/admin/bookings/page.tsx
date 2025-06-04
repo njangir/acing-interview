@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription as DialogDesc, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -24,7 +24,7 @@ import { MOCK_BOOKINGS, MOCK_SERVICES } from "@/constants";
 import type { Booking } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck, PlusCircle, CalendarIcon, Edit, Filter, InfoIcon, Video } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Badge as UiBadge } from '@/components/ui/badge'; // Renamed to avoid conflict
 import { cn } from '@/lib/utils';
 import { format, parse } from 'date-fns';
 import Link from 'next/link';
@@ -58,6 +58,10 @@ export default function AdminBookingsPage() {
   const [isCreateBookingModalOpen, setIsCreateBookingModalOpen] = useState(false);
   const [filterServiceId, setFilterServiceId] = useState<string>('all');
 
+  const [isCancelAlertOpen, setIsCancelAlertOpen] = useState(false);
+  const [bookingToCancel, setBookingToCancel] = useState<Booking | null>(null);
+
+
   const createBookingForm = useForm<CreateBookingFormValues>({
     resolver: zodResolver(createBookingFormSchema),
     defaultValues: {
@@ -78,7 +82,6 @@ export default function AdminBookingsPage() {
   useEffect(() => {
     if (selectedBookingForEdit) {
       let currentStatus = selectedBookingForEdit.status;
-      // Map 'upcoming' to 'scheduled' or 'accepted' based on link for edit form
       if (currentStatus === 'upcoming') {
         currentStatus = selectedBookingForEdit.meetingLink ? 'scheduled' : 'accepted';
       }
@@ -87,7 +90,7 @@ export default function AdminBookingsPage() {
         date: parse(selectedBookingForEdit.date, 'yyyy-MM-dd', new Date()),
         time: selectedBookingForEdit.time,
         meetingLink: selectedBookingForEdit.meetingLink || '',
-        status: currentStatus as EditBookingFormValues['status'], // Cast as it's now validated
+        status: currentStatus as EditBookingFormValues['status'],
         paymentStatus: selectedBookingForEdit.paymentStatus,
       });
     }
@@ -104,7 +107,7 @@ export default function AdminBookingsPage() {
 
     if (action === 'accept') {
       message = `Booking ${bookingId} accepted. User will be notified. Please add meeting link to schedule.`;
-      bookingToUpdate.status = 'accepted'; // Changed from 'upcoming'
+      bookingToUpdate.status = 'accepted';
       bookingUpdated = true;
     } else if (action === 'cancel') {
       message = `Booking ${bookingId} cancelled and user notified.`;
@@ -117,8 +120,8 @@ export default function AdminBookingsPage() {
     } else if (action === 'approve_refund' && bookingToUpdate.paymentStatus === 'paid' && bookingToUpdate.requestedRefund) {
       message = `Refund for booking ${bookingId} approved. Booking cancelled.`;
       bookingToUpdate.status = 'cancelled';
-      bookingToUpdate.paymentStatus = 'pay_later_unpaid'; // Mark as unpaid/refunded
-      bookingToUpdate.requestedRefund = false; // Reset refund request
+      bookingToUpdate.paymentStatus = 'pay_later_unpaid';
+      bookingToUpdate.requestedRefund = false;
       bookingUpdated = true;
     }
 
@@ -133,6 +136,13 @@ export default function AdminBookingsPage() {
     setSelectedBookingForEdit(booking);
     setIsEditBookingModalOpen(true);
   }
+
+  const openCancelDialog = (booking: Booking) => {
+    if (booking.status !== 'cancelled') {
+      setBookingToCancel(booking);
+      setIsCancelAlertOpen(true);
+    }
+  };
 
   function onCreateBookingSubmit(data: CreateBookingFormValues) {
     const selectedService = MOCK_SERVICES.find(s => s.id === data.serviceId);
@@ -200,27 +210,20 @@ export default function AdminBookingsPage() {
     }
 
     const bookingToUpdate = MOCK_BOOKINGS[bookingIndex];
-    let newStatus = data.status; // Status chosen by admin in the dropdown
+    let newStatus = data.status; 
 
     if (data.meetingLink) {
-      // If a link is provided, and admin chose 'accepted' or 'pending_approval', upgrade to 'scheduled'
       if (newStatus === 'accepted' || newStatus === 'pending_approval') {
         newStatus = 'scheduled';
       }
     } else {
-      // If no link is provided, and admin chose 'scheduled', downgrade to 'accepted'
-      // unless it's being completed or cancelled
       if (newStatus === 'scheduled' && data.status !== 'completed' && data.status !== 'cancelled') {
         newStatus = 'accepted';
       }
     }
-     // If status was 'upcoming' (old value, now mapped in useEffect to accepted/scheduled)
-    // and now has a link, ensure it's 'scheduled'. If no link, 'accepted'.
-    // This handles the direct selection from dropdown.
-    if (data.status === 'upcoming') { // Should not happen with new dropdown but as fallback
+    if (data.status === 'upcoming') { 
         newStatus = data.meetingLink ? 'scheduled' : 'accepted';
     }
-
 
     const updatedBooking: Booking = {
       ...bookingToUpdate,
@@ -243,12 +246,11 @@ export default function AdminBookingsPage() {
 
   const getFilteredBookings = () => {
     let bookings = [...MOCK_BOOKINGS].sort((a, b) => {
-      // Prioritize pending_approval, then by date
       if (a.status === 'pending_approval' && b.status !== 'pending_approval') return -1;
       if (b.status === 'pending_approval' && a.status !== 'pending_approval') return 1;
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
-      return dateB - dateA; // Sort by most recent first for other statuses
+      return dateB - dateA; 
     });
 
     if (filterServiceId !== 'all') {
@@ -305,7 +307,9 @@ export default function AdminBookingsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {currentFilteredBookings.length > 0 ? currentFilteredBookings.map((booking) => (
+              {currentFilteredBookings.length > 0 ? currentFilteredBookings.map((booking) => {
+                const showAsAddLink = booking.status === 'accepted' && booking.paymentStatus === 'paid' && !booking.meetingLink;
+                return (
                 <TableRow key={booking.id}>
                   <TableCell>
                     <div className="font-medium text-xs">{booking.id}</div>
@@ -320,7 +324,7 @@ export default function AdminBookingsPage() {
                   <TableCell>{booking.serviceName}</TableCell>
                   <TableCell>{new Date(booking.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} - {booking.time}</TableCell>
                   <TableCell>
-                     <Badge
+                     <UiBadge
                         variant={
                             booking.status === 'pending_approval' ? 'secondary' :
                             booking.status === 'accepted' ? 'outline' :
@@ -336,10 +340,10 @@ export default function AdminBookingsPage() {
                         )}
                     >
                         {booking.status.replace('_', ' ').toUpperCase()}
-                    </Badge>
+                    </UiBadge>
                   </TableCell>
                    <TableCell>
-                     <Badge variant={booking.paymentStatus === 'paid' ? 'default' : 'secondary'}
+                     <UiBadge variant={booking.paymentStatus === 'paid' ? 'default' : 'secondary'}
                       className={cn(
                         booking.paymentStatus === 'paid' && 'bg-green-100 text-green-700',
                         booking.paymentStatus === 'pay_later_unpaid' && 'bg-gray-100 text-gray-700 line-through opacity-75',
@@ -347,13 +351,13 @@ export default function AdminBookingsPage() {
                       )}
                      >
                        {booking.paymentStatus.replace('_', ' ').toUpperCase()}
-                     </Badge>
+                     </UiBadge>
                    </TableCell>
                    <TableCell>
                     {booking.requestedRefund ? (
-                        <Badge variant="destructive">YES</Badge>
+                        <UiBadge variant="destructive">YES</UiBadge>
                     ) : (
-                        <Badge variant="outline">NO</Badge>
+                        <UiBadge variant="outline">NO</UiBadge>
                     )}
                     {booking.requestedRefund && booking.refundReason && (
                         <p className="text-xs text-muted-foreground mt-1 truncate w-24 hover:w-auto hover:whitespace-normal" title={booking.refundReason}>
@@ -382,7 +386,12 @@ export default function AdminBookingsPage() {
                             onClick={() => openEditModal(booking)}
                             disabled={booking.status === 'cancelled' || booking.status === 'completed'}
                           >
-                                <Edit className="mr-2 h-4 w-4 text-blue-500" /> Edit / Schedule
+                            {showAsAddLink ? (
+                              <Video className="mr-2 h-4 w-4 text-green-500" />
+                            ) : (
+                              <Edit className="mr-2 h-4 w-4 text-blue-500" />
+                            )}
+                            {showAsAddLink ? 'Add Meeting Link & Schedule' : 'Edit Details / Reschedule'}
                           </DropdownMenuItem>
                           {booking.status === 'pending_approval' && (
                             <DropdownMenuItem onClick={() => handleAdminAction(booking.id, 'accept')}>
@@ -400,47 +409,55 @@ export default function AdminBookingsPage() {
                             </DropdownMenuItem>
                            )}
                           <DropdownMenuSeparator />
-                           <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                               <DropdownMenuItem
-                                 className={cn(
-                                     "text-red-600 hover:!text-red-600",
-                                     booking.status === 'cancelled' && 'opacity-50 cursor-not-allowed'
-                                  )}
-                                 disabled={booking.status === 'cancelled'}
-                                 onSelect={(e) => { if (booking.status === 'cancelled') e.preventDefault();}}
-                                >
-                                <XCircle className="mr-2 h-4 w-4" /> Cancel Booking
-                              </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently cancel the booking for {booking.userName} and notify them.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Back</AlertDialogCancel>
-                                <AlertDialogAction
-                                  className="bg-destructive hover:bg-destructive/90"
-                                  onClick={() => handleAdminAction(booking.id, 'cancel')}>
-                                  Confirm Cancellation
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          <DropdownMenuItem
+                            className={cn(
+                                "text-red-600 hover:!text-red-600",
+                                booking.status === 'cancelled' && 'opacity-50 cursor-not-allowed'
+                            )}
+                            disabled={booking.status === 'cancelled'}
+                            onClick={() => openCancelDialog(booking)}
+                            onSelect={(e) => { if (booking.status === 'cancelled') e.preventDefault();}}
+                          >
+                            <XCircle className="mr-2 h-4 w-4" /> Cancel Booking
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              )) : (
+              );
+            }) : (
                  <TableRow><TableCell colSpan={8} className="text-center h-24">No bookings found matching the criteria.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+       <AlertDialog open={isCancelAlertOpen} onOpenChange={setIsCancelAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently cancel the booking for {bookingToCancel?.userName} and notify them.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setBookingToCancel(null)}>Back</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={() => {
+                if (bookingToCancel) {
+                  handleAdminAction(bookingToCancel.id, 'cancel');
+                  setBookingToCancel(null); 
+                }
+                setIsCancelAlertOpen(false); 
+              }}>
+              Confirm Cancellation
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
 
       <Dialog open={isEditBookingModalOpen} onOpenChange={(isOpen) => {
         setIsEditBookingModalOpen(isOpen);
@@ -722,5 +739,3 @@ export default function AdminBookingsPage() {
     </>
   );
 }
-
-    
