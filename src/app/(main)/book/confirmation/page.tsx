@@ -24,19 +24,32 @@ export default function BookingConfirmationPage() {
   const [details, setDetails] = useState<ConfirmationDetails | null>(null);
 
   useEffect(() => {
+    // If details are already set in state, don't re-process from localStorage
+    if (details) {
+      return;
+    }
+
     const storedDetails = localStorage.getItem('confirmationDetails');
     if (storedDetails) {
-      const parsedDetails = JSON.parse(storedDetails);
-      setDetails(parsedDetails);
-      // Clean up local storage items after displaying confirmation
-      localStorage.removeItem('bookingDetails');
-      localStorage.removeItem('userDetails');
-      localStorage.removeItem('confirmationDetails');
+      try {
+        const parsedDetails = JSON.parse(storedDetails);
+        setDetails(parsedDetails);
+        // Clean up local storage items only after successfully setting state
+        localStorage.removeItem('bookingDetails');
+        localStorage.removeItem('userDetails');
+        localStorage.removeItem('confirmationDetails');
+      } catch (error) {
+        console.error("Error parsing confirmation details from localStorage:", error);
+        // Fallback redirect if parsing fails
+        router.push('/book');
+      }
     } else {
-      // If no details, redirect to booking start, or show error
+      // If no details found in localStorage (and not already in state), redirect.
+      // This might happen if the user directly navigates to this page.
+      console.warn("No confirmationDetails found in localStorage on page load. Redirecting.");
       router.push('/book');
     }
-  }, [router]);
+  }, [router, details]); // Add `details` to dependency array
 
   if (!details) {
     return <div className="container py-12">Loading confirmation...</div>;

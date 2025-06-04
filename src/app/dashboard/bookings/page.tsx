@@ -16,8 +16,10 @@ export default function MyBookingsPage() {
 
   const userBookings = useMemo(() => {
     if (!currentUser) return [];
+    // Ensure MOCK_BOOKINGS is a dependency so this recalculates if the component re-renders
+    // and MOCK_BOOKINGS array (in memory) has been updated.
     return MOCK_BOOKINGS.filter(b => b.userEmail === currentUser.email);
-  }, [currentUser]);
+  }, [currentUser, MOCK_BOOKINGS]);
 
   const upcomingBookings = useMemo(() => {
     return userBookings.filter(b => b.status === 'upcoming' || b.status === 'pending_approval');
