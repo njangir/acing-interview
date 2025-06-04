@@ -14,6 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, XCircle, CreditCard, Info, CheckCircle } from 'lucide-react';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
 
 type PaymentOption = 'payNow' | 'payLater';
 
@@ -24,6 +25,7 @@ export default function PaymentPage() {
   const serviceId = params.serviceId as string;
   const bookingIdFromQuery = searchParamsHook.get('bookingId'); 
   const { toast } = useToast();
+  const { currentUser } = useAuth();
   
   const [service, setService] = useState<Service | null>(null);
   const [bookingDetails, setBookingDetails] = useState<any>(null); // Slot details
@@ -51,7 +53,7 @@ export default function PaymentPage() {
         setUserDetails({ 
             name: existingBooking.userName,
             email: existingBooking.userEmail,
-            phone: existingBooking.userEmail, // Assuming phone might be same or needs to be fetched differently
+            phone: existingBooking.userEmail, 
         });
       } else {
         setError("Existing booking information not found. Please try again or start a new booking.");
@@ -62,6 +64,8 @@ export default function PaymentPage() {
           setBookingDetails(JSON.parse(storedBookingDetails));
         } else {
           setError("Booking slot information not found.");
+          router.push(`/book/${serviceId}/slots`); // Redirect if slot info missing
+          return;
         }
 
         const storedUserDetails = localStorage.getItem('userDetails');
@@ -69,53 +73,51 @@ export default function PaymentPage() {
           setUserDetails(JSON.parse(storedUserDetails));
         } else {
           setError("User details not found.");
+           router.push(`/book/${serviceId}/slots`); // Redirect if user info missing (should be set by slot page for logged in)
+          return;
         }
     }
-  }, [serviceId, bookingIdFromQuery]);
+  }, [serviceId, bookingIdFromQuery, router]);
 
   const handlePaymentOrConfirmation = async () => {
     setIsLoading(true);
     setError(null);
 
-    if (!service || !bookingDetails || !userDetails) {
-      setError("Critical booking information is missing. Please start over.");
+    if (!service || !bookingDetails || !userDetails || !currentUser) {
+      setError("Critical booking information is missing or you are not logged in. Please start over.");
       setIsLoading(false);
       return;
     }
     
+    const newBookingId = `booking-${Date.now()}`;
+    const meetingLink = `https://meet.google.com/mock-link-${Math.random().toString(36).substring(2, 9)}`;
+    
     const confirmationPayload = {
-        serviceName: service?.name,
-        serviceId: service?.id,
-        date: bookingDetails?.date,
-        time: bookingDetails?.time,
-        userName: userDetails?.name,
-        userEmail: userDetails?.email,
-        meetingLink: "https://meet.google.com/mock-link-" + Math.random().toString(36).substring(7),
+        serviceName: service.name,
+        serviceId: service.id,
+        date: bookingDetails.date,
+        time: bookingDetails.time,
+        userName: userDetails.name,
+        userEmail: userDetails.email, 
+        meetingLink: meetingLink,
     };
 
+    let paymentSuccess = true;
+    let newBookingStatus: Booking['status'] = 'upcoming';
+    let newPaymentStatus: Booking['paymentStatus'] = 'paid';
+    let transactionId: string | null = "mock_txn_" + Date.now();
+
     if (paymentOption === 'payNow') {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      const paymentSuccess = Math.random() > 0.1; 
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate payment processing
+      paymentSuccess = Math.random() > 0.1; // 90% success rate
 
       if (paymentSuccess) {
-        localStorage.setItem('confirmationDetails', JSON.stringify({
-          ...confirmationPayload,
-          transactionId: "mock_txn_" + Date.now(),
-          paymentStatus: 'paid',
-        }));
-        if (bookingIdFromQuery) {
-            const bookingIndex = MOCK_BOOKINGS.findIndex(b => b.id === bookingIdFromQuery);
-            if (bookingIndex !== -1) {
-                MOCK_BOOKINGS[bookingIndex].paymentStatus = 'paid';
-                MOCK_BOOKINGS[bookingIndex].transactionId = confirmationPayload.meetingLink.split('/').pop(); 
-            }
-        }
+        newPaymentStatus = 'paid';
         toast({
           title: "Payment Successful!",
           description: "Your booking is confirmed. Redirecting...",
           variant: "default",
         });
-        router.push(`/book/confirmation`);
       } else {
         setError("Payment failed. Please try again.");
         toast({
@@ -123,26 +125,61 @@ export default function PaymentPage() {
           description: "There was an issue processing your payment. Please try again.",
           variant: "destructive",
         });
+        setIsLoading(false);
+        return;
       }
-    } else { 
-      if (bookingIdFromQuery) {
-          setError("Pay Later option is not available for existing bookings.");
+    } else { // Pay Later
+      if (bookingIdFromQuery) { // Should not happen if UI is correct, but good check
+          setError("Pay Later option is not available for existing bookings being paid now.");
           setIsLoading(false);
           return;
       }
-      await new Promise(resolve => setTimeout(resolve, 1000)); 
-      localStorage.setItem('confirmationDetails', JSON.stringify({
-        ...confirmationPayload,
-        transactionId: null,
-        paymentStatus: 'pay_later_pending',
-      }));
+      await new Promise(resolve => setTimeout(resolve, 500));
+      newPaymentStatus = 'pay_later_pending';
+      transactionId = null;
       toast({
         title: "Booking Tentatively Confirmed!",
         description: "Your slot is reserved. Payment will be due before the session. Redirecting...",
         variant: "default",
       });
+    }
+
+    // Add to MOCK_BOOKINGS for this session
+    if (paymentSuccess) {
+      const newBookingEntry: Booking = {
+        id: newBookingId,
+        serviceName: service.name,
+        serviceId: service.id,
+        date: bookingDetails.date,
+        time: bookingDetails.time,
+        userName: userDetails.name,
+        userEmail: currentUser.email, // Ensure it's the logged-in user's email
+        meetingLink: meetingLink,
+        status: newBookingStatus,
+        paymentStatus: newPaymentStatus,
+        transactionId: transactionId,
+        requestedRefund: false,
+      };
+      
+      if (bookingIdFromQuery) { // Paying for an existing 'pay_later_pending' booking
+        const bookingIndex = MOCK_BOOKINGS.findIndex(b => b.id === bookingIdFromQuery);
+        if (bookingIndex !== -1) {
+            MOCK_BOOKINGS[bookingIndex].paymentStatus = 'paid';
+            MOCK_BOOKINGS[bookingIndex].transactionId = transactionId;
+            MOCK_BOOKINGS[bookingIndex].status = 'upcoming'; // Ensure status is upcoming
+        }
+      } else { // New booking
+        MOCK_BOOKINGS.push(newBookingEntry);
+      }
+
+      localStorage.setItem('confirmationDetails', JSON.stringify({
+        ...confirmationPayload,
+        transactionId: transactionId,
+        paymentStatus: newPaymentStatus,
+      }));
       router.push(`/book/confirmation`);
     }
+    
     setIsLoading(false);
   };
 
@@ -152,7 +189,8 @@ export default function PaymentPage() {
         <Alert variant="destructive">
           <XCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error} Please start the booking process again.</AlertDescription>
+          <AlertDescription>{error} Please start the booking process again from the service selection or slot page.</AlertDescription>
+           <Button onClick={() => router.push('/book')} className="mt-4">Go to Services</Button>
         </Alert>
       </div>
     );
@@ -178,7 +216,6 @@ export default function PaymentPage() {
               Time: {bookingDetails.time} <br />
               Name: {userDetails.name} <br />
               Email: {userDetails.email}
-              {/* examApplied and previousAttempts are removed as they are no longer collected in the new flow */}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -188,17 +225,17 @@ export default function PaymentPage() {
             </div>
 
             <RadioGroup 
-                defaultValue="payNow" 
                 onValueChange={(value: PaymentOption) => setPaymentOption(value)} 
                 className="space-y-2"
-                value={bookingIdFromQuery ? 'payNow' : paymentOption}
+                value={bookingIdFromQuery ? 'payNow' : paymentOption} // Default to payNow if it's an existing booking
+                // defaultValue="payNow" // removed defaultValue to rely on value
             >
               <Label className="font-semibold text-md">Payment Options:</Label>
               <div className="flex items-center space-x-2 p-3 border rounded-md hover:border-primary transition-colors">
-                <RadioGroupItem value="payNow" id="payNow" />
+                <RadioGroupItem value="payNow" id="payNow" disabled={bookingIdFromQuery && MOCK_BOOKINGS.find(b=>b.id===bookingIdFromQuery)?.paymentStatus === 'paid'} />
                 <Label htmlFor="payNow" className="flex-1 cursor-pointer">Pay Now & Confirm Slot</Label>
               </div>
-              {!bookingIdFromQuery && ( 
+              {!bookingIdFromQuery && ( // Only show Pay Later for brand new bookings
                 <div className="flex items-center space-x-2 p-3 border rounded-md hover:border-primary transition-colors">
                     <RadioGroupItem value="payLater" id="payLater" />
                     <Label htmlFor="payLater" className="flex-1 cursor-pointer">Pay Later (Tentative Slot)</Label>
@@ -233,7 +270,7 @@ export default function PaymentPage() {
           <CardFooter>
             <Button 
               onClick={handlePaymentOrConfirmation} 
-              disabled={isLoading} 
+              disabled={isLoading || (bookingIdFromQuery && MOCK_BOOKINGS.find(b=>b.id===bookingIdFromQuery)?.paymentStatus === 'paid')} 
               size="lg" 
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
             >

@@ -1,13 +1,49 @@
+
+'use client';
+import { useMemo } from 'react';
 import { PageHeader } from "@/components/core/page-header";
 import { BookingCard } from "@/components/core/booking-card";
 import { MOCK_BOOKINGS } from "@/constants";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { useAuth } from '@/hooks/use-auth';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Shield } from 'lucide-react';
 
 export default function MyBookingsPage() {
-  const upcomingBookings = MOCK_BOOKINGS.filter(b => b.status === 'upcoming');
-  const pastBookings = MOCK_BOOKINGS.filter(b => b.status !== 'upcoming');
+  const { currentUser } = useAuth();
+
+  const userBookings = useMemo(() => {
+    if (!currentUser) return [];
+    return MOCK_BOOKINGS.filter(b => b.userEmail === currentUser.email);
+  }, [currentUser]);
+
+  const upcomingBookings = useMemo(() => {
+    return userBookings.filter(b => b.status === 'upcoming' || b.status === 'pending_approval');
+  }, [userBookings]);
+
+  const pastBookings = useMemo(() => {
+    return userBookings.filter(b => b.status === 'completed' || b.status === 'cancelled');
+  }, [userBookings]);
+
+  if (!currentUser) {
+    return (
+      <div className="container py-12">
+        <Alert variant="destructive">
+          <Shield className="h-4 w-4" />
+          <AlertTitle>Access Denied</AlertTitle>
+          <AlertDescription>
+            You need to be logged in to view your bookings.
+            <Button asChild className="mt-4 ml-2">
+              <Link href="/login?redirect=/dashboard/bookings">Login</Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
 
   return (
     <>
