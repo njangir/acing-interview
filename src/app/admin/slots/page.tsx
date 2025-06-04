@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { addDays, format, startOfWeek, endOfWeek, nextSaturday, nextSunday } from 'date-fns';
+import { addDays, format, startOfWeek, endOfWeek, nextSaturday, nextSunday, isBefore, startOfToday } from 'date-fns';
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,8 +26,8 @@ export default function AdminSlotsPage() {
     let currentTime = new Date(`1970-01-01T${start}:00`);
     const const_endTime = new Date(`1970-01-01T${end}:00`);
 
-    if (currentTime >= const_endTime) {
-      return []; // Start time is not before end time
+    if (currentTime >= const_endTime || intervalMin <= 0) {
+      return []; 
     }
 
     while (currentTime < const_endTime) {
@@ -46,16 +46,16 @@ export default function AdminSlotsPage() {
     let slotsToApply: string[] = [];
     if (actionType === 'set') {
       slotsToApply = customSlots || generateTimeSlots(startTime, endTime, interval);
-      if (!slotsToApply.length && !customSlots) { // check if generateTimeSlots returned empty due to invalid range
-        toast({ title: "Invalid Time Range", description: "End time must be after start time, or interval is too large.", variant: "destructive" });
+      if (!slotsToApply.length && !customSlots) { 
+        toast({ title: "Invalid Time Range or Interval", description: "End time must be after start time, and interval must be positive.", variant: "destructive" });
         return;
       }
-    } // For 'clear', slotsToApply remains an empty array
+    } 
 
     const updates: Record<string, string[]> = {};
     dates.forEach(date => {
       const dateString = format(date, 'yyyy-MM-dd');
-      AVAILABLE_SLOTS[dateString] = slotsToApply; // Directly mutate the imported constant for prototype
+      AVAILABLE_SLOTS[dateString] = slotsToApply; 
       updates[dateString] = slotsToApply;
     });
     
@@ -65,6 +65,8 @@ export default function AdminSlotsPage() {
       title: `Availability ${actionType === 'set' ? 'Updated' : 'Cleared'} (Simulated)`,
       description: `Slots for ${dates.length} date(s) have been ${actionType === 'set' ? 'set' : 'cleared'}. In a real app, this would be saved to a backend.`,
     });
+    // Force re-render of calendar by changing selectedDate slightly if needed or use a dedicated state
+    setSelectedDate(new Date(selectedDate || Date.now())); 
   };
 
   const handleMakeDateAvailable = () => {
@@ -90,8 +92,8 @@ export default function AdminSlotsPage() {
     let slotsDefinition: string[] = [];
 
     if (type === 'nextWeekAvailable' || type === 'nextWeekUnavailable') {
-      let current = startOfWeek(addDays(today, 7), { weekStartsOn: 1 }); // Next Monday
-      const end = endOfWeek(addDays(today, 7), { weekStartsOn: 1 }); // Next Sunday
+      let current = startOfWeek(addDays(today, 7), { weekStartsOn: 1 }); 
+      const end = endOfWeek(addDays(today, 7), { weekStartsOn: 1 }); 
       while(current <= end) {
         dates.push(new Date(current));
         current = addDays(current, 1);
@@ -111,6 +113,26 @@ export default function AdminSlotsPage() {
     handleUpdateAvailability(dates, actionType === 'set' ? slotsDefinition : [], actionType);
   };
 
+  const todayForCalendar = startOfToday();
+
+  const modifiers = {
+    available: (date: Date) => {
+      if (isBefore(date, todayForCalendar)) return false;
+      const dateString = format(date, 'yyyy-MM-dd');
+      return AVAILABLE_SLOTS[dateString] && AVAILABLE_SLOTS[dateString].length > 0;
+    },
+    unavailable: (date: Date) => {
+      if (isBefore(date, todayForCalendar)) return false;
+      const dateString = format(date, 'yyyy-MM-dd');
+      return !AVAILABLE_SLOTS[dateString] || AVAILABLE_SLOTS[dateString].length === 0;
+    }
+  };
+
+  const modifiersClassNames = {
+    available: 'day-available',
+    unavailable: 'day-unavailable',
+  };
+
 
   return (
     <>
@@ -122,7 +144,7 @@ export default function AdminSlotsPage() {
         <Info className="h-4 w-4 !text-primary" />
         <AlertTitle>Simulation Notice</AlertTitle>
         <AlertDescription>
-          This page simulates updating available slots. Changes directly modify the `AVAILABLE_SLOTS` constant for this session and are reflected in the user's booking calendar. These changes are not permanently stored.
+          This page simulates updating available slots. Changes directly modify the `AVAILABLE_SLOTS` constant for this session and are reflected in the user's booking calendar. These changes are not permanently stored. Date colors: <span className="font-semibold text-green-600">Green</span> for available, <span className="font-semibold text-red-600">Red</span> for unavailable/no slots (future dates).
         </AlertDescription>
       </Alert>
       <div className="grid md:grid-cols-2 gap-8">
@@ -139,7 +161,9 @@ export default function AdminSlotsPage() {
                 selected={selectedDate}
                 onSelect={setSelectedDate}
                 className="rounded-md border"
-                disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1))}
+                disabled={(date) => isBefore(date, todayForCalendar)}
+                modifiers={modifiers}
+                modifiersClassNames={modifiersClassNames}
               />
             </div>
              <div className="grid grid-cols-2 gap-4">
@@ -197,5 +221,3 @@ export default function AdminSlotsPage() {
     </>
   );
 }
-
-    
