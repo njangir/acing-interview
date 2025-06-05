@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, useWatch } from 'react-hook-form';
 import * as z from 'zod';
 import { useState, useEffect } from 'react';
+import Image from 'next/image'; // Import Image component
 
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from '@/components/ui/button';
@@ -16,9 +17,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { MOCK_SERVICES, MOCK_TESTIMONIALS } from '@/constants'; // Removed MOCK_USER_PROFILE_FOR_CONTACT
-import { Edit2Icon, Award, MapPin, ListChecks, Briefcase } from 'lucide-react';
-import { useAuth } from '@/hooks/use-auth'; // Added useAuth
+import { MOCK_SERVICES, MOCK_TESTIMONIALS } from '@/constants';
+import { Edit2Icon, Award, MapPin, ListChecks, Briefcase, Upload } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
 
 const testimonialFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -29,7 +30,9 @@ const testimonialFormSchema = z.object({
   submissionStatus: z.enum(['aspirant', 'selected_cleared'], { required_error: "Please select your current status." }),
   selectedForce: z.enum(['Army', 'Navy', 'Air Force']).optional(),
   interviewLocation: z.string().optional(),
-  numberOfAttempts: z.coerce.number().min(1, "Number of attempts must be at least 1.").optional(), // Use coerce for number input
+  numberOfAttempts: z.coerce.number().min(1, "Number of attempts must be at least 1.").optional(),
+  bodyImageUrl: z.string().url().optional().or(z.literal('')), // For the uploaded image URL (simulated)
+  bodyImageDataAiHint: z.string().max(50, "AI hint should be concise").optional(),
   isNotRobot: z.boolean().refine(val => val === true, { message: "Please confirm you're not a robot." }),
 }).superRefine((data, ctx) => {
     if (data.submissionStatus === 'selected_cleared') {
@@ -62,7 +65,9 @@ type TestimonialFormValues = z.infer<typeof testimonialFormSchema>;
 
 export default function SubmitTestimonialPage() {
   const { toast } = useToast();
-  const { currentUser } = useAuth(); // Get currentUser from AuthContext
+  const { currentUser } = useAuth();
+  const [bodyImageFile, setBodyImageFile] = useState<File | null>(null);
+  const [bodyImagePreview, setBodyImagePreview] = useState<string | null>(null);
 
   const form = useForm<TestimonialFormValues>({
     resolver: zodResolver(testimonialFormSchema),
@@ -76,6 +81,8 @@ export default function SubmitTestimonialPage() {
       selectedForce: undefined,
       interviewLocation: "",
       numberOfAttempts: undefined,
+      bodyImageUrl: "",
+      bodyImageDataAiHint: "",
       isNotRobot: false,
     },
   });
@@ -83,17 +90,9 @@ export default function SubmitTestimonialPage() {
    useEffect(() => {
     if (currentUser) {
         form.reset({
+            ...form.getValues(), // Preserve other potentially filled fields
             name: currentUser.name || "",
             email: currentUser.email || "",
-            // Keep other form values as they might have been partially filled
-            serviceId: form.getValues("serviceId"),
-            story: form.getValues("story"),
-            batch: form.getValues("batch"),
-            submissionStatus: form.getValues("submissionStatus"),
-            selectedForce: form.getValues("selectedForce"),
-            interviewLocation: form.getValues("interviewLocation"),
-            numberOfAttempts: form.getValues("numberOfAttempts"),
-            isNotRobot: form.getValues("isNotRobot"),
         });
     }
   }, [currentUser, form]);
@@ -103,23 +102,49 @@ export default function SubmitTestimonialPage() {
     name: 'submissionStatus',
   });
 
+  const handleBodyImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setBodyImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setBodyImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setBodyImageFile(null);
+      setBodyImagePreview(null);
+    }
+  };
+
+
   function onSubmit(data: TestimonialFormValues) {
     const selectedService = MOCK_SERVICES.find(s => s.id === data.serviceId);
+    let finalBodyImageUrl = data.bodyImageUrl; // Use if a URL was manually entered
+
+    if (bodyImageFile) {
+      // Simulate upload and get a URL. In a real app, this would be an async upload.
+      finalBodyImageUrl = `https://placehold.co/400x300.png?text=${encodeURIComponent(bodyImageFile.name.substring(0,15))}`;
+      console.log("Simulating upload of body image:", bodyImageFile.name);
+    }
+
     const newTestimonial = {
       id: `testimonial-${Date.now()}`,
       name: data.name,
       userEmail: data.email,
       batch: data.batch,
       story: data.story,
+      imageUrl: currentUser?.imageUrl || 'https://placehold.co/100x100.png', // User's profile avatar
+      dataAiHint: 'person avatar', // AI hint for profile avatar
       serviceTaken: selectedService?.name || 'Unknown Service',
       serviceId: data.serviceId,
       submissionStatus: data.submissionStatus,
       selectedForce: data.submissionStatus === 'selected_cleared' ? data.selectedForce : undefined,
       interviewLocation: data.submissionStatus === 'selected_cleared' ? data.interviewLocation : undefined,
       numberOfAttempts: data.submissionStatus === 'selected_cleared' ? data.numberOfAttempts : undefined,
+      bodyImageUrl: finalBodyImageUrl,
+      bodyImageDataAiHint: data.bodyImageDataAiHint,
       status: 'pending' as const,
-      imageUrl: 'https://placehold.co/100x100.png',
-      dataAiHint: 'person'
     };
 
     MOCK_TESTIMONIALS.push(newTestimonial);
@@ -129,7 +154,7 @@ export default function SubmitTestimonialPage() {
       title: "Testimonial Submitted!",
       description: "Thank you for sharing your experience. Your testimonial is pending review.",
     });
-    form.reset({ // Reset with user details but clear other fields
+    form.reset({
         name: currentUser?.name || "",
         email: currentUser?.email || "",
         serviceId: "",
@@ -139,8 +164,12 @@ export default function SubmitTestimonialPage() {
         selectedForce: undefined,
         interviewLocation: "",
         numberOfAttempts: undefined,
+        bodyImageUrl: "",
+        bodyImageDataAiHint: "",
         isNotRobot: false,
     });
+    setBodyImageFile(null);
+    setBodyImagePreview(null);
   }
 
   return (
@@ -225,7 +254,7 @@ export default function SubmitTestimonialPage() {
                   </FormItem>
                 )}
               />
-              <FormField
+               <FormField
                 control={form.control}
                 name="batch"
                 render={({ field }) => (
@@ -238,6 +267,32 @@ export default function SubmitTestimonialPage() {
                   </FormItem>
                 )}
               />
+
+              <FormItem>
+                <FormLabel>Upload a Photo for Your Testimonial (Optional)</FormLabel>
+                <FormControl>
+                    <Input id="bodyImage" type="file" accept="image/*" onChange={handleBodyImageChange} />
+                </FormControl>
+                {bodyImagePreview && (
+                    <div className="mt-2">
+                        <Image src={bodyImagePreview} alt="Body image preview" width={200} height={150} className="rounded-md border object-contain" />
+                    </div>
+                )}
+                <FormMessage />
+              </FormItem>
+
+              <FormField
+                control={form.control}
+                name="bodyImageDataAiHint"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>AI Hint for Your Photo (Optional)</FormLabel>
+                    <FormControl><Input placeholder="e.g., graduation, celebration" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="submissionStatus"

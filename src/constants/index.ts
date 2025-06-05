@@ -64,26 +64,29 @@ export const MOCK_TESTIMONIALS: Testimonial[] = [
     name: 'Rohan Sharma',
     userEmail: 'aspirant@example.com',
     batch: 'NDA Aspirant',
-    story: "The mock interview was incredibly realistic and the feedback helped me identify my weak areas. Cleared SSB in my first attempt!",
-    imageUrl: 'https://placehold.co/100x100.png',
-    dataAiHint: 'happy student',
+    story: "The mock interview was incredibly realistic and the feedback helped me identify my weak areas. Cleared SSB in my first attempt! The resources provided were also top-notch.",
+    imageUrl: 'https://placehold.co/100x100.png', // Fallback avatar if profile not found
+    dataAiHint: 'happy student', // For avatar
     serviceTaken: 'SSB Mock Interview',
     serviceId: 'ssb-mock-interview',
     submissionStatus: 'selected_cleared',
     status: 'approved',
+    bodyImageUrl: 'https://placehold.co/400x300.png', // User's photo for testimonial body
+    bodyImageDataAiHint: 'celebration success', // AI hint for body image
   },
   {
     id: 't2',
     name: 'Priya Singh',
     userEmail: 'priya.singh@example.com',
     batch: 'CDS Aspirant',
-    story: "The counselling session gave me the confidence I needed. The insights into the SSB process were invaluable.",
+    story: "The counselling session gave me the confidence I needed. The insights into the SSB process were invaluable. Highly recommend for anyone serious about joining the forces.",
     imageUrl: 'https://placehold.co/100x100.png',
     dataAiHint: 'smiling person',
     serviceTaken: 'Personal Counselling Session',
     serviceId: 'personal-counselling-session',
     submissionStatus: 'aspirant',
     status: 'approved',
+    // No bodyImageUrl for this one to test conditional rendering
   },
   {
     id: 't3',
@@ -103,13 +106,15 @@ export const MOCK_TESTIMONIALS: Testimonial[] = [
     name: 'Sneha Reddy',
     userEmail: 'sneha.reddy@example.com',
     batch: 'SSB Aspirant',
-    story: "The mentor's profile was very inspiring. The guidance was top-notch.",
+    story: "The mentor's profile was very inspiring. The guidance was top-notch, helped me improve my approach to the psychological tests significantly.",
     imageUrl: 'https://placehold.co/100x100.png',
     dataAiHint: 'confident woman',
     serviceTaken: 'SSB Mock Interview',
     serviceId: 'ssb-mock-interview',
     submissionStatus: 'aspirant',
     status: 'pending',
+    bodyImageUrl: 'https://placehold.co/300x400.png',
+    bodyImageDataAiHint: 'study learning',
   },
 ];
 

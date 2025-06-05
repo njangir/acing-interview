@@ -20,15 +20,17 @@ export interface Testimonial {
   userEmail?: string;
   batch?: string; // Existing field
   story: string;
-  imageUrl?: string;
-  dataAiHint?: string;
+  imageUrl?: string; // This will now primarily be a fallback for the avatar
+  dataAiHint?: string; // For the avatar image
   serviceTaken: string;
   serviceId?: string;
   submissionStatus?: 'aspirant' | 'selected_cleared';
   status: 'pending' | 'approved' | 'rejected';
-  selectedForce?: 'Army' | 'Navy' | 'Air Force'; // New field
-  interviewLocation?: string; // New field
-  numberOfAttempts?: number; // New field
+  selectedForce?: 'Army' | 'Navy' | 'Air Force';
+  interviewLocation?: string;
+  numberOfAttempts?: number;
+  bodyImageUrl?: string; // New field for image within the testimonial body
+  bodyImageDataAiHint?: string; // New field for AI hint for body image
 }
 
 export interface Booking {
@@ -99,9 +101,9 @@ export interface UserProfile {
   name: string;
   email: string;
   phone: string;
-  imageUrl?: string;
+  imageUrl?: string; // This is the user's chosen avatar
   awardedBadges: Badge[];
-  gender?: 'Male' | 'Female' | 'Other' | 'Prefer not to say'; // New field
-  targetOrganization?: 'Army' | 'Navy' | 'Air Force' | 'Other'; // New field
+  gender?: 'Male' | 'Female' | 'Other' | 'Prefer not to say';
+  targetOrganization?: 'Army' | 'Navy' | 'Air Force' | 'Other';
 }
 
