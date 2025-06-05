@@ -4,8 +4,9 @@
 import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger, SheetTitle as RadixSheetTitle } from '@/components/ui/sheet'; // Renamed SheetTitle to avoid conflict
+import { Sheet, SheetContent, SheetTrigger, SheetTitle as RadixSheetTitle } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area'; // Added ScrollArea
 import { Menu, LogIn, UserPlus, ShieldCheck, LayoutDashboard, LogOut, Home, Briefcase, UserCircle, BookCheck, Award, MessageSquare } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Logo } from '@/components/icons/logo';
@@ -34,30 +35,21 @@ export function Header() {
   const isDashboardPath = pathname.startsWith('/dashboard');
   const isAdminPath = pathname.startsWith('/admin');
 
-  // Define navigation groups for mobile sheet
   let contextualNavItems: Array<{ href: string; label: string; icon: LucideIcon }> = [];
   let contextualNavTitle = "";
   let displayMainSiteNavSeparately = false;
-
-  let mobileSheetPrimaryTitle = "Field Menu";
-  let mobileSheetPrimaryNavItems = [...mainSiteNavItems];
-
 
   if (isLoggedIn && !isAdmin) {
     if (isDashboardPath) {
       contextualNavTitle = "Officer Candidate HQ Menu";
       contextualNavItems = DASHBOARD_NAV_LINKS.map(link => ({...link, label: link.label.replace("My ", "")}));
       displayMainSiteNavSeparately = true;
-    } else {
-      // Logged in, not admin, on a main site page - add dashboard link to primary nav
-      mobileSheetPrimaryNavItems.push({ href: '/dashboard', label: 'Officer Candidate HQ', icon: LayoutDashboard });
     }
   } else if (isAdmin && isAdminPath) {
     contextualNavTitle = "Admin Command Menu";
     contextualNavItems = ADMIN_DASHBOARD_NAV_LINKS;
     displayMainSiteNavSeparately = true;
   }
-  // If not logged in, mobileSheetPrimaryNavItems remains mainSiteNavItems and title "Field Menu"
 
 
   const renderNavLinks = (items: Array<{ href: string; label: string; icon: LucideIcon }>) => {
@@ -155,74 +147,74 @@ export function Header() {
                 <span className="sr-only">Toggle navigation menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[280px] sm:w-[320px]">
+            <SheetContent side="right" className="w-[280px] sm:w-[320px] p-0"> {/* Removed padding here */}
               <RadixSheetTitle className="sr-only">Mobile Navigation Menu</RadixSheetTitle>
-              <nav className="grid gap-2 text-base font-medium mt-8">
-                <Link href="/" className="flex items-center gap-2 text-lg font-semibold mb-4" onClick={() => setIsSheetOpen(false)}>
-                  <Logo />
-                </Link>
+              <ScrollArea className="h-full"> {/* ScrollArea wraps the nav */}
+                <nav className="grid gap-2 text-base font-medium p-4"> {/* Added padding here */}
+                  <Link href="/" className="flex items-center gap-2 text-lg font-semibold mb-4" onClick={() => setIsSheetOpen(false)}>
+                    <Logo />
+                  </Link>
 
-                {contextualNavTitle && (
-                  <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">{contextualNavTitle}</h3>
-                )}
-                {renderNavLinks(contextualNavItems)}
+                  {contextualNavTitle && (
+                    <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">{contextualNavTitle}</h3>
+                  )}
+                  {renderNavLinks(contextualNavItems)}
 
-                {displayMainSiteNavSeparately && contextualNavItems.length > 0 && (
-                  <>
-                    <Separator className="my-2" />
-                    <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">Main Menu</h3>
-                  </>
-                )}
-                
-                {(!contextualNavTitle || displayMainSiteNavSeparately) && renderNavLinks(mainSiteNavItems) }
-                
-                {/* If user is logged in, not admin, and on a main site page, ensure dashboard link is available if not already covered */}
-                {isLoggedIn && !isAdmin && !isDashboardPath && !mainSiteNavItems.find(item => item.href === '/dashboard') && (
-                   <Link
-                      href="/dashboard"
-                      className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
-                                    (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) && "bg-primary/10 text-primary"
-                      )}
-                      onClick={() => setIsSheetOpen(false)}
-                    >
-                      <LayoutDashboard className="h-5 w-5" />
-                      Officer Candidate HQ
-                    </Link>
-                )}
-
-
-                 {isAdmin && !isAdminPath && ( // Always show Admin Command link at the bottom for admins if they are not already in admin section
+                  {displayMainSiteNavSeparately && contextualNavItems.length > 0 && (
+                    <>
+                      <Separator className="my-2" />
+                      <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">Main Menu</h3>
+                    </>
+                  )}
+                  
+                  {(!contextualNavTitle || displayMainSiteNavSeparately) && renderNavLinks(mainSiteNavItems) }
+                  
+                  {isLoggedIn && !isAdmin && !isDashboardPath && !mainSiteNavItems.find(item => item.href === '/dashboard') && (
                     <Link
-                        href="/admin"
-                        className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary mt-2 border-t pt-3",
-                                      isAdminPath && "bg-primary/10 text-primary")}
+                        href="/dashboard"
+                        className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
+                                      (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) && "bg-primary/10 text-primary"
+                        )}
                         onClick={() => setIsSheetOpen(false)}
-                        >
-                        <ShieldCheck className="h-5 w-5" /> Admin Command
-                    </Link>
-                 )}
+                      >
+                        <LayoutDashboard className="h-5 w-5" />
+                        Officer Candidate HQ
+                      </Link>
+                  )}
 
-                 <div className="mt-auto pt-4 border-t">
-                    {isLoggedIn ? (
-                         <Button variant="outline" size="sm" onClick={() => { logout(); setIsSheetOpen(false);}} className="w-full">
-                            <LogOut className="mr-2 h-4 w-4" /> Log Out
-                        </Button>
-                    ) : (
-                        <div className="space-y-2">
-                            <Button asChild size="sm" className="w-full">
-                                <Link href="/login" onClick={() => setIsSheetOpen(false)}>
-                                <LogIn className="mr-2 h-4 w-4" /> Log In
-                                </Link>
-                            </Button>
-                             <Button asChild size="sm" variant="outline" className="w-full">
-                                <Link href="/signup" onClick={() => setIsSheetOpen(false)}>
-                                <UserPlus className="mr-2 h-4 w-4" /> Enlist
-                                </Link>
-                            </Button>
-                        </div>
-                    )}
-                 </div>
-              </nav>
+                  {isAdmin && !isAdminPath && (
+                      <Link
+                          href="/admin"
+                          className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary mt-2 border-t pt-3",
+                                        isAdminPath && "bg-primary/10 text-primary")}
+                          onClick={() => setIsSheetOpen(false)}
+                          >
+                          <ShieldCheck className="h-5 w-5" /> Admin Command
+                      </Link>
+                  )}
+
+                  <div className="pt-4 border-t"> {/* Removed mt-auto */}
+                      {isLoggedIn ? (
+                          <Button variant="outline" size="sm" onClick={() => { logout(); setIsSheetOpen(false);}} className="w-full">
+                              <LogOut className="mr-2 h-4 w-4" /> Log Out
+                          </Button>
+                      ) : (
+                          <div className="space-y-2">
+                              <Button asChild size="sm" className="w-full">
+                                  <Link href="/login" onClick={() => setIsSheetOpen(false)}>
+                                  <LogIn className="mr-2 h-4 w-4" /> Log In
+                                  </Link>
+                              </Button>
+                              <Button asChild size="sm" variant="outline" className="w-full">
+                                  <Link href="/signup" onClick={() => setIsSheetOpen(false)}>
+                                  <UserPlus className="mr-2 h-4 w-4" /> Enlist
+                                  </Link>
+                              </Button>
+                          </div>
+                      )}
+                  </div>
+                </nav>
+              </ScrollArea>
             </SheetContent>
           </Sheet>
         </div>
@@ -230,4 +222,3 @@ export function Header() {
     </header>
   );
 }
-
