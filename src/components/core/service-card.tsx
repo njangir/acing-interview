@@ -15,7 +15,7 @@ export function ServiceCard({ service }: ServiceCardProps) {
   const isBookable = service.isBookable === undefined ? true : service.isBookable;
 
   return (
-    <Card className="flex flex-col h-full shadow-lg hover:shadow-xl transition-shadow duration-300">
+    <Card className="flex flex-col h-full shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 ease-in-out">
       <CardHeader>
         {service.image && (
           <div className="relative h-48 w-full mb-4 rounded-t-lg overflow-hidden">

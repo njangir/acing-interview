@@ -28,13 +28,13 @@ export default function HomePage() {
               </Button>
             </div>
           </div>
-          <div className="hidden md:block relative animate-subtle-appear" style={{ animationDelay: '0.2s' }}>
+          <div className="hidden md:block relative animate-subtle-appear group overflow-hidden rounded-lg shadow-2xl" style={{ animationDelay: '0.2s' }}>
             <Image
               src="https://placehold.co/600x450.png"
               alt="SSB Interview Preparation"
               width={600}
               height={450}
-              className="rounded-lg shadow-2xl"
+              className="rounded-lg transition-transform duration-300 group-hover:scale-105"
               data-ai-hint="military officer meeting"
             />
           </div>
@@ -53,7 +53,7 @@ export default function HomePage() {
               { icon: <Target className="h-12 w-12 text-accent" />, title: "Realistic Mock Interviews", description: "Experience the actual SSB environment and get tailored feedback." },
               { icon: <CheckCircle className="h-12 w-12 text-accent" />, title: "Proven Success Strategies", description: "Learn techniques that work and boost your confidence." },
             ].map((item, index) => (
-              <Card key={index} className="text-center p-6 shadow-md hover:shadow-lg transition-shadow">
+              <Card key={index} className="text-center p-6 shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 ease-in-out">
                 <div className="flex justify-center mb-4">{item.icon}</div>
                 <h3 className="text-xl font-semibold mb-2 font-headline text-primary/90">{item.title}</h3>
                 <p className="text-muted-foreground">{item.description}</p>

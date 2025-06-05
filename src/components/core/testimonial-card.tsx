@@ -33,7 +33,7 @@ export function TestimonialCard({ testimonial }: TestimonialCardProps) {
   }, [testimonial.userEmail, testimonial.imageUrl]);
 
   return (
-    <Card className="h-full shadow-lg bg-card flex flex-col">
+    <Card className="h-full shadow-lg bg-card flex flex-col hover:shadow-xl hover:scale-[1.02] transition-all duration-300 ease-in-out">
       <CardHeader className="flex flex-row items-center gap-4 pb-2">
         <Avatar className="h-12 w-12">
           <AvatarImage 
