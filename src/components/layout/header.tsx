@@ -4,15 +4,17 @@
 import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetTitle as RadixSheetTitle } from '@/components/ui/sheet'; // Renamed SheetTitle to avoid conflict
+import { Separator } from '@/components/ui/separator';
 import { Menu, LogIn, UserPlus, ShieldCheck, LayoutDashboard, LogOut, Home, Briefcase, UserCircle, BookCheck, Award, MessageSquare } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Logo } from '@/components/icons/logo';
 import { useAuth } from '@/hooks/use-auth';
 import { usePathname } from 'next/navigation';
 import { DASHBOARD_NAV_LINKS, ADMIN_DASHBOARD_NAV_LINKS } from '@/constants';
 import { cn } from '@/lib/utils';
 
-const navLinks = [
+const mainSiteNavItems: Array<{ href: string; label: string; icon: LucideIcon }> = [
   { href: '/', label: 'Home Base', icon: Home },
   { href: '/services', label: 'Training Ops', icon: Briefcase },
   { href: '/mentor', label: 'Your Mentor', icon: Award },
@@ -32,26 +34,54 @@ export function Header() {
   const isDashboardPath = pathname.startsWith('/dashboard');
   const isAdminPath = pathname.startsWith('/admin');
 
-  // Determine mobile navigation links and title
-  const baseNavLinks = navLinks;
-  let effectiveMobileNavLinks = [...baseNavLinks];
-  let mobileNavTitle = "Field Menu";
+  // Define navigation groups for mobile sheet
+  let contextualNavItems: Array<{ href: string; label: string; icon: LucideIcon }> = [];
+  let contextualNavTitle = "";
+  let displayMainSiteNavSeparately = false;
+
+  let mobileSheetPrimaryTitle = "Field Menu";
+  let mobileSheetPrimaryNavItems = [...mainSiteNavItems];
+
 
   if (isLoggedIn && !isAdmin) {
     if (isDashboardPath) {
-      // User is on a dashboard page, show dashboard specific navigation
-      effectiveMobileNavLinks = DASHBOARD_NAV_LINKS.map(link => ({...link, label: link.label.replace("My ", "")}));
-      mobileNavTitle = "Officer Candidate HQ Menu";
+      contextualNavTitle = "Officer Candidate HQ Menu";
+      contextualNavItems = DASHBOARD_NAV_LINKS.map(link => ({...link, label: link.label.replace("My ", "")}));
+      displayMainSiteNavSeparately = true;
     } else {
-      // User is logged in, not admin, and not on a dashboard page. Add dashboard link to general nav.
-      effectiveMobileNavLinks.push({ href: '/dashboard', label: 'Officer Candidate HQ', icon: LayoutDashboard });
+      // Logged in, not admin, on a main site page - add dashboard link to primary nav
+      mobileSheetPrimaryNavItems.push({ href: '/dashboard', label: 'Officer Candidate HQ', icon: LayoutDashboard });
     }
   } else if (isAdmin && isAdminPath) {
-    // Admin is on an admin page, show admin specific navigation
-    effectiveMobileNavLinks = ADMIN_DASHBOARD_NAV_LINKS;
-    mobileNavTitle = "Admin Command Menu";
+    contextualNavTitle = "Admin Command Menu";
+    contextualNavItems = ADMIN_DASHBOARD_NAV_LINKS;
+    displayMainSiteNavSeparately = true;
   }
-  // If user is admin but not on admin path, or not logged in, effectiveMobileNavLinks remains baseNavLinks.
+  // If not logged in, mobileSheetPrimaryNavItems remains mainSiteNavItems and title "Field Menu"
+
+
+  const renderNavLinks = (items: Array<{ href: string; label: string; icon: LucideIcon }>) => {
+    return items.map((link) => {
+      const LinkIcon = link.icon;
+      const isActive = pathname === link.href ||
+                       (link.href === '/dashboard' && isDashboardPath) ||
+                       (link.href === '/admin' && isAdminPath) ||
+                       (link.href !== '/' && link.href !== '/dashboard' && link.href !== '/admin' && pathname.startsWith(link.href) && link.href.length > 1);
+      return (
+        <Link
+          key={link.href}
+          href={link.href}
+          className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
+                        isActive && "bg-primary/10 text-primary"
+          )}
+          onClick={() => setIsSheetOpen(false)}
+        >
+          <LinkIcon className="h-5 w-5" />
+          {link.label}
+        </Link>
+      );
+    });
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -60,7 +90,7 @@ export function Header() {
           <Logo />
         </Link>
         <nav className="hidden md:flex gap-6 items-center">
-          {navLinks.map((link) => (
+          {mainSiteNavItems.map((link) => (
             <Link
               key={link.href}
               href={link.href}
@@ -88,7 +118,6 @@ export function Header() {
           {isLoggedIn ? (
             <>
               {currentUser && <span className="text-sm text-muted-foreground hidden sm:inline">Officer Candidate {currentUser.name.split(' ')[0]}</span>}
-              {/* Redundant Officer Candidate HQ Button removed from here */}
               <Button variant="outline" size="sm" onClick={logout}>
                 <LogOut className="mr-0 sm:mr-2 h-4 w-4" />
                 <span className="hidden sm:inline">Log Out</span>
@@ -127,38 +156,42 @@ export function Header() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-[280px] sm:w-[320px]">
-              <SheetTitle className="sr-only">{mobileNavTitle}</SheetTitle>
+              <RadixSheetTitle className="sr-only">Mobile Navigation Menu</RadixSheetTitle>
               <nav className="grid gap-2 text-base font-medium mt-8">
                 <Link href="/" className="flex items-center gap-2 text-lg font-semibold mb-4" onClick={() => setIsSheetOpen(false)}>
                   <Logo />
                 </Link>
 
-                {mobileNavTitle !== "Field Menu" && (!isLoggedIn || isAdmin || isDashboardPath) && ( // Show title if specific menu
-                    <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">{mobileNavTitle}</h3>
+                {contextualNavTitle && (
+                  <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">{contextualNavTitle}</h3>
                 )}
+                {renderNavLinks(contextualNavItems)}
 
-                {effectiveMobileNavLinks.map((link) => {
-                  const LinkIcon = link.icon;
-                  // For mobile nav, active if it's the exact path, or if it's a dashboard/admin root and current path starts with it.
-                  const isActive = pathname === link.href ||
-                                   (link.href === '/dashboard' && isDashboardPath) ||
-                                   (link.href === '/admin' && isAdminPath);
-                  return (
-                    <Link
-                      key={link.href}
-                      href={link.href}
+                {displayMainSiteNavSeparately && contextualNavItems.length > 0 && (
+                  <>
+                    <Separator className="my-2" />
+                    <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">Main Menu</h3>
+                  </>
+                )}
+                
+                {(!contextualNavTitle || displayMainSiteNavSeparately) && renderNavLinks(mainSiteNavItems) }
+                
+                {/* If user is logged in, not admin, and on a main site page, ensure dashboard link is available if not already covered */}
+                {isLoggedIn && !isAdmin && !isDashboardPath && !mainSiteNavItems.find(item => item.href === '/dashboard') && (
+                   <Link
+                      href="/dashboard"
                       className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
-                                    isActive && "bg-primary/10 text-primary"
+                                    (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) && "bg-primary/10 text-primary"
                       )}
                       onClick={() => setIsSheetOpen(false)}
                     >
-                      <LinkIcon className="h-5 w-5" />
-                      {link.label}
+                      <LayoutDashboard className="h-5 w-5" />
+                      Officer Candidate HQ
                     </Link>
-                  );
-                })}
+                )}
 
-                 {isAdmin && ( // Always show Admin Command link at the bottom for admins if they are not already in admin section
+
+                 {isAdmin && !isAdminPath && ( // Always show Admin Command link at the bottom for admins if they are not already in admin section
                     <Link
                         href="/admin"
                         className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary mt-2 border-t pt-3",
@@ -197,3 +230,4 @@ export function Header() {
     </header>
   );
 }
+
