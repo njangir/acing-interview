@@ -70,8 +70,6 @@ export default function DashboardOverviewPage() {
   }, [userBookings]);
 
 
-  const recentService = MOCK_SERVICES[0];
-
   const accessibleResourcesCount = useMemo(() => {
     const purchasedServiceIds = getPurchasedServiceIds();
     const filtered = MOCK_RESOURCES.filter(resource =>
@@ -189,30 +187,6 @@ export default function DashboardOverviewPage() {
             </Card>
           )}
         </div>
-
-        {recentService && (
-          <div>
-            <h2 className="text-2xl font-semibold mb-4 font-headline text-primary mt-8">Quick Actions</h2>
-            <Card className="shadow">
-              <CardHeader>
-                <CardTitle className="text-lg font-headline text-primary/90">Access {recentService.name} Intel</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground mb-4">
-                  Access exclusive materials related to your recent training.
-                </p>
-                 <div className="flex flex-col sm:flex-row gap-4">
-                    <Button asChild variant="outline" className="border-primary text-primary hover:bg-primary/10">
-                        <Link href={`/dashboard/resources?service=${recentService.id}`}>Go to Training Materials</Link>
-                    </Button>
-                    <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                        <Link href={`/book/${recentService.id}/slots`}>Re-engage: {recentService.name}</Link>
-                    </Button>
-                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
     </>
   );

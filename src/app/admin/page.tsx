@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ADMIN_DASHBOARD_NAV_LINKS, MOCK_BOOKINGS, MOCK_USER_MESSAGES, MOCK_SERVICES } from "@/constants";
 import { ArrowRight, BellRing, TrendingUp, MessagesSquare, Star } from "lucide-react";
-import { WeeklyScheduleView } from '@/components/core/weekly-schedule-view'; // Added import
+import { WeeklyScheduleView } from '@/components/core/weekly-schedule-view';
 
 export default function AdminOverviewPage() {
   const newBookingRequests = useMemo(() => MOCK_BOOKINGS.filter(b => b.status === 'pending_approval').length, []);
@@ -82,32 +82,7 @@ export default function AdminOverviewPage() {
         title="Admin - Weekly Bookings Overview"
         showUserName={true}
       />
-
       
-      <h2 className="text-2xl font-semibold mb-4 mt-8 font-headline text-primary">Admin Sections</h2>
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {ADMIN_DASHBOARD_NAV_LINKS.filter(link => link.href !== '/admin').map((link) => {
-          const Icon = link.icon;
-          return (
-            <Card key={link.href} className="shadow-lg hover:shadow-xl transition-shadow flex flex-col">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-lg font-medium font-headline text-primary">{link.label}</CardTitle>
-                <Icon className="h-6 w-6 text-accent" />
-              </CardHeader>
-              <CardContent className="flex-grow">
-                <CardDescription>Manage {link.label.toLowerCase()}.</CardDescription>
-              </CardContent>
-              <CardFooter>
-                <Button asChild variant="outline" className="w-full whitespace-normal h-auto">
-                  <Link href={link.href}>
-                    Go to {link.label} <ArrowRight className="ml-2 h-4 w-4 flex-shrink-0" />
-                  </Link>
-                </Button>
-              </CardFooter>
-            </Card>
-          );
-        })}
-      </div>
     </>
   );
 }
