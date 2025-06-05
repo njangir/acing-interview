@@ -11,21 +11,23 @@ import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { Badge as UiBadge } from "@/components/ui/badge"; // Renamed to avoid conflict
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { MOCK_TESTIMONIALS, MOCK_BADGES, MOCK_SERVICES, PREDEFINED_AVATARS } from "@/constants";
+import { MOCK_TESTIMONIALS, MOCK_BADGES, MOCK_SERVICES, PREDEFINED_AVATARS, MOCK_BOOKINGS } from "@/constants";
 import type { Testimonial, Badge as BadgeType, UserProfile, Service } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { Check, X, Eye, EyeOff, Filter, ShieldAlert, CheckCircle2, PlusCircle, Briefcase, Upload } from 'lucide-react';
+import { Check, X, Eye, EyeOff, Filter, ShieldAlert, CheckCircle2, PlusCircle, Briefcase, Upload, Users } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 const adminTestimonialFormSchema = z.object({
+  selectedUserId: z.string().optional(), // For selecting existing user
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   userEmail: z.string().email("Please enter a valid email.").optional().or(z.literal('')),
   serviceId: z.string({ required_error: "Please select the service." }),
@@ -56,16 +58,53 @@ const adminTestimonialFormSchema = z.object({
 
 type AdminTestimonialFormValues = z.infer<typeof adminTestimonialFormSchema>;
 
+interface SelectableUser {
+  id: string; // email
+  name: string;
+  email: string;
+  avatarUrl?: string;
+}
+
 
 export default function AdminTestimonialsPage() {
   const { toast } = useToast();
   const [testimonials, setTestimonials] = useState<Testimonial[]>(MOCK_TESTIMONIALS);
   const [filterBadgeId, setFilterBadgeId] = useState<string>('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isNameEmailEditable, setIsNameEmailEditable] = useState(true);
+
+
+  const selectableUsers = useMemo((): SelectableUser[] => {
+    const usersMap = new Map<string, SelectableUser>();
+    MOCK_BOOKINGS.forEach(booking => {
+      if (booking.userEmail && !usersMap.has(booking.userEmail)) {
+        let avatarUrl = PREDEFINED_AVATARS[0].url; // Default
+        try {
+          const userProfileString = localStorage.getItem(`mockUserProfile_${booking.userEmail}`);
+          if (userProfileString) {
+            const userProfile: UserProfile = JSON.parse(userProfileString);
+            if (userProfile.imageUrl) {
+              avatarUrl = userProfile.imageUrl;
+            }
+          }
+        } catch (e) { console.error("Error parsing profile for user list", e); }
+        
+        usersMap.set(booking.userEmail, {
+          id: booking.userEmail,
+          name: booking.userName,
+          email: booking.userEmail,
+          avatarUrl: avatarUrl,
+        });
+      }
+    });
+    return Array.from(usersMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, []);
+
 
   const adminForm = useForm<AdminTestimonialFormValues>({
     resolver: zodResolver(adminTestimonialFormSchema),
     defaultValues: {
+      selectedUserId: "manual",
       name: "",
       userEmail: "",
       serviceId: "",
@@ -87,13 +126,41 @@ export default function AdminTestimonialsPage() {
     control: adminForm.control,
     name: 'submissionStatus',
   });
+  
+  const watchedSelectedUserId = useWatch({
+    control: adminForm.control,
+    name: 'selectedUserId',
+  });
+
+  useEffect(() => {
+    if (watchedSelectedUserId && watchedSelectedUserId !== "manual") {
+      const selectedUser = selectableUsers.find(u => u.id === watchedSelectedUserId);
+      if (selectedUser) {
+        adminForm.setValue("name", selectedUser.name);
+        adminForm.setValue("userEmail", selectedUser.email);
+        adminForm.setValue("profileImageUrl", selectedUser.avatarUrl || PREDEFINED_AVATARS[0].url);
+        adminForm.setValue("profileImageDataAiHint", "person avatar");
+        setIsNameEmailEditable(false);
+      }
+    } else {
+      // If "manual" or no user selected, clear related fields and make editable
+      if (watchedSelectedUserId === "manual") { // only reset if user explicitly chose manual
+        adminForm.setValue("name", "");
+        adminForm.setValue("userEmail", "");
+        adminForm.setValue("profileImageUrl", PREDEFINED_AVATARS[0].url);
+      }
+      setIsNameEmailEditable(true);
+    }
+  }, [watchedSelectedUserId, adminForm, selectableUsers]);
+
 
   const handleApprovalToggle = (testimonialId: string, currentStatus: Testimonial['status']) => {
+    const testimonialIndex = MOCK_TESTIMONIALS.findIndex(t => t.id === testimonialId);
+    if (testimonialIndex === -1) return;
+
     const newStatus = currentStatus === 'approved' ? 'pending' : 'approved';
-    setTestimonials(prev =>
-      prev.map(t => t.id === testimonialId ? { ...t, status: newStatus } : t)
-    );
-    MOCK_TESTIMONIALS.find(t => t.id === testimonialId)!.status = newStatus;
+    MOCK_TESTIMONIALS[testimonialIndex].status = newStatus;
+    setTestimonials([...MOCK_TESTIMONIALS]); // Update state from the source of truth
     toast({
       title: "Testimonial Status Updated",
       description: `Testimonial ${testimonialId} is now ${newStatus}.`,
@@ -101,10 +168,11 @@ export default function AdminTestimonialsPage() {
   };
 
   const handleReject = (testimonialId: string) => {
-     setTestimonials(prev =>
-      prev.map(t => t.id === testimonialId ? { ...t, status: 'rejected' } : t)
-    );
-    MOCK_TESTIMONIALS.find(t => t.id === testimonialId)!.status = 'rejected';
+    const testimonialIndex = MOCK_TESTIMONIALS.findIndex(t => t.id === testimonialId);
+    if (testimonialIndex === -1) return;
+    
+    MOCK_TESTIMONIALS[testimonialIndex].status = 'rejected';
+    setTestimonials([...MOCK_TESTIMONIALS]); // Update state from the source of truth
     toast({
       title: "Testimonial Rejected",
       description: `Testimonial ${testimonialId} has been rejected.`,
@@ -113,7 +181,7 @@ export default function AdminTestimonialsPage() {
   };
 
   const filteredTestimonials = useMemo(() => {
-    let filtered = testimonials;
+    let filtered = [...MOCK_TESTIMONIALS]; // Work with a copy of the mock data
     if (filterBadgeId !== 'all') {
       filtered = filtered.filter(testimonial => {
         if (!testimonial.userEmail) return false;
@@ -131,7 +199,7 @@ export default function AdminTestimonialsPage() {
         const statusOrder = { pending: 0, approved: 1, rejected: 2 };
         return statusOrder[a.status] - statusOrder[b.status];
     });
-  }, [testimonials, filterBadgeId]);
+  }, [testimonials, filterBadgeId]); // Depend on local state `testimonials`
 
   function onAdminSubmit(data: AdminTestimonialFormValues) {
     const selectedService = MOCK_SERVICES.find(s => s.id === data.serviceId);
@@ -155,16 +223,55 @@ export default function AdminTestimonialsPage() {
       status: data.approvalStatus,
     };
 
-    MOCK_TESTIMONIALS.push(newTestimonial);
-    setTestimonials(prev => [...prev, newTestimonial]);
+    MOCK_TESTIMONIALS.push(newTestimonial); // Add to the "global" mock data
+    setTestimonials([...MOCK_TESTIMONIALS]); // Update local state from the modified "global" mock
 
     toast({
       title: "Testimonial Added!",
       description: `Testimonial from ${data.name} has been successfully added.`,
     });
     setIsCreateModalOpen(false);
-    adminForm.reset();
+    adminForm.reset({
+        selectedUserId: "manual",
+        name: "",
+        userEmail: "",
+        serviceId: "",
+        story: "",
+        batch: "",
+        submissionStatus: 'aspirant',
+        selectedForce: undefined,
+        interviewLocation: "",
+        numberOfAttempts: undefined,
+        profileImageUrl: PREDEFINED_AVATARS[0].url,
+        profileImageDataAiHint: PREDEFINED_AVATARS[0].hint,
+        bodyImageUrl: "",
+        bodyImageDataAiHint: "",
+        approvalStatus: 'approved',
+    });
+    setIsNameEmailEditable(true);
   }
+
+  const handleOpenCreateModal = () => {
+    adminForm.reset({ // Reset form to default values for new entry
+        selectedUserId: "manual",
+        name: "",
+        userEmail: "",
+        serviceId: "",
+        story: "",
+        batch: "",
+        submissionStatus: 'aspirant',
+        selectedForce: undefined,
+        interviewLocation: "",
+        numberOfAttempts: undefined,
+        profileImageUrl: PREDEFINED_AVATARS[0].url,
+        profileImageDataAiHint: PREDEFINED_AVATARS[0].hint,
+        bodyImageUrl: "",
+        bodyImageDataAiHint: "",
+        approvalStatus: 'approved',
+    });
+    setIsNameEmailEditable(true);
+    setIsCreateModalOpen(true);
+  };
 
 
   return (
@@ -190,7 +297,7 @@ export default function AdminTestimonialsPage() {
                     </SelectContent>
                 </Select>
             </div>
-        <Button onClick={() => { adminForm.reset(); setIsCreateModalOpen(true); }}>
+        <Button onClick={handleOpenCreateModal}>
           <PlusCircle className="mr-2 h-4 w-4" /> Add New Testimonial
         </Button>
       </div>
@@ -217,27 +324,34 @@ export default function AdminTestimonialsPage() {
               {filteredTestimonials.map((testimonial) => (
                 <TableRow key={testimonial.id}>
                   <TableCell className="font-medium">
-                    <div>{testimonial.name}</div>
-                    <div className="text-xs text-muted-foreground">{testimonial.userEmail || 'N/A'}</div>
-                    {testimonial.batch && <div className="text-xs text-muted-foreground">Batch: {testimonial.batch}</div>}
+                    <div className="flex items-center gap-2">
+                        {testimonial.imageUrl && (
+                             <Image src={testimonial.imageUrl} alt={testimonial.name} width={32} height={32} className="rounded-full border" data-ai-hint={testimonial.dataAiHint || 'person avatar'}/>
+                        )}
+                        <div>
+                            <div>{testimonial.name}</div>
+                            <div className="text-xs text-muted-foreground">{testimonial.userEmail || 'N/A'}</div>
+                        </div>
+                    </div>
+                    {testimonial.batch && <div className="text-xs text-muted-foreground mt-1">Batch: {testimonial.batch}</div>}
                   </TableCell>
                   <TableCell className="max-w-sm text-sm">{testimonial.story}</TableCell>
                   <TableCell className="text-xs">{testimonial.serviceTaken}</TableCell>
                    <TableCell>
                     {testimonial.submissionStatus === 'selected_cleared' ? (
-                        <Badge variant="secondary" className="bg-sky-100 text-sky-700"><CheckCircle2 className="mr-1 h-3 w-3"/>Selected/Cleared</Badge>
+                        <UiBadge variant="secondary" className="bg-sky-100 text-sky-700"><CheckCircle2 className="mr-1 h-3 w-3"/>Selected/Cleared</UiBadge>
                     ) : (
-                        <Badge variant="outline" className="border-amber-500 text-amber-700"><ShieldAlert className="mr-1 h-3 w-3"/>Aspirant</Badge>
+                        <UiBadge variant="outline" className="border-amber-500 text-amber-700"><ShieldAlert className="mr-1 h-3 w-3"/>Aspirant</UiBadge>
                     )}
                    </TableCell>
                   <TableCell>
-                    <Badge variant={
+                    <UiBadge variant={
                       testimonial.status === 'approved' ? 'default' :
                       testimonial.status === 'pending' ? 'secondary' :
                       'destructive'
                     } className={testimonial.status === 'approved' ? 'bg-green-500 hover:bg-green-600' : ''}>
                       {testimonial.status.toUpperCase()}
-                    </Badge>
+                    </UiBadge>
                   </TableCell>
                   <TableCell className="text-right space-x-2">
                      {testimonial.status !== 'rejected' && (
@@ -267,13 +381,28 @@ export default function AdminTestimonialsPage() {
               )}
             </TableBody>
           </Table>
-          {testimonials.length === 0 && filterBadgeId === 'all' && (
+          {MOCK_TESTIMONIALS.length === 0 && filterBadgeId === 'all' && ( // Check MOCK_TESTIMONIALS for the initial empty state
             <p className="text-center text-muted-foreground py-4">No testimonials submitted yet.</p>
           )}
         </CardContent>
       </Card>
 
-      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+      <Dialog open={isCreateModalOpen} onOpenChange={(isOpen) => {
+        setIsCreateModalOpen(isOpen);
+        if (!isOpen) {
+          adminForm.reset({
+            selectedUserId: "manual",
+            name: "", userEmail: "", serviceId: "", story: "", batch: "",
+            submissionStatus: 'aspirant', selectedForce: undefined,
+            interviewLocation: "", numberOfAttempts: undefined,
+            profileImageUrl: PREDEFINED_AVATARS[0].url,
+            profileImageDataAiHint: PREDEFINED_AVATARS[0].hint,
+            bodyImageUrl: "", bodyImageDataAiHint: "",
+            approvalStatus: 'approved',
+          });
+          setIsNameEmailEditable(true);
+        }
+      }}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Add New Testimonial</DialogTitle>
@@ -283,11 +412,40 @@ export default function AdminTestimonialsPage() {
             <form onSubmit={adminForm.handleSubmit(onAdminSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto p-2 custom-scrollbar">
               <FormField
                 control={adminForm.control}
+                name="selectedUserId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2"><Users className="h-4 w-4"/> Select User (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || "manual"}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an existing user or enter manually" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="manual">--- Enter Manually / New User ---</SelectItem>
+                        {selectableUsers.map(user => (
+                          <SelectItem key={user.id} value={user.id}>
+                            <div className="flex items-center gap-2">
+                              <Image src={user.avatarUrl || PREDEFINED_AVATARS[0].url} alt={user.name} width={20} height={20} className="rounded-full" data-ai-hint="person avatar" />
+                              {user.name} ({user.email})
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={adminForm.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>User's Full Name</FormLabel>
-                    <FormControl><Input placeholder="John Doe" {...field} /></FormControl>
+                    <FormControl><Input placeholder="John Doe" {...field} disabled={!isNameEmailEditable} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -298,7 +456,7 @@ export default function AdminTestimonialsPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>User's Email (Optional)</FormLabel>
-                    <FormControl><Input type="email" placeholder="user@example.com" {...field} /></FormControl>
+                    <FormControl><Input type="email" placeholder="user@example.com" {...field} disabled={!isNameEmailEditable} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -347,8 +505,8 @@ export default function AdminTestimonialsPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>User Profile Image URL (Optional)</FormLabel>
-                    <FormControl><Input type="url" placeholder="https://placehold.co/100x100.png" {...field} /></FormControl>
-                    {field.value && <Image src={field.value || PREDEFINED_AVATARS[0].url} alt="Profile preview" width={60} height={60} className="mt-2 rounded-full border" />}
+                    <FormControl><Input type="url" placeholder="https://placehold.co/100x100.png" {...field} disabled={!isNameEmailEditable && !!watchedSelectedUserId && watchedSelectedUserId !== 'manual'} /></FormControl>
+                    {adminForm.getValues("profileImageUrl") && <Image src={adminForm.getValues("profileImageUrl") || PREDEFINED_AVATARS[0].url} alt="Profile preview" width={60} height={60} className="mt-2 rounded-full border" />}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -369,7 +527,7 @@ export default function AdminTestimonialsPage() {
                   <FormItem>
                     <FormLabel>Testimonial Body Image URL (Optional)</FormLabel>
                     <FormControl><Input type="url" placeholder="https://placehold.co/400x300.png" {...field} /></FormControl>
-                     {field.value && <Image src={field.value} alt="Body image preview" width={100} height={75} className="mt-2 rounded-md border object-contain" />}
+                     {adminForm.getValues("bodyImageUrl") && <Image src={adminForm.getValues("bodyImageUrl")!} alt="Body image preview" width={100} height={75} className="mt-2 rounded-md border object-contain" />}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -446,6 +604,3 @@ export default function AdminTestimonialsPage() {
     </>
   );
 }
-
-
-    
