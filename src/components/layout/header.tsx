@@ -4,16 +4,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger, SheetTitle as RadixSheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Menu, LogIn, UserPlus, ShieldCheck, LayoutDashboard, LogOut, Home, Briefcase, UserCircle, BookCheck, Award, MessageSquare, Bell, CheckCircle } from 'lucide-react';
+import { Menu, LogIn, UserPlus, ShieldCheck, LayoutDashboard, LogOut, Home, Briefcase, UserCircle, BookCheck, Award, MessageSquare, Bell } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Logo } from '@/components/icons/logo';
 import { useAuth } from '@/hooks/use-auth';
 import { usePathname } from 'next/navigation';
-import { DASHBOARD_NAV_LINKS, ADMIN_DASHBOARD_NAV_LINKS, MOCK_BOOKINGS, MOCK_USER_MESSAGES } from '@/constants';
+import { DASHBOARD_NAV_LINKS, ADMIN_DASHBOARD_NAV_LINKS, MOCK_BOOKINGS, MOCK_USER_MESSAGES, MOCK_SERVICES } from '@/constants';
 import type { Booking, UserMessage } from '@/types';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -64,34 +64,38 @@ export function Header() {
     const seenNotifications = getSeenNotifications();
     const currentActiveNotifications: NotificationItem[] = [];
 
-    // Check booking notifications
     MOCK_BOOKINGS.forEach(booking => {
       if (booking.userEmail === currentUser.email) {
         let eventId: string | null = null;
         let message: string | null = null;
-        let eventTimestamp = new Date(booking.date); // Default to booking date
+        let eventTimestamp = new Date(booking.date);
         const href = '/dashboard/bookings';
 
         if ((booking.status === 'accepted' || booking.status === 'scheduled')) {
           eventId = getNotificationEventId(booking.id, 'booking', booking.status);
           message = `Your booking for '${booking.serviceName}' is now ${booking.status}.`;
-          // If a meeting link was just added, consider it a more recent event
-          if (booking.meetingLink && !seenNotifications.includes(getNotificationEventId(booking.id, 'booking', 'link_added'))) {
-             eventId = getNotificationEventId(booking.id, 'booking', 'link_added'); // More specific event
-             message = `Meeting link for '${booking.serviceName}' is available.`;
-             eventTimestamp = new Date(); // Treat as a recent update
+          
+          const service = MOCK_SERVICES.find(s => s.id === booking.serviceId);
+          const isPaid = booking.paymentStatus === 'paid';
+          const linkAddedEventId = getNotificationEventId(booking.id, 'booking', 'link_added');
+          if (isPaid && booking.meetingLink && !seenNotifications.includes(linkAddedEventId)) {
+             eventId = linkAddedEventId;
+             message = `Meeting link for '${booking.serviceName}' on ${booking.date} is available.`;
+             eventTimestamp = new Date(); 
           }
         } else if (booking.status === 'cancelled') {
           eventId = getNotificationEventId(booking.id, 'booking', 'cancelled');
           message = `Your booking for '${booking.serviceName}' on ${booking.date} has been cancelled.`;
-          eventTimestamp = new Date(); // Treat cancellation as a recent event
+          eventTimestamp = new Date();
         } else if (booking.status === 'completed' && (booking.reportUrl || (booking.detailedFeedback && booking.detailedFeedback.length > 0))) {
-          eventId = getNotificationEventId(booking.id, 'booking', 'feedback_ready');
-          message = `Feedback/Report for your session '${booking.serviceName}' is available.`;
-          eventTimestamp = new Date(); // Feedback availability is a recent event
+          const feedbackReadyEventId = getNotificationEventId(booking.id, 'booking', 'feedback_ready');
+          if (!seenNotifications.includes(feedbackReadyEventId)){
+            eventId = feedbackReadyEventId;
+            message = `Feedback/Report for your session '${booking.serviceName}' is available.`;
+            eventTimestamp = new Date(); 
+          }
         }
         
-        // Simplified refund processed notification
         if (booking.requestedRefund === false && booking.status === 'cancelled' && booking.paymentStatus === 'pay_later_unpaid') {
             const refundEventId = getNotificationEventId(booking.id, 'booking', 'refund_processed');
             if (!seenNotifications.includes(refundEventId)) {
@@ -111,7 +115,6 @@ export function Header() {
       }
     });
 
-    // Check message notifications
     const userMessageThreads: { [key: string]: UserMessage[] } = {};
      MOCK_USER_MESSAGES.forEach(msg => {
         if (msg.userEmail === currentUser.email) {
@@ -148,13 +151,12 @@ export function Header() {
 
   useEffect(() => {
     calculateNotifications();
-  }, [calculateNotifications, pathname]); // Recalculate on pathname change
+  }, [calculateNotifications, pathname]); 
 
  const handlePopoverOpenChange = (open: boolean) => {
     setIsNotificationPopoverOpen(open);
-    // When popover closes, recalculate to ensure count is fresh if nothing was clicked or new notifications arrived.
     if (!open) {
-        calculateNotifications();
+        calculateNotifications(); // Refresh count when popover closes
     }
   };
 
@@ -165,13 +167,8 @@ export function Header() {
     const updatedSeenNotifications = Array.from(new Set([...seenNotifications, notificationId]));
     localStorage.setItem(`seenNotifications_${currentUser.email}`, JSON.stringify(updatedSeenNotifications));
     
-    // Recalculate notifications to update the list and count
     calculateNotifications(); 
-    
-    // Optional: close popover after click, or let user close it manually
-    // For now, let's keep it open so they can click multiple, then manually close.
-    // If you want to close it:
-    // setIsNotificationPopoverOpen(false); 
+    // setIsNotificationPopoverOpen(false); // Close popover after click
   };
 
 
@@ -190,8 +187,7 @@ export function Header() {
       contextualNavTitle = "Officer Candidate HQ";
       contextualNavItems = DASHBOARD_NAV_LINKS.map(link => ({...link, label: link.label.replace("My ", "")}));
     } else {
-      // For non-dashboard pages, main site nav is primary
-      contextualNavItems = []; // No separate contextual menu
+      contextualNavItems = []; 
     }
   } else if (isAdmin && isAdminPath) {
     contextualNavTitle = "Admin Command";
@@ -220,6 +216,14 @@ export function Header() {
         </Link>
       );
     });
+  };
+
+  const getOverallNotificationsLink = () => {
+    if (notificationsToShow.length === 0) return "/dashboard";
+    const bookingNotifs = notificationsToShow.filter(n => n.type === 'booking').length;
+    const messageNotifs = notificationsToShow.filter(n => n.type === 'message').length;
+    if (bookingNotifs >= messageNotifs) return "/dashboard/bookings";
+    return "/dashboard/contact";
   };
 
   return (
@@ -277,10 +281,15 @@ export function Header() {
                           <Link
                             key={item.id}
                             href={item.href}
-                            className="block p-3 hover:bg-accent text-sm"
-                            onClick={() => handleNotificationClick(item.id)} 
+                            className="block p-3 hover:bg-accent/50 text-sm"
+                            onClick={() => {
+                              handleNotificationClick(item.id);
+                              // Navigation is handled by Link, popover can stay open or close
+                              // If you want to close it on click:
+                              // setIsNotificationPopoverOpen(false);
+                            }} 
                           >
-                            <p className="truncate">{item.message}</p>
+                            <p className="truncate font-medium text-foreground">{item.message}</p>
                             <p className="text-xs text-muted-foreground">
                               {formatDistanceToNow(item.timestamp, { addSuffix: true })}
                             </p>
@@ -292,12 +301,11 @@ export function Header() {
                         </div>
                       )}
                     </ScrollArea>
-                     {notificationsToShow.length > 0 && ( // Only show "View All" if there are active notifications displayed
+                     {notificationsToShow.length > 0 && (
                          <div className="p-2 border-t text-center">
                             <Button variant="link" size="sm" asChild onClick={() => setIsNotificationPopoverOpen(false)}>
-                                {/* Dynamically link to bookings or messages based on the first notification type, or a general dashboard link */}
-                                <Link href={notificationsToShow[0].type === 'booking' ? "/dashboard/bookings" : (notificationsToShow[0].type === 'message' ? "/dashboard/contact" : "/dashboard")}>
-                                  Go to relevant section
+                                <Link href={getOverallNotificationsLink()}>
+                                  View All
                                 </Link>
                             </Button>
                         </div>
@@ -391,7 +399,7 @@ export function Header() {
                       </Link>
                   )}
 
-                  <div className="pt-4 border-t">
+                  <div className="pt-4 mt-auto border-t"> {/* Added mt-auto here */}
                       {isLoggedIn ? (
                           <Button variant="outline" size="sm" onClick={() => { logout(); setIsSheetOpen(false);}} className="w-full">
                               <LogOut className="mr-2 h-4 w-4" /> Log Out
@@ -420,4 +428,6 @@ export function Header() {
     </header>
   );
 }
+    
+
     
