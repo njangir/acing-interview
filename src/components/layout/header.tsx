@@ -33,8 +33,8 @@ interface NotificationItem {
   type: 'booking' | 'message';
 }
 
-const getNotificationEventId = (itemId: string, type: string): string => {
-  return `${type}-${itemId}`;
+const getNotificationEventId = (itemId: string, type: string, subType?: string): string => {
+  return `${type}-${itemId}${subType ? `-${subType}` : ''}`;
 };
 
 
@@ -69,34 +69,44 @@ export function Header() {
       if (booking.userEmail === currentUser.email) {
         let eventId: string | null = null;
         let message: string | null = null;
-        let href = '/dashboard/bookings';
+        let eventTimestamp = new Date(booking.date); // Default to booking date
+        const href = '/dashboard/bookings';
 
         if ((booking.status === 'accepted' || booking.status === 'scheduled')) {
-          eventId = getNotificationEventId(booking.id, booking.status);
+          eventId = getNotificationEventId(booking.id, 'booking', booking.status);
           message = `Your booking for '${booking.serviceName}' is now ${booking.status}.`;
+          // If a meeting link was just added, consider it a more recent event
+          if (booking.meetingLink && !seenNotifications.includes(getNotificationEventId(booking.id, 'booking', 'link_added'))) {
+             eventId = getNotificationEventId(booking.id, 'booking', 'link_added'); // More specific event
+             message = `Meeting link for '${booking.serviceName}' is available.`;
+             eventTimestamp = new Date(); // Treat as a recent update
+          }
         } else if (booking.status === 'cancelled') {
-          eventId = getNotificationEventId(booking.id, 'cancelled');
+          eventId = getNotificationEventId(booking.id, 'booking', 'cancelled');
           message = `Your booking for '${booking.serviceName}' on ${booking.date} has been cancelled.`;
+          eventTimestamp = new Date(); // Treat cancellation as a recent event
         } else if (booking.status === 'completed' && (booking.reportUrl || (booking.detailedFeedback && booking.detailedFeedback.length > 0))) {
-          eventId = getNotificationEventId(booking.id, 'feedback_ready');
+          eventId = getNotificationEventId(booking.id, 'booking', 'feedback_ready');
           message = `Feedback/Report for your session '${booking.serviceName}' is available.`;
+          eventTimestamp = new Date(); // Feedback availability is a recent event
         }
-        // Simplified refund processed notification for demo
+        
+        // Simplified refund processed notification
         if (booking.requestedRefund === false && booking.status === 'cancelled' && booking.paymentStatus === 'pay_later_unpaid') {
-             const refundEventId = getNotificationEventId(booking.id, 'refund_processed');
-             if (!seenNotifications.includes(refundEventId)) {
+            const refundEventId = getNotificationEventId(booking.id, 'booking', 'refund_processed');
+            if (!seenNotifications.includes(refundEventId)) {
                  currentActiveNotifications.push({
                     id: refundEventId,
                     message: `Your refund for '${booking.serviceName}' has been processed.`,
-                    timestamp: new Date(), // Use current time for demo as actual timestamp isn't stored for this event
+                    timestamp: new Date(), 
                     href,
                     type: 'booking',
                  });
-             }
+            }
         }
 
         if (eventId && message && !seenNotifications.includes(eventId)) {
-          currentActiveNotifications.push({ id: eventId, message, timestamp: new Date(booking.date), href, type: 'booking' });
+          currentActiveNotifications.push({ id: eventId, message, timestamp: eventTimestamp, href, type: 'booking' });
         }
       }
     });
@@ -116,13 +126,13 @@ export function Header() {
     Object.values(userMessageThreads).forEach(thread => {
         const lastMessage = thread.sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime()).pop();
         if (lastMessage && lastMessage.senderType === 'admin') {
-            const eventId = getNotificationEventId(lastMessage.id, 'admin_reply');
+            const eventId = getNotificationEventId(lastMessage.id, 'message', 'admin_reply');
             if (!seenNotifications.includes(eventId)) {
                 currentActiveNotifications.push({
                     id: eventId,
                     message: `New reply from Admin in conversation: "${lastMessage.subject.replace('Re: ','')}"`,
                     timestamp: lastMessage.timestamp,
-                    href: '/dashboard/contact', // Or a direct link to messages page
+                    href: '/dashboard/contact', 
                     type: 'message',
                 });
             }
@@ -138,25 +148,30 @@ export function Header() {
 
   useEffect(() => {
     calculateNotifications();
-  }, [calculateNotifications, pathname]);
+  }, [calculateNotifications, pathname]); // Recalculate on pathname change
 
  const handlePopoverOpenChange = (open: boolean) => {
     setIsNotificationPopoverOpen(open);
-    if (open && currentUser && notificationsToShow.length > 0) {
-      // When popover opens, mark current notifications as seen
-      const seenNotifications = getSeenNotifications();
-      const notificationIdsToMarkSeen = notificationsToShow.map(n => n.id);
-      const updatedSeenNotifications = Array.from(new Set([...seenNotifications, ...notificationIdsToMarkSeen]));
-      localStorage.setItem(`seenNotifications_${currentUser.email}`, JSON.stringify(updatedSeenNotifications));
-      
-      // Visually update: reset count and clear for next calculation if desired, or filter `notificationsToShow`
-      // For this implementation, we'll just reset the badge count.
-      // The popover will show what *was* new. Next calculate will show 0 new.
-      setNotificationCount(0);
-    }
-     if (!open) { // When popover closes, recalculate to update list if new ones came in
+    // When popover closes, recalculate to ensure count is fresh if nothing was clicked or new notifications arrived.
+    if (!open) {
         calculateNotifications();
     }
+  };
+
+  const handleNotificationClick = (notificationId: string) => {
+    if (!currentUser) return;
+
+    const seenNotifications = getSeenNotifications();
+    const updatedSeenNotifications = Array.from(new Set([...seenNotifications, notificationId]));
+    localStorage.setItem(`seenNotifications_${currentUser.email}`, JSON.stringify(updatedSeenNotifications));
+    
+    // Recalculate notifications to update the list and count
+    calculateNotifications(); 
+    
+    // Optional: close popover after click, or let user close it manually
+    // For now, let's keep it open so they can click multiple, then manually close.
+    // If you want to close it:
+    // setIsNotificationPopoverOpen(false); 
   };
 
 
@@ -169,22 +184,18 @@ export function Header() {
 
   let contextualNavItems: Array<{ href: string; label: string; icon: LucideIcon }> = [];
   let contextualNavTitle = "Field Menu";
-  let displayMainSiteNavSeparately = false;
-
+  
   if (isLoggedIn && !isAdmin) {
     if (isDashboardPath) {
       contextualNavTitle = "Officer Candidate HQ";
       contextualNavItems = DASHBOARD_NAV_LINKS.map(link => ({...link, label: link.label.replace("My ", "")}));
-      displayMainSiteNavSeparately = true;
     } else {
-      contextualNavItems = mainSiteNavItems;
+      // For non-dashboard pages, main site nav is primary
+      contextualNavItems = []; // No separate contextual menu
     }
   } else if (isAdmin && isAdminPath) {
     contextualNavTitle = "Admin Command";
     contextualNavItems = ADMIN_DASHBOARD_NAV_LINKS;
-    displayMainSiteNavSeparately = true;
-  } else {
-     contextualNavItems = mainSiteNavItems;
   }
 
 
@@ -260,14 +271,14 @@ export function Header() {
                   </PopoverTrigger>
                   <PopoverContent className="w-80 p-0" align="end">
                     <div className="p-3 font-medium border-b">Notifications</div>
-                    <ScrollArea className="h-auto max-h-80">
+                    <ScrollArea className="h-auto max-h-80 custom-scrollbar">
                       {notificationsToShow.length > 0 ? (
                         notificationsToShow.map((item) => (
                           <Link
                             key={item.id}
                             href={item.href}
                             className="block p-3 hover:bg-accent text-sm"
-                            onClick={() => setIsNotificationPopoverOpen(false)}
+                            onClick={() => handleNotificationClick(item.id)} 
                           >
                             <p className="truncate">{item.message}</p>
                             <p className="text-xs text-muted-foreground">
@@ -281,10 +292,13 @@ export function Header() {
                         </div>
                       )}
                     </ScrollArea>
-                    {notificationsToShow.length > 0 && (
+                     {notificationsToShow.length > 0 && ( // Only show "View All" if there are active notifications displayed
                          <div className="p-2 border-t text-center">
-                            <Button variant="link" size="sm" asChild onClick={() => {setIsNotificationPopoverOpen(false); calculateNotifications();}}>
-                                <Link href={notificationsToShow[0].type === 'booking' ? "/dashboard/bookings" : "/dashboard/contact"}>View All</Link>
+                            <Button variant="link" size="sm" asChild onClick={() => setIsNotificationPopoverOpen(false)}>
+                                {/* Dynamically link to bookings or messages based on the first notification type, or a general dashboard link */}
+                                <Link href={notificationsToShow[0].type === 'booking' ? "/dashboard/bookings" : (notificationsToShow[0].type === 'message' ? "/dashboard/contact" : "/dashboard")}>
+                                  Go to relevant section
+                                </Link>
                             </Button>
                         </div>
                     )}
@@ -330,14 +344,13 @@ export function Header() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-[280px] sm:w-[320px] p-0">
-              <RadixSheetTitle className="sr-only">Mobile Navigation Menu</RadixSheetTitle>
               <ScrollArea className="h-full">
                 <nav className="grid gap-2 text-base font-medium p-4">
                   <Link href="/" className="flex items-center gap-2 text-lg font-semibold mb-4" onClick={() => setIsSheetOpen(false)}>
                     <Logo />
                   </Link>
 
-                  {(contextualNavItems.length > 0 && displayMainSiteNavSeparately) && (
+                  {contextualNavItems.length > 0 && (
                     <>
                         <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">{contextualNavTitle}</h3>
                         {renderNavLinks(contextualNavItems)}
@@ -347,14 +360,14 @@ export function Header() {
                     </>
                   )}
 
-                  {(!displayMainSiteNavSeparately) && (
+                  {contextualNavItems.length === 0 && (
                      <>
                         <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">{contextualNavTitle}</h3>
-                        {renderNavLinks(contextualNavItems)}
+                        {renderNavLinks(mainSiteNavItems)}
                      </>
                   )}
                   
-                  {isLoggedIn && !isAdmin && !isDashboardPath && !mainSiteNavItems.find(item => item.href === '/dashboard') && !contextualNavItems.find(item => item.href === '/dashboard') && (
+                  {isLoggedIn && !isAdmin && !isDashboardPath && !contextualNavItems.some(item => item.href.startsWith('/dashboard')) && (
                     <Link
                         href="/dashboard"
                         className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
@@ -407,6 +420,4 @@ export function Header() {
     </header>
   );
 }
-    
-
     
