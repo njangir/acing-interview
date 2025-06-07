@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -9,7 +9,7 @@ import Image from 'next/image';
 
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription as DialogDesc, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -20,7 +20,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { MOCK_BADGES } from "@/constants";
 import type { Badge } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Edit, Trash2, Award as AwardIcon } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Award as AwardIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+
+const ITEMS_PER_PAGE = 7;
 
 const badgeFormSchema = z.object({
   name: z.string().min(3, "Badge name must be at least 3 characters."),
@@ -37,10 +39,10 @@ const defaultPlaceholderImage = "https://placehold.co/100x100.png?text=Badge";
 
 export default function AdminBadgesPage() {
   const { toast } = useToast();
-  // Use state for badges to allow for dynamic updates on the page
   const [badges, setBadges] = useState<Badge[]>(MOCK_BADGES);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentBadge, setCurrentBadge] = useState<Badge | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const form = useForm<BadgeFormValues>({
     resolver: zodResolver(badgeFormSchema),
@@ -65,16 +67,27 @@ export default function AdminBadgesPage() {
         dataAiHint: currentBadge.dataAiHint,
       });
     } else {
-      form.reset({ // Reset to defaults for new badge
-        name: '',
-        description: '',
-        force: 'General',
-        rankName: '',
-        imageUrl: '',
-        dataAiHint: '',
+      form.reset({ 
+        name: '', description: '', force: 'General', rankName: '', imageUrl: '', dataAiHint: '',
       });
     }
   }, [currentBadge, form, isModalOpen]);
+
+  const totalPages = Math.ceil(badges.length / ITEMS_PER_PAGE);
+
+  const paginatedBadges = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return badges.slice(startIndex, endIndex);
+  }, [currentPage, badges]);
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  };
 
 
   const handleAddNew = () => {
@@ -88,13 +101,17 @@ export default function AdminBadgesPage() {
   };
 
   const handleDelete = (badgeId: string) => {
-    // Simulate deleting from MOCK_BADGES
     const badgeIndex = MOCK_BADGES.findIndex(b => b.id === badgeId);
     if (badgeIndex > -1) {
       MOCK_BADGES.splice(badgeIndex, 1);
     }
-    setBadges([...MOCK_BADGES]); // Update state to reflect change
+    setBadges([...MOCK_BADGES]); 
     toast({ title: "Badge Deleted", description: "The badge has been removed." });
+    if (currentPage > Math.ceil(MOCK_BADGES.length / ITEMS_PER_PAGE) && MOCK_BADGES.length > 0) {
+      setCurrentPage(Math.ceil(MOCK_BADGES.length / ITEMS_PER_PAGE));
+    } else if (MOCK_BADGES.length === 0) {
+      setCurrentPage(1);
+    }
   };
 
   function onSubmit(data: BadgeFormValues) {
@@ -106,18 +123,16 @@ export default function AdminBadgesPage() {
     };
 
     if (currentBadge) {
-      // Update existing badge in MOCK_BADGES
       const badgeIndex = MOCK_BADGES.findIndex(b => b.id === currentBadge.id);
       if (badgeIndex > -1) {
         MOCK_BADGES[badgeIndex] = newBadgeData;
       }
       toast({ title: "Badge Updated", description: `${newBadgeData.name} has been updated.` });
     } else {
-      // Add new badge to MOCK_BADGES
       MOCK_BADGES.push(newBadgeData);
       toast({ title: "Badge Added", description: `${newBadgeData.name} has been created.` });
     }
-    setBadges([...MOCK_BADGES]); // Update state to reflect changes
+    setBadges([...MOCK_BADGES]); 
     setIsModalOpen(false);
   }
 
@@ -135,7 +150,7 @@ export default function AdminBadgesPage() {
       <Card>
         <CardHeader>
           <CardTitle>All Badges</CardTitle>
-          <CardDescription>View and manage all available badges.</CardDescription>
+          <CardDescription>View and manage all available badges. Showing {paginatedBadges.length} of {badges.length}</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -149,7 +164,7 @@ export default function AdminBadgesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {badges.length > 0 ? badges.map((badge) => (
+              {paginatedBadges.length > 0 ? paginatedBadges.map((badge) => (
                 <TableRow key={badge.id}>
                   <TableCell>
                     <Image 
@@ -199,6 +214,29 @@ export default function AdminBadgesPage() {
             </TableBody>
           </Table>
         </CardContent>
+        {totalPages > 1 && (
+          <CardFooter className="flex justify-center items-center space-x-4 py-4">
+            <Button
+              variant="outline"
+              onClick={handlePreviousPage}
+              disabled={currentPage === 1}
+              size="sm"
+            >
+              <ChevronLeft className="mr-2 h-4 w-4" /> Previous
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+              size="sm"
+            >
+              Next <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+          </CardFooter>
+        )}
       </Card>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

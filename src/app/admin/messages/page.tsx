@@ -4,17 +4,19 @@
 import { useState, useMemo } from 'react';
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { MOCK_USER_MESSAGES, MOCK_USER_PROFILE_FOR_CONTACT } from "@/constants";
 import type { UserMessage } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, Send, CornerDownRight, User, Shield } from 'lucide-react';
+import { Mail, Send, CornerDownRight, User, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+
+const ITEMS_PER_PAGE = 5;
 
 interface Conversation {
   userEmail: string;
@@ -28,10 +30,11 @@ interface Conversation {
 
 export default function AdminMessagesPage() {
   const { toast } = useToast();
-  const [forceUpdate, setForceUpdate] = useState(0); // To trigger re-calculation of memos
+  const [forceUpdate, setForceUpdate] = useState(0); 
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [replyText, setReplyText] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const groupedMessages = useMemo(() => {
     const groups: Record<string, UserMessage[]> = {};
@@ -44,9 +47,9 @@ export default function AdminMessagesPage() {
         groups[msg.userEmail].push(msg);
     });
     return groups;
-  }, [forceUpdate]); // Depend on MOCK_USER_MESSAGES via forceUpdate
+  }, [forceUpdate]); 
 
-  const conversationList = useMemo((): Conversation[] => {
+  const allConversationList = useMemo((): Conversation[] => {
     return Object.entries(groupedMessages).map(([userEmail, messages]) => {
         const lastMessage = messages[messages.length - 1];
         let convStatus: UserMessage['status'] = 'read';
@@ -54,15 +57,14 @@ export default function AdminMessagesPage() {
         if (lastMessage.senderType === 'user') {
             const adminRepliesExist = messages.some(m => m.senderType === 'admin' && m.timestamp > lastMessage.timestamp);
             if (!adminRepliesExist) {
-                convStatus = lastMessage.status; // 'new' or 'read' if user sent last and no newer admin reply
+                convStatus = lastMessage.status; 
             } else {
-                convStatus = 'replied'; // Admin has replied after user's last message
+                convStatus = 'replied'; 
             }
-        } else { // Last message is from admin
+        } else { 
             convStatus = 'replied';
         }
         
-        // If any user message in the thread is 'new' and there's no admin reply *after* it, the conversation is 'new'.
         const latestUserNewMessage = messages.slice().reverse().find(m => m.senderType === 'user' && m.status === 'new');
         if (latestUserNewMessage) {
             const hasAdminRepliedAfterIt = messages.some(m => m.senderType === 'admin' && m.timestamp > latestUserNewMessage.timestamp);
@@ -82,12 +84,27 @@ export default function AdminMessagesPage() {
             status: convStatus,
         };
     }).sort((a,b) => {
-        // Prioritize 'new' conversations, then by last message time
         if (a.status === 'new' && b.status !== 'new') return -1;
         if (b.status === 'new' && a.status !== 'new') return 1;
         return b.lastMessageTimestamp.getTime() - a.lastMessageTimestamp.getTime();
     });
   }, [groupedMessages]);
+
+  const totalPages = Math.ceil(allConversationList.length / ITEMS_PER_PAGE);
+
+  const paginatedConversationList = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return allConversationList.slice(startIndex, endIndex);
+  }, [currentPage, allConversationList]);
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  };
 
 
   const handleViewConversation = (conversation: Conversation) => {
@@ -95,8 +112,6 @@ export default function AdminMessagesPage() {
     setReplyText('');
     setIsModalOpen(true);
 
-    // Mark user messages in this conversation as 'read' if they were 'new'
-    // and an admin is viewing it
     let updated = false;
     MOCK_USER_MESSAGES.forEach(msg => {
         if (msg.userEmail === conversation.userEmail && msg.senderType === 'user' && msg.status === 'new') {
@@ -119,33 +134,31 @@ export default function AdminMessagesPage() {
 
     const newAdminMessage: UserMessage = {
       id: `msg-${Date.now()}`,
-      userName: selectedConversation.userName, // Keep context of original user
+      userName: selectedConversation.userName, 
       userEmail: selectedConversation.userEmail,
-      subject: `Re: ${selectedConversation.subject}`, // Or maintain original subject
+      subject: `Re: ${selectedConversation.subject}`, 
       messageBody: replyText,
       timestamp: new Date(),
-      status: 'replied', // This admin message itself is a reply
+      status: 'replied', 
       senderType: 'admin',
       adminName: 'Admin Support', 
     };
 
     MOCK_USER_MESSAGES.push(newAdminMessage);
     
-    // Mark previous user messages in this conversation as 'replied'
      MOCK_USER_MESSAGES.forEach(msg => {
         if (msg.userEmail === selectedConversation.userEmail && msg.senderType === 'user' && (msg.status === 'new' || msg.status === 'read')) {
             msg.status = 'replied';
         }
     });
 
-    setForceUpdate(p => p + 1); // Trigger re-render and re-calculation of conversation list
+    setForceUpdate(p => p + 1); 
     
     toast({
       title: "Reply Sent",
       description: `Your reply to ${selectedConversation.userName} has been sent.`,
     });
     
-    // Update selectedConversation with the new message for immediate modal update
     setSelectedConversation(prev => prev ? {
         ...prev,
         messages: [...prev.messages, newAdminMessage].sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime()),
@@ -153,7 +166,7 @@ export default function AdminMessagesPage() {
         lastMessageTimestamp: newAdminMessage.timestamp,
         lastMessageSnippet: `${newAdminMessage.senderType === 'admin' ? 'Admin: ' : ''}${newAdminMessage.messageBody.substring(0, 40)}${newAdminMessage.messageBody.length > 40 ? "..." : ""}`,
     } : null);
-    setReplyText(''); // Clear reply box
+    setReplyText(''); 
   };
 
   return (
@@ -166,13 +179,13 @@ export default function AdminMessagesPage() {
         <CardHeader>
           <CardTitle>Message Threads</CardTitle>
           <CardDescription>
-            Showing {conversationList.length} conversation(s).
+            Showing {paginatedConversationList.length} of {allConversationList.length} conversation(s).
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {conversationList.length > 0 ? (
+          {paginatedConversationList.length > 0 ? (
             <div className="space-y-3">
-              {conversationList.map((conv) => (
+              {paginatedConversationList.map((conv) => (
                 <Card 
                     key={conv.userEmail} 
                     className="hover:shadow-md transition-shadow cursor-pointer"
@@ -215,6 +228,29 @@ export default function AdminMessagesPage() {
             <p className="text-center text-muted-foreground py-8">No messages yet.</p>
           )}
         </CardContent>
+         {totalPages > 1 && (
+          <CardFooter className="flex justify-center items-center space-x-4 py-4">
+            <Button
+              variant="outline"
+              onClick={handlePreviousPage}
+              disabled={currentPage === 1}
+              size="sm"
+            >
+              <ChevronLeft className="mr-2 h-4 w-4" /> Previous
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+              size="sm"
+            >
+              Next <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+          </CardFooter>
+        )}
       </Card>
 
       <Dialog open={isModalOpen} onOpenChange={(isOpen) => {
@@ -277,4 +313,3 @@ export default function AdminMessagesPage() {
     </>
   );
 }
-

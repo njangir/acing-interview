@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -23,12 +23,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { MOCK_BOOKINGS, MOCK_SERVICES } from "@/constants";
 import type { Booking } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck, PlusCircle, CalendarIcon, Edit, Filter, InfoIcon, Video } from 'lucide-react';
-import { Badge as UiBadge } from '@/components/ui/badge'; // Renamed to avoid conflict
+import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck, PlusCircle, CalendarIcon, Edit, Filter, InfoIcon, Video, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Badge as UiBadge } from '@/components/ui/badge'; 
 import { cn } from '@/lib/utils';
 import { format, parse } from 'date-fns';
 import Link from 'next/link';
 import { ScrollArea } from '@/components/ui/scroll-area';
+
+const ITEMS_PER_PAGE = 7;
 
 const createBookingFormSchema = z.object({
   userEmails: z.string().min(1, { message: "At least one email address is required." }),
@@ -58,6 +60,7 @@ export default function AdminBookingsPage() {
   const [isEditBookingModalOpen, setIsEditBookingModalOpen] = useState(false);
   const [isCreateBookingModalOpen, setIsCreateBookingModalOpen] = useState(false);
   const [filterServiceId, setFilterServiceId] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [isCancelAlertOpen, setIsCancelAlertOpen] = useState(false);
   const [bookingToCancel, setBookingToCancel] = useState<Booking | null>(null);
@@ -121,7 +124,7 @@ export default function AdminBookingsPage() {
     } else if (action === 'approve_refund' && bookingToUpdate.paymentStatus === 'paid' && bookingToUpdate.requestedRefund) {
       message = `Refund for booking ${bookingId} approved. Booking cancelled.`;
       bookingToUpdate.status = 'cancelled';
-      bookingToUpdate.paymentStatus = 'pay_later_unpaid'; // Mark as unpaid/refunded
+      bookingToUpdate.paymentStatus = 'pay_later_unpaid'; 
       bookingToUpdate.requestedRefund = false;
       bookingUpdated = true;
     }
@@ -245,7 +248,7 @@ export default function AdminBookingsPage() {
     setSelectedBookingForEdit(null);
   }
 
-  const getFilteredBookings = () => {
+  const filteredBookings = useMemo(() => {
     let bookings = [...MOCK_BOOKINGS].sort((a, b) => {
       if (a.status === 'pending_approval' && b.status !== 'pending_approval') return -1;
       if (b.status === 'pending_approval' && a.status !== 'pending_approval') return 1;
@@ -258,9 +261,27 @@ export default function AdminBookingsPage() {
       bookings = bookings.filter(booking => booking.serviceId === filterServiceId);
     }
     return bookings;
+  }, [forceUpdate, filterServiceId]); 
+
+  const totalPages = Math.ceil(filteredBookings.length / ITEMS_PER_PAGE);
+
+  const paginatedBookings = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return filteredBookings.slice(startIndex, endIndex);
+  }, [currentPage, filteredBookings]);
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
   };
 
-  const currentFilteredBookings = getFilteredBookings();
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  };
+
+  useEffect(() => {
+    setCurrentPage(1); // Reset to first page when filter changes
+  }, [filterServiceId]);
 
 
   return (
@@ -291,7 +312,7 @@ export default function AdminBookingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>All Bookings</CardTitle>
-          <CardDescription>View and manage all bookings. Showing: {currentFilteredBookings.length}</CardDescription>
+          <CardDescription>View and manage all bookings. Showing: {paginatedBookings.length} of {filteredBookings.length}</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -308,7 +329,7 @@ export default function AdminBookingsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {currentFilteredBookings.length > 0 ? currentFilteredBookings.map((booking) => {
+              {paginatedBookings.length > 0 ? paginatedBookings.map((booking) => {
                 const showAsAddLink = booking.status === 'accepted' && booking.paymentStatus === 'paid' && !booking.meetingLink;
                 return (
                 <TableRow key={booking.id}>
@@ -432,6 +453,29 @@ export default function AdminBookingsPage() {
             </TableBody>
           </Table>
         </CardContent>
+        {totalPages > 1 && (
+          <CardFooter className="flex justify-center items-center space-x-4 py-4">
+            <Button
+              variant="outline"
+              onClick={handlePreviousPage}
+              disabled={currentPage === 1}
+              size="sm"
+            >
+              <ChevronLeft className="mr-2 h-4 w-4" /> Previous
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+              size="sm"
+            >
+              Next <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+          </CardFooter>
+        )}
       </Card>
 
        <AlertDialog open={isCancelAlertOpen} onOpenChange={setIsCancelAlertOpen}>
@@ -751,5 +795,3 @@ export default function AdminBookingsPage() {
     </>
   );
 }
-
-    
