@@ -4,16 +4,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'; // Added SheetHeader, SheetTitle
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Menu, LogIn, UserPlus, ShieldCheck, LayoutDashboard, LogOut, Home, Briefcase, UserCircle, BookCheck, Award, MessageSquare, Bell } from 'lucide-react';
+import { Menu, LogIn, UserPlus, ShieldCheck, LayoutDashboard, LogOut, Home, Briefcase, UserCircle, BookCheck, Award, MessageSquare, Bell, X as XIcon } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Logo } from '@/components/icons/logo';
 import { useAuth } from '@/hooks/use-auth';
 import { usePathname } from 'next/navigation';
-import { DASHBOARD_NAV_LINKS, ADMIN_DASHBOARD_NAV_LINKS, MOCK_BOOKINGS, MOCK_USER_MESSAGES, MOCK_SERVICES } from '@/constants';
+import { DASHBOARD_NAV_LINKS, ADMIN_DASHBOARD_NAV_LINKS, MOCK_BOOKINGS, MOCK_USER_MESSAGES } from '@/constants';
 import type { Booking, UserMessage } from '@/types';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -43,19 +43,24 @@ export function Header() {
   const isLoggedIn = !!currentUser;
   const pathname = usePathname();
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
+  const [isMounted, setIsMounted] = useState(false); // For client-side rendering
 
   const [notificationCount, setNotificationCount] = useState(0);
   const [notificationsToShow, setNotificationsToShow] = useState<NotificationItem[]>([]);
   const [isNotificationPopoverOpen, setIsNotificationPopoverOpen] = useState(false);
 
+  useEffect(() => {
+    setIsMounted(true); // Component is mounted, safe to render client-side components
+  }, []);
+
   const getSeenNotifications = useCallback((): string[] => {
-    if (!currentUser) return [];
+    if (typeof window === 'undefined' || !currentUser) return [];
     const seen = localStorage.getItem(`seenNotifications_${currentUser.email}`);
     return seen ? JSON.parse(seen) : [];
   }, [currentUser]);
 
   const calculateNotifications = useCallback(() => {
-    if (!isLoggedIn || isAdmin || !currentUser) {
+    if (typeof window === 'undefined' || !isLoggedIn || isAdmin || !currentUser) {
       setNotificationCount(0);
       setNotificationsToShow([]);
       return;
@@ -72,15 +77,16 @@ export function Header() {
         const href = '/dashboard/bookings';
         const serviceName = booking.serviceName.length > 20 ? booking.serviceName.substring(0, 17) + '...' : booking.serviceName;
 
+        const initialBookingWasPaid = initialBookingWasPaidCheck(booking.id); // Simplified
+
         if ((booking.status === 'accepted' || booking.status === 'scheduled')) {
           eventId = getNotificationEventId(booking.id, 'booking', booking.status);
           message = `Booking for '${serviceName}' is ${booking.status}.`;
-           // Check if the link was *just* added or status *just* changed to scheduled with link
            const linkAddedEventId = getNotificationEventId(booking.id, 'booking', 'link_added');
            if (booking.meetingLink && !seenNotifications.includes(linkAddedEventId) && booking.paymentStatus === 'paid') {
-               eventId = linkAddedEventId; // Prioritize link added notification
+               eventId = linkAddedEventId;
                message = `Meeting link for '${serviceName}' on ${booking.date} is available.`;
-               eventTimestamp = new Date(); // Use current time for "just now" feel
+               eventTimestamp = new Date(); // Use current time for fresh notification
            }
         } else if (booking.status === 'cancelled') {
           eventId = getNotificationEventId(booking.id, 'booking', 'cancelled');
@@ -91,18 +97,18 @@ export function Header() {
           if (!seenNotifications.includes(feedbackReadyEventId)){
             eventId = feedbackReadyEventId;
             message = `Feedback/Report for '${serviceName}' is ready.`;
-            eventTimestamp = new Date(); 
+            eventTimestamp = new Date();
           }
         }
         
-        // Refund processed notification
-        if (booking.requestedRefund === false && booking.status === 'cancelled' && booking.paymentStatus === 'pay_later_unpaid') {
+        if (initialBookingWasPaid && booking.requestedRefund === false && booking.status === 'cancelled' && booking.paymentStatus === 'pay_later_unpaid') {
             const refundEventId = getNotificationEventId(booking.id, 'booking', 'refund_processed');
-            if (!seenNotifications.includes(refundEventId)) {
+            const alreadyNotifiedRefund = currentActiveNotifications.some(n => n.id === refundEventId) || seenNotifications.includes(refundEventId);
+            if (!alreadyNotifiedRefund) {
                  currentActiveNotifications.push({
                     id: refundEventId,
                     message: `Your refund for '${serviceName}' has been processed.`,
-                    timestamp: new Date(), 
+                    timestamp: new Date(),
                     href,
                     type: 'booking',
                  });
@@ -110,17 +116,15 @@ export function Header() {
         }
 
 
-        if (eventId && message && !seenNotifications.includes(eventId)) {
+        if (eventId && message && !seenNotifications.includes(eventId) && !currentActiveNotifications.some(n=>n.id === eventId)) {
           currentActiveNotifications.push({ id: eventId, message, timestamp: eventTimestamp, href, type: 'booking' });
         }
       }
     });
 
-    // Message notifications
     const userMessageThreads: { [key: string]: UserMessage[] } = {};
      MOCK_USER_MESSAGES.forEach(msg => {
         if (msg.userEmail === currentUser.email) {
-            // Group by original subject to form a thread
             const threadKey = msg.userEmail + (msg.subject.startsWith("Re:") ? msg.subject.substring(3).trim() : msg.subject.trim());
             if (!userMessageThreads[threadKey]) {
                  userMessageThreads[threadKey] = [];
@@ -134,12 +138,12 @@ export function Header() {
         if (lastMessage && lastMessage.senderType === 'admin') {
             const eventId = getNotificationEventId(lastMessage.id, 'message', 'admin_reply');
             const subjectSnippet = lastMessage.subject.replace('Re: ','').substring(0,25);
-            if (!seenNotifications.includes(eventId)) {
+            if (!seenNotifications.includes(eventId)  && !currentActiveNotifications.some(n=>n.id === eventId)) {
                 currentActiveNotifications.push({
                     id: eventId,
                     message: `Admin replied in: "${subjectSnippet}${subjectSnippet.length === 25 ? '...' : ''}"`,
                     timestamp: lastMessage.timestamp,
-                    href: '/dashboard/contact', // Or a specific message thread page if implemented
+                    href: '/dashboard/contact',
                     type: 'message',
                 });
             }
@@ -153,27 +157,34 @@ export function Header() {
 
   }, [isLoggedIn, isAdmin, currentUser, getSeenNotifications]);
 
+  // Placeholder for a more robust check if a booking was originally paid
+  const initialBookingWasPaidCheck = (bookingId: string): boolean => {
+    // In a real app, you'd check historical payment status or have a flag
+    const booking = MOCK_BOOKINGS.find(b => b.id === bookingId);
+    return booking?.transactionId !== null; // Simple check: if it had a transactionId, it was paid
+  };
 
   useEffect(() => {
     calculateNotifications();
-  }, [calculateNotifications, pathname]); 
-
- const handlePopoverOpenChange = (open: boolean) => {
-    setIsNotificationPopoverOpen(open);
-    if (!open) { // When popover closes
-        calculateNotifications(); // Recalculate to ensure badge is up-to-date
-    }
-  };
+  }, [calculateNotifications, pathname]);
 
   const handleNotificationClick = (notificationId: string) => {
-    if (!currentUser) return;
+    if (typeof window === 'undefined' || !currentUser) return;
 
     const seenNotifications = getSeenNotifications();
     const updatedSeenNotifications = Array.from(new Set([...seenNotifications, notificationId]));
     localStorage.setItem(`seenNotifications_${currentUser.email}`, JSON.stringify(updatedSeenNotifications));
     
-    // Instead of closing popover, just re-calculate to update list and count
-    calculateNotifications(); 
+    calculateNotifications(); // Recalculate to update list and count
+    // Popover can stay open or be closed based on UX preference
+    // setIsNotificationPopoverOpen(false); 
+  };
+
+  const handlePopoverOpenChange = (open: boolean) => {
+    setIsNotificationPopoverOpen(open);
+    if (open) { // When popover is opened, recalculate to show the latest
+        calculateNotifications();
+    }
   };
 
 
@@ -224,7 +235,7 @@ export function Header() {
   };
 
   const getOverallNotificationsLink = () => {
-    if (notificationsToShow.length === 0) return "/dashboard"; // Fallback if no active notifs shown
+    if (notificationsToShow.length === 0) return "/dashboard";
     const bookingNotifs = notificationsToShow.filter(n => n.type === 'booking').length;
     const messageNotifs = notificationsToShow.filter(n => n.type === 'message').length;
     if (bookingNotifs >= messageNotifs) return "/dashboard/bookings";
@@ -278,8 +289,24 @@ export function Header() {
                       <span className="sr-only">Notifications</span>
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-80 p-0" align="end">
-                    <div className="p-3 font-medium border-b">Notifications</div>
+                  <PopoverContent 
+                    className="w-80 sm:w-96 p-0" 
+                    align="end" 
+                    side="bottom"
+                    sideOffset={8}
+                  >
+                    <div className="flex justify-between items-center p-3 border-b">
+                        <h3 className="font-medium text-sm">Notifications</h3>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6" 
+                            onClick={() => setIsNotificationPopoverOpen(false)}
+                            aria-label="Close notifications"
+                        >
+                            <XIcon className="h-4 w-4" />
+                        </Button>
+                    </div>
                     <ScrollArea className="h-auto max-h-80 custom-scrollbar">
                       {notificationsToShow.length > 0 ? (
                         notificationsToShow.map((item) => (
@@ -289,9 +316,6 @@ export function Header() {
                             className="block p-3 hover:bg-accent/50 text-sm"
                             onClick={() => {
                               handleNotificationClick(item.id);
-                              // Navigation is handled by Link, popover can stay open or close
-                              // If you want to close it on click:
-                              // setIsNotificationPopoverOpen(false);
                             }} 
                           >
                             <p className="truncate font-medium text-foreground">{item.message}</p>
@@ -310,7 +334,7 @@ export function Header() {
                          <div className="p-2 border-t text-center">
                             <Button variant="link" size="sm" asChild onClick={() => setIsNotificationPopoverOpen(false)}>
                                 <Link href={getOverallNotificationsLink()}>
-                                  View All
+                                  View All in Dashboard
                                 </Link>
                             </Button>
                         </div>
@@ -348,94 +372,97 @@ export function Header() {
               </Button>
            )}
         </div>
-        <div className="md:hidden ml-2">
-          <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Menu className="h-6 w-6" />
-                <span className="sr-only">Toggle navigation menu</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[280px] sm:w-[320px] p-0 flex flex-col"> {/* Added flex flex-col */}
-              <SheetHeader className="p-4 border-b">
-                <SheetTitle>Menu</SheetTitle>
-              </SheetHeader>
-              <ScrollArea className="flex-grow"> {/* Added flex-grow */}
-                <nav className="grid gap-2 text-base font-medium p-4">
-                  <Link href="/" className="flex items-center gap-2 text-lg font-semibold mb-4" onClick={() => setIsSheetOpen(false)}>
-                    <Logo />
-                  </Link>
+        {isMounted && ( // Conditionally render mobile menu trigger
+            <div className="md:hidden ml-2">
+            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                    <Menu className="h-6 w-6" />
+                    <span className="sr-only">Toggle navigation menu</span>
+                </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-[280px] sm:w-[320px] p-0 flex flex-col">
+                <SheetHeader className="p-4 border-b">
+                    <SheetTitle>Menu</SheetTitle>
+                </SheetHeader>
+                <ScrollArea className="flex-grow">
+                    <nav className="grid gap-2 text-base font-medium p-4">
+                    <Link href="/" className="flex items-center gap-2 text-lg font-semibold mb-4" onClick={() => setIsSheetOpen(false)}>
+                        <Logo />
+                    </Link>
 
-                  {contextualNavItems.length > 0 && (
-                    <>
-                        <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">{contextualNavTitle}</h3>
-                        {renderNavLinks(contextualNavItems)}
-                        <Separator className="my-2" />
-                        <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">Main Menu</h3>
-                        {renderNavLinks(mainSiteNavItems)}
-                    </>
-                  )}
+                    {contextualNavItems.length > 0 && (
+                        <>
+                            <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">{contextualNavTitle}</h3>
+                            {renderNavLinks(contextualNavItems)}
+                            <Separator className="my-2" />
+                            <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">Main Menu</h3>
+                            {renderNavLinks(mainSiteNavItems)}
+                        </>
+                    )}
 
-                  {contextualNavItems.length === 0 && (
-                     <>
-                        <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">{contextualNavTitle}</h3>
-                        {renderNavLinks(mainSiteNavItems)}
-                     </>
-                  )}
-                  
-                  {isLoggedIn && !isAdmin && !isDashboardPath && !contextualNavItems.some(item => item.href.startsWith('/dashboard')) && (
-                    <Link
-                        href="/dashboard"
-                        className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
-                                      (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) && "bg-primary/10 text-primary"
+                    {contextualNavItems.length === 0 && (
+                        <>
+                            <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">{contextualNavTitle}</h3>
+                            {renderNavLinks(mainSiteNavItems)}
+                        </>
+                    )}
+                    
+                    {isLoggedIn && !isAdmin && !isDashboardPath && !contextualNavItems.some(item => item.href.startsWith('/dashboard')) && (
+                        <Link
+                            href="/dashboard"
+                            className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
+                                        (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) && "bg-primary/10 text-primary"
+                            )}
+                            onClick={() => setIsSheetOpen(false)}
+                        >
+                            <LayoutDashboard className="h-5 w-5" />
+                            Officer Candidate HQ
+                        </Link>
+                    )}
+
+                    {isAdmin && !isAdminPath && (
+                        <Link
+                            href="/admin"
+                            className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary mt-2 border-t pt-3",
+                                            isAdminPath && "bg-primary/10 text-primary")}
+                            onClick={() => setIsSheetOpen(false)}
+                            >
+                            <ShieldCheck className="h-5 w-5" /> Admin Command
+                        </Link>
+                    )}
+
+                    <div className="pt-4 mt-2 border-t">
+                        {isLoggedIn ? (
+                            <Button variant="outline" size="sm" onClick={() => { logout(); setIsSheetOpen(false);}} className="w-full">
+                                <LogOut className="mr-2 h-4 w-4" /> Log Out
+                            </Button>
+                        ) : (
+                            <div className="space-y-2">
+                                <Button asChild size="sm" className="w-full">
+                                    <Link href="/login" onClick={() => setIsSheetOpen(false)}>
+                                    <LogIn className="mr-2 h-4 w-4" /> Log In
+                                    </Link>
+                                </Button>
+                                <Button asChild size="sm" variant="outline" className="w-full">
+                                    <Link href="/signup" onClick={() => setIsSheetOpen(false)}>
+                                    <UserPlus className="mr-2 h-4 w-4" /> Enlist
+                                    </Link>
+                                </Button>
+                            </div>
                         )}
-                        onClick={() => setIsSheetOpen(false)}
-                      >
-                        <LayoutDashboard className="h-5 w-5" />
-                        Officer Candidate HQ
-                      </Link>
-                  )}
-
-                  {isAdmin && !isAdminPath && (
-                      <Link
-                          href="/admin"
-                          className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary mt-2 border-t pt-3",
-                                        isAdminPath && "bg-primary/10 text-primary")}
-                          onClick={() => setIsSheetOpen(false)}
-                          >
-                          <ShieldCheck className="h-5 w-5" /> Admin Command
-                      </Link>
-                  )}
-
-                  <div className="pt-4 mt-2 border-t"> {/* Adjusted mt-auto */}
-                      {isLoggedIn ? (
-                          <Button variant="outline" size="sm" onClick={() => { logout(); setIsSheetOpen(false);}} className="w-full">
-                              <LogOut className="mr-2 h-4 w-4" /> Log Out
-                          </Button>
-                      ) : (
-                          <div className="space-y-2">
-                              <Button asChild size="sm" className="w-full">
-                                  <Link href="/login" onClick={() => setIsSheetOpen(false)}>
-                                  <LogIn className="mr-2 h-4 w-4" /> Log In
-                                  </Link>
-                              </Button>
-                              <Button asChild size="sm" variant="outline" className="w-full">
-                                  <Link href="/signup" onClick={() => setIsSheetOpen(false)}>
-                                  <UserPlus className="mr-2 h-4 w-4" /> Enlist
-                                  </Link>
-                              </Button>
-                          </div>
-                      )}
-                  </div>
-                </nav>
-              </ScrollArea>
-            </SheetContent>
-          </Sheet>
-        </div>
+                    </div>
+                    </nav>
+                </ScrollArea>
+                </SheetContent>
+            </Sheet>
+            </div>
+        )}
       </div>
     </header>
   );
 }
+    
     
 
     
