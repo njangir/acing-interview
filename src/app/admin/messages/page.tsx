@@ -235,7 +235,7 @@ export default function AdminMessagesPage() {
                     key={message.id} 
                     className={cn(
                         "p-3 rounded-lg max-w-[80%]",
-                        message.senderType === 'user' ? "bg-primary/10 text-primary-foreground self-start mr-auto" : "bg-secondary text-secondary-foreground self-end ml-auto"
+                        message.senderType === 'user' ? "bg-primary/10 text-foreground self-start mr-auto" : "bg-secondary text-secondary-foreground self-end ml-auto"
                     )}
                 >
                     <div className="flex items-center gap-2 mb-1">
@@ -277,3 +277,4 @@ export default function AdminMessagesPage() {
     </>
   );
 }
+
