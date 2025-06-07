@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react'; // Added useEffect
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -17,6 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
 const ITEMS_PER_PAGE = 5;
+const POLLING_INTERVAL = 5000; // 5 seconds
 
 interface Conversation {
   userEmail: string;
@@ -30,11 +31,19 @@ interface Conversation {
 
 export default function AdminMessagesPage() {
   const { toast } = useToast();
-  const [forceUpdate, setForceUpdate] = useState(0); 
+  const [forceUpdate, setForceUpdate] = useState(0);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [replyText, setReplyText] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setForceUpdate(prev => prev + 1);
+    }, POLLING_INTERVAL);
+
+    return () => clearInterval(intervalId); // Cleanup interval on component unmount
+  }, []);
 
   const groupedMessages = useMemo(() => {
     const groups: Record<string, UserMessage[]> = {};
@@ -47,7 +56,7 @@ export default function AdminMessagesPage() {
         groups[msg.userEmail].push(msg);
     });
     return groups;
-  }, [forceUpdate]); 
+  }, [forceUpdate]);
 
   const allConversationList = useMemo((): Conversation[] => {
     return Object.entries(groupedMessages).map(([userEmail, messages]) => {
@@ -57,11 +66,11 @@ export default function AdminMessagesPage() {
         if (lastMessage.senderType === 'user') {
             const adminRepliesExist = messages.some(m => m.senderType === 'admin' && m.timestamp > lastMessage.timestamp);
             if (!adminRepliesExist) {
-                convStatus = lastMessage.status; 
+                convStatus = lastMessage.status;
             } else {
-                convStatus = 'replied'; 
+                convStatus = 'replied';
             }
-        } else { 
+        } else {
             convStatus = 'replied';
         }
         
@@ -134,14 +143,14 @@ export default function AdminMessagesPage() {
 
     const newAdminMessage: UserMessage = {
       id: `msg-${Date.now()}`,
-      userName: selectedConversation.userName, 
+      userName: selectedConversation.userName,
       userEmail: selectedConversation.userEmail,
-      subject: `Re: ${selectedConversation.subject}`, 
+      subject: `Re: ${selectedConversation.subject}`,
       messageBody: replyText,
       timestamp: new Date(),
-      status: 'replied', 
+      status: 'replied',
       senderType: 'admin',
-      adminName: 'Admin Support', 
+      adminName: 'Admin Support',
     };
 
     MOCK_USER_MESSAGES.push(newAdminMessage);
@@ -152,7 +161,7 @@ export default function AdminMessagesPage() {
         }
     });
 
-    setForceUpdate(p => p + 1); 
+    setForceUpdate(p => p + 1);
     
     toast({
       title: "Reply Sent",
@@ -166,7 +175,7 @@ export default function AdminMessagesPage() {
         lastMessageTimestamp: newAdminMessage.timestamp,
         lastMessageSnippet: `${newAdminMessage.senderType === 'admin' ? 'Admin: ' : ''}${newAdminMessage.messageBody.substring(0, 40)}${newAdminMessage.messageBody.length > 40 ? "..." : ""}`,
     } : null);
-    setReplyText(''); 
+    setReplyText('');
   };
 
   return (
@@ -186,8 +195,8 @@ export default function AdminMessagesPage() {
           {paginatedConversationList.length > 0 ? (
             <div className="space-y-3">
               {paginatedConversationList.map((conv) => (
-                <Card 
-                    key={conv.userEmail} 
+                <Card
+                    key={conv.userEmail}
                     className="hover:shadow-md transition-shadow cursor-pointer"
                     onClick={() => handleViewConversation(conv)}
                 >
@@ -200,8 +209,8 @@ export default function AdminMessagesPage() {
                             </CardDescription>
                         </div>
                         <Badge variant={
-                            conv.status === 'new' ? 'destructive' : 
-                            conv.status === 'replied' ? 'default' : 
+                            conv.status === 'new' ? 'destructive' :
+                            conv.status === 'replied' ? 'default' :
                             'secondary'
                         }
                         className={cn(
@@ -267,16 +276,16 @@ export default function AdminMessagesPage() {
           <ScrollArea className="flex-grow p-4 border rounded-md my-4 bg-muted/20 custom-scrollbar">
             <div className="space-y-4">
               {selectedConversation?.messages.map((message) => (
-                <div 
-                    key={message.id} 
+                <div
+                    key={message.id}
                     className={cn(
                         "p-3 rounded-lg max-w-[80%]",
                         message.senderType === 'user' ? "bg-primary/10 text-foreground self-start mr-auto" : "bg-secondary text-secondary-foreground self-end ml-auto"
                     )}
                 >
                     <div className="flex items-center gap-2 mb-1">
-                        {message.senderType === 'user' ? 
-                            <User className="h-4 w-4 text-primary" /> : 
+                        {message.senderType === 'user' ?
+                            <User className="h-4 w-4 text-primary" /> :
                             <Shield className="h-4 w-4 text-accent" />
                         }
                         <span className="font-semibold text-sm">
@@ -313,3 +322,4 @@ export default function AdminMessagesPage() {
     </>
   );
 }
+
