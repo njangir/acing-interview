@@ -107,3 +107,13 @@ export interface UserProfile {
   targetOrganization?: 'Army' | 'Navy' | 'Air Force' | 'Other';
 }
 
+export interface FeedbackSubmissionHistoryEntry {
+  id: string; // Unique ID for the history entry
+  submissionDate: string; // ISO date string
+  bookingId: string;
+  userName: string;
+  serviceName: string;
+  reportFileName?: string;
+  badgeAssignedName?: string;
+  // Optionally, a summary of skill ratings or comments
+}

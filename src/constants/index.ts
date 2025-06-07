@@ -1,5 +1,5 @@
 
-import type { Service, Testimonial, Booking, Resource, MentorProfileData, UserMessage, Badge, UserProfile } from '@/types';
+import type { Service, Testimonial, Booking, Resource, MentorProfileData, UserMessage, Badge, UserProfile, FeedbackSubmissionHistoryEntry } from '@/types';
 import { Shield, Video, FileText, Link as LinkIcon, CalendarDays, Users, UserSquare2, ListChecks, Edit3, UploadCloud, BookCopy, MessageSquare, UserCog, CalendarPlus, MailQuestion, MessagesSquare, Award, Edit2Icon, DownloadCloud, Sparkles } from 'lucide-react';
 
 const today = new Date();
@@ -320,20 +320,21 @@ export const AVAILABLE_SLOTS: Record<string, string[]> = {
 
 export const MENTOR_PROFILE: MentorProfileData = {
   name: "Kanika Sharma",
-  title: "SSB Mentor & Defence Enthusiast",
+  title: "SSB Mentor | Defence Enthusiast | National Security Professional",
   imageUrl: "https://placehold.co/300x300.png",
   dataAiHint: "female mentor portrait",
-  bio: "I’m Kanika Sharma, a passionate defence aspirant turned mentor with a track record of 4 SSB recommendations for the Indian Army and Indian Air Force, including the prestigious Flying Branch. Currently serving in one of the top national security departments of the Government of India. Though I may not wear the uniform, I work every day with the mission to secure the nation and now dedicate myself to helping the next generation of officers in uniform. My mission is to empower and guide young Indians who dream of joining the armed forces — with not just knowledge, but clarity, confidence, and courage. Let me help you turn your dream into your destiny. Jai Hind 🇮🇳",
+  bio: "I’m Kanika Sharma, a passionate defence aspirant turned mentor with a track record of 4 SSB recommendations for the Indian Army and Indian Air Force, including the prestigious Flying Branch.\n\t•\t✅ First woman candidate to be recommended for the IAF Flying Branch through NCC Entry\n\t•\t✅ Cleared the challenging CPSS (Computerized Pilot Selection System) exam — a gateway to becoming a military pilot in the Indian Air Force\n\t•\t✅ NCC ‘C’ Certificate holder, trained, tested, and trusted under the nation’s finest leadership framework\n\t•\t✅ Currently serving in one of the top national security departments of the Government of India\n\nThough I may not wear the uniform, I work every day with the mission to secure the nation and now dedicate myself to helping the next generation of officers in uniform.",
   experience: [
     "4 SSB recommendations for the Indian Army and Indian Air Force",
     "First woman candidate to be recommended for the IAF Flying Branch through NCC Entry",
-    "Cleared the challenging CPSS (Computerized Pilot Selection System) exam — a gateway to becoming a military pilot in the Indian Air Force",
-    "NCC ‘C’ Certificate holder, trained, tested, and trusted under the nation’s finest leadership framework",
+    "Cleared the challenging CPSS (Computerized Pilot Selection System) exam",
+    "NCC ‘C’ Certificate holder",
+    "Currently serving in a top national security department of the Government of India",
   ],
-  philosophy: "I’ve walked your path, faced the Service Selection Board, and cracked it four times. I know exactly what it takes — and more importantly, what not to do. My mentorship is for serious aspirants who want to understand OLQs (Officer-Like Qualities) at a deeper level, master the psych tests, GTO tasks, and personal interviews, build the right mindset and personality for selection, get real, honest feedback and personalized strategy, and be mentored by someone who’s lived the journey.",
+  philosophy: "I’ve walked your path, faced the Service Selection Board, and cracked it four times. I know exactly what it takes — and more importantly, what not to do. My mentorship is for serious aspirants who want to:\n\t•\t✅ Understand OLQs (Officer-Like Qualities) at a deeper level\n\t•\t✅ Master the psych tests, GTO tasks, and personal interviews\n\t•\t✅ Build the right mindset and personality for selection\n\t•\t✅ Get real, honest feedback and personalized strategy\n\t•\t✅ Be mentored by someone who’s lived the journey",
   quote: "You don’t need a uniform to serve the nation — but if you wear one in your dreams, I’m here to guide you to it.",
-  contactEmail: "kanika.sharma.mentor@example.com",
-  contactPhone: "+91 98765 43210"
+  contactEmail: "kanika.sharma.mentor@armedforcesinterviewace.com", // Placeholder
+  contactPhone: "+91 9000000000" // Placeholder
 };
 
 export const MOCK_USER_MESSAGES: UserMessage[] = [
@@ -460,3 +461,6 @@ export const SKILL_RATING_VALUES: Record<string, number> = {
 
 export const MAX_SKILL_RATING_VALUE = 7;
 export const TARGET_SKILL_RATING_VALUE = 4; // Represents "Good"
+
+
+export const MOCK_SUBMISSION_HISTORY: FeedbackSubmissionHistoryEntry[] = [];

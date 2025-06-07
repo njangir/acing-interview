@@ -9,11 +9,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MOCK_BOOKINGS, MOCK_BADGES, MOCK_SERVICES, PREDEFINED_SKILLS, SKILL_RATINGS, SKILL_RATING_VALUES, MAX_SKILL_RATING_VALUE } from "@/constants";
-import type { Booking, Badge as BadgeType, Service } from '@/types';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge as UiBadge } from '@/components/ui/badge';
+import { MOCK_BOOKINGS, MOCK_BADGES, MOCK_SERVICES, PREDEFINED_SKILLS, SKILL_RATINGS, SKILL_RATING_VALUES, MAX_SKILL_RATING_VALUE, MOCK_SUBMISSION_HISTORY } from "@/constants";
+import type { Booking, Badge as BadgeType, Service, FeedbackSubmissionHistoryEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { UploadCloud, AwardIcon, Star } from 'lucide-react';
+import { UploadCloud, AwardIcon, Star, History, ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { format } from 'date-fns';
+
+const ITEMS_PER_PAGE_HISTORY = 5;
 
 export default function AdminReportsPage() {
   const { toast } = useToast();
@@ -23,6 +28,14 @@ export default function AdminReportsPage() {
   const [selectedBadgeId, setSelectedBadgeId] = useState<string>('');
   const [skillRatingsData, setSkillRatingsData] = useState<Record<string, string>>({});
   const [currentUserAverageSkills, setCurrentUserAverageSkills] = useState<Record<string, { averageRatingValue: number; ratingCount: number }>>({});
+
+  const [submissionHistory, setSubmissionHistory] = useState<FeedbackSubmissionHistoryEntry[]>([]);
+  const [currentHistoryPage, setCurrentHistoryPage] = useState(1);
+
+  useEffect(() => {
+    // Sort by most recent first
+    setSubmissionHistory([...MOCK_SUBMISSION_HISTORY].sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime()));
+  }, []); // Load initial history
 
   const completedBookings = useMemo(() => {
     return MOCK_BOOKINGS.filter(booking => booking.status === 'completed');
@@ -102,7 +115,7 @@ export default function AdminReportsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedBookingId) {
+    if (!selectedBookingId || !selectedBookingDetails) {
       toast({
         title: "Missing Information",
         description: "Please select a booking.",
@@ -155,6 +168,19 @@ export default function AdminReportsPage() {
         localStorage.setItem(mockUserProfileKey, JSON.stringify(userProfile));
         console.log(`Assigned badge "${assignedBadge.name}" to user ${selectedBookingDetails.userName} (simulated)`);
     }
+
+    // Add to history
+    const historyEntry: FeedbackSubmissionHistoryEntry = {
+      id: `hist-${Date.now()}`,
+      submissionDate: new Date().toISOString(),
+      bookingId: selectedBookingId,
+      userName: selectedBookingDetails.userName,
+      serviceName: selectedBookingDetails.serviceName,
+      reportFileName: reportFile ? reportFile.name : (selectedBookingDetails.reportUrl ? selectedBookingDetails.reportUrl.split('/').pop() : undefined),
+      badgeAssignedName: assignedBadge ? assignedBadge.name : undefined,
+    };
+    MOCK_SUBMISSION_HISTORY.unshift(historyEntry); // Add to the beginning for most recent first
+    setSubmissionHistory([...MOCK_SUBMISSION_HISTORY].sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime()));
     
     toast({
       title: "Feedback Processed",
@@ -171,13 +197,30 @@ export default function AdminReportsPage() {
     if (fileInput) fileInput.value = '';
   };
 
+  // Pagination for History
+  const totalHistoryPages = Math.ceil(submissionHistory.length / ITEMS_PER_PAGE_HISTORY);
+  const paginatedHistory = useMemo(() => {
+    const startIndex = (currentHistoryPage - 1) * ITEMS_PER_PAGE_HISTORY;
+    const endIndex = startIndex + ITEMS_PER_PAGE_HISTORY;
+    return submissionHistory.slice(startIndex, endIndex);
+  }, [currentHistoryPage, submissionHistory]);
+
+  const handlePreviousHistoryPage = () => {
+    setCurrentHistoryPage((prev) => Math.max(prev - 1, 1));
+  };
+
+  const handleNextHistoryPage = () => {
+    setCurrentHistoryPage((prev) => Math.min(prev + 1, totalHistoryPages));
+  };
+
+
   return (
     <>
       <PageHeader
-        title="Upload Feedback Report & Assign Badge"
+        title="Upload Feedback Report &amp; Assign Badge"
         description="Upload PDF feedback reports for completed booking sessions, provide skill ratings, and optionally assign an achievement badge."
       />
-      <Card className="max-w-2xl mx-auto">
+      <Card className="max-w-2xl mx-auto mb-8">
         <CardHeader>
           <CardTitle>Process Completed Session</CardTitle>
           <CardDescription>Select a booking, upload the report, rate skills, and assign a badge if applicable.</CardDescription>
@@ -290,12 +333,87 @@ export default function AdminReportsPage() {
           </CardContent>
           <CardFooter>
             <Button type="submit" className="w-full" disabled={!selectedBookingId}>
-              <UploadCloud className="mr-2 h-4 w-4" /> Save Feedback & {reportFile ? "Upload Report" : "Update Details"}
+              <UploadCloud className="mr-2 h-4 w-4" /> Save Feedback &amp; {reportFile ? "Upload Report" : "Update Details"}
             </Button>
           </CardFooter>
         </form>
       </Card>
+
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle className="flex items-center"><History className="mr-2 h-5 w-5 text-primary" /> Submission History</CardTitle>
+          <CardDescription>History of all feedback and report submissions. Showing {paginatedHistory.length} of {submissionHistory.length} entries.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Submitted On</TableHead>
+                <TableHead>Booking ID</TableHead>
+                <TableHead>User Name</TableHead>
+                <TableHead>Service</TableHead>
+                <TableHead>Report File</TableHead>
+                <TableHead>Badge Assigned</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginatedHistory.length > 0 ? paginatedHistory.map((entry) => (
+                <TableRow key={entry.id}>
+                  <TableCell>{format(new Date(entry.submissionDate), 'MMM d, yyyy - h:mm a')}</TableCell>
+                  <TableCell>{entry.bookingId}</TableCell>
+                  <TableCell>{entry.userName}</TableCell>
+                  <TableCell>{entry.serviceName}</TableCell>
+                  <TableCell>
+                    {entry.reportFileName ? (
+                        <UiBadge variant="secondary" className="flex items-center gap-1 max-w-xs truncate">
+                            <FileSpreadsheet className="h-3 w-3"/> {entry.reportFileName}
+                        </UiBadge>
+                    ) : (
+                        <span className="text-xs text-muted-foreground">N/A</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {entry.badgeAssignedName ? (
+                        <UiBadge variant="outline" className="text-accent-foreground border-accent flex items-center gap-1">
+                            <AwardIcon className="h-3 w-3"/>{entry.badgeAssignedName}
+                        </UiBadge>
+                    ) : (
+                        <span className="text-xs text-muted-foreground">None</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              )) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center h-24">No submission history found.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+        {totalHistoryPages > 1 && (
+          <CardFooter className="flex justify-center items-center space-x-4 py-4">
+            <Button
+              variant="outline"
+              onClick={handlePreviousHistoryPage}
+              disabled={currentHistoryPage === 1}
+              size="sm"
+            >
+              <ChevronLeft className="mr-2 h-4 w-4" /> Previous
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {currentHistoryPage} of {totalHistoryPages}
+            </span>
+            <Button
+              variant="outline"
+              onClick={handleNextHistoryPage}
+              disabled={currentHistoryPage === totalHistoryPages}
+              size="sm"
+            >
+              Next <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+          </CardFooter>
+        )}
+      </Card>
     </>
   );
 }
-
