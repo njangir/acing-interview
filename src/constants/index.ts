@@ -319,22 +319,21 @@ export const AVAILABLE_SLOTS: Record<string, string[]> = {
 
 
 export const MENTOR_PROFILE: MentorProfileData = {
-  name: "Col. (Retd.) Arjun Singh",
-  title: "Lead Mentor & SSB Expert",
+  name: "Kanika Sharma",
+  title: "SSB Mentor & Defence Enthusiast",
   imageUrl: "https://placehold.co/300x300.png",
-  dataAiHint: "mentor portrait",
-  bio: "Col. (Retd.) Arjun Singh is a seasoned veteran with an illustrious career in the Indian Armed Forces. Having successfully cleared the Services Selection Board (SSB) an exceptional seven times for various entries, he possesses an unparalleled understanding of the selection process. His passion for mentoring and guiding young aspirants has led him to help countless candidates achieve their dreams of joining the forces.",
+  dataAiHint: "female mentor portrait",
+  bio: "I’m Kanika Sharma, a passionate defence aspirant turned mentor with a track record of 4 SSB recommendations for the Indian Army and Indian Air Force, including the prestigious Flying Branch. Currently serving in one of the top national security departments of the Government of India. Though I may not wear the uniform, I work every day with the mission to secure the nation and now dedicate myself to helping the next generation of officers in uniform. My mission is to empower and guide young Indians who dream of joining the armed forces — with not just knowledge, but clarity, confidence, and courage. Let me help you turn your dream into your destiny. Jai Hind 🇮🇳",
   experience: [
-    "7-time SSB cleared (NDA, IMA, OTA, TES, UES, NCC Special Entry, TA)",
-    "Over 20 years of distinguished service in the Indian Army.",
-    "Expert in psychological testing, interview techniques, and GTO tasks.",
-    "Certified assessor and trainer.",
-    "Proven track record of mentoring successful candidates.",
+    "4 SSB recommendations for the Indian Army and Indian Air Force",
+    "First woman candidate to be recommended for the IAF Flying Branch through NCC Entry",
+    "Cleared the challenging CPSS (Computerized Pilot Selection System) exam — a gateway to becoming a military pilot in the Indian Air Force",
+    "NCC ‘C’ Certificate holder, trained, tested, and trusted under the nation’s finest leadership framework",
   ],
-  philosophy: "My approach is to demystify the SSB process and empower candidates with self-awareness and genuine confidence. I focus on honing their innate abilities rather than prescribing coached responses. Success in SSB is about showcasing your true potential, and I am here to help you discover and project that effectively.",
-  quote: "The best way to predict your future is to create it. Let's create yours in the Armed Forces.",
-  contactEmail: "arjun.singh.mentor@example.com",
-  contactPhone: "+91 9988776655"
+  philosophy: "I’ve walked your path, faced the Service Selection Board, and cracked it four times. I know exactly what it takes — and more importantly, what not to do. My mentorship is for serious aspirants who want to understand OLQs (Officer-Like Qualities) at a deeper level, master the psych tests, GTO tasks, and personal interviews, build the right mindset and personality for selection, get real, honest feedback and personalized strategy, and be mentored by someone who’s lived the journey.",
+  quote: "You don’t need a uniform to serve the nation — but if you wear one in your dreams, I’m here to guide you to it.",
+  contactEmail: "kanika.sharma.mentor@example.com",
+  contactPhone: "+91 98765 43210"
 };
 
 export const MOCK_USER_MESSAGES: UserMessage[] = [
