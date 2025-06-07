@@ -24,11 +24,12 @@ import { MOCK_BOOKINGS, MOCK_SERVICES } from "@/constants";
 import type { Booking } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck, PlusCircle, CalendarIcon, Edit, Filter, InfoIcon, Video, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Badge as UiBadge } from '@/components/ui/badge'; 
+import { Badge as UiBadge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { format, parse } from 'date-fns';
 import Link from 'next/link';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
 
 const ITEMS_PER_PAGE = 7;
 
@@ -124,7 +125,7 @@ export default function AdminBookingsPage() {
     } else if (action === 'approve_refund' && bookingToUpdate.paymentStatus === 'paid' && bookingToUpdate.requestedRefund) {
       message = `Refund for booking ${bookingId} approved. Booking cancelled.`;
       bookingToUpdate.status = 'cancelled';
-      bookingToUpdate.paymentStatus = 'pay_later_unpaid'; 
+      bookingToUpdate.paymentStatus = 'pay_later_unpaid';
       bookingToUpdate.requestedRefund = false;
       bookingUpdated = true;
     }
@@ -214,7 +215,7 @@ export default function AdminBookingsPage() {
     }
 
     const bookingToUpdate = MOCK_BOOKINGS[bookingIndex];
-    let newStatus = data.status; 
+    let newStatus = data.status;
 
     if (data.meetingLink) {
       if (newStatus === 'accepted' || newStatus === 'pending_approval') {
@@ -225,7 +226,7 @@ export default function AdminBookingsPage() {
         newStatus = 'accepted';
       }
     }
-    if (data.status === 'upcoming') { 
+    if (data.status === 'upcoming') {
         newStatus = data.meetingLink ? 'scheduled' : 'accepted';
     }
 
@@ -233,7 +234,7 @@ export default function AdminBookingsPage() {
       ...bookingToUpdate,
       date: format(data.date, 'yyyy-MM-dd'),
       time: data.time,
-      meetingLink: data.meetingLink || '', 
+      meetingLink: data.meetingLink || '',
       status: newStatus,
       paymentStatus: data.paymentStatus,
     };
@@ -254,14 +255,14 @@ export default function AdminBookingsPage() {
       if (b.status === 'pending_approval' && a.status !== 'pending_approval') return 1;
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
-      return dateB - dateA; 
+      return dateB - dateA;
     });
 
     if (filterServiceId !== 'all') {
       bookings = bookings.filter(booking => booking.serviceId === filterServiceId);
     }
     return bookings;
-  }, [forceUpdate, filterServiceId]); 
+  }, [forceUpdate, filterServiceId]);
 
   const totalPages = Math.ceil(filteredBookings.length / ITEMS_PER_PAGE);
 
@@ -280,12 +281,12 @@ export default function AdminBookingsPage() {
   };
 
   useEffect(() => {
-    setCurrentPage(1); // Reset to first page when filter changes
+    setCurrentPage(1);
   }, [filterServiceId]);
 
 
   return (
-    <>
+    <TooltipProvider>
       <PageHeader
         title="Manage Booking Requests"
         description="Review, accept, edit, cancel, or create new booking requests."
@@ -318,14 +319,10 @@ export default function AdminBookingsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Booking / Txn ID</TableHead>
-                <TableHead>User</TableHead>
-                <TableHead>Service</TableHead>
-                <TableHead>Date & Time</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Payment</TableHead>
-                <TableHead>Refund Req.</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="w-[25%]">Booking & User Info</TableHead>
+                <TableHead className="w-[25%]">Service & Schedule</TableHead>
+                <TableHead className="w-[25%]">Payment & Refund</TableHead>
+                <TableHead className="w-[25%] text-right">Status & Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -334,18 +331,52 @@ export default function AdminBookingsPage() {
                 return (
                 <TableRow key={booking.id}>
                   <TableCell>
-                    <div className="font-medium text-xs">{booking.id}</div>
+                    <div className="font-medium text-sm">{booking.id}</div>
                     {booking.paymentStatus === 'paid' && booking.transactionId && (
-                        <div className="text-xs text-muted-foreground mt-1">Txn: {booking.transactionId}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">Txn: {booking.transactionId}</div>
                     )}
+                    <div className="font-medium mt-1.5">{booking.userName}</div>
+                    <div className="text-xs text-muted-foreground">{booking.userEmail}</div>
                   </TableCell>
                   <TableCell>
-                    <div className="font-medium">{booking.userName}</div>
-                    <div className="text-sm text-muted-foreground">{booking.userEmail}</div>
+                    <div className="font-medium">{booking.serviceName}</div>
+                    <div className="text-sm text-muted-foreground">
+                        {new Date(booking.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </div>
+                    <div className="text-sm text-muted-foreground">{booking.time}</div>
                   </TableCell>
-                  <TableCell>{booking.serviceName}</TableCell>
-                  <TableCell>{new Date(booking.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} - {booking.time}</TableCell>
                   <TableCell>
+                     <UiBadge variant={booking.paymentStatus === 'paid' ? 'default' : 'secondary'}
+                      className={cn(
+                        "mb-1",
+                        booking.paymentStatus === 'paid' && 'bg-green-100 text-green-700',
+                        booking.paymentStatus === 'pay_later_unpaid' && 'bg-gray-100 text-gray-700 line-through opacity-75',
+                        booking.paymentStatus === 'pay_later_pending' && 'bg-orange-100 text-orange-700'
+                      )}
+                     >
+                       {booking.paymentStatus.replace('_', ' ').toUpperCase()}
+                     </UiBadge>
+                    <div>
+                        {booking.requestedRefund ? (
+                            <UiBadge variant="destructive">REFUND REQ: YES</UiBadge>
+                        ) : (
+                            <UiBadge variant="outline">REFUND REQ: NO</UiBadge>
+                        )}
+                        {booking.requestedRefund && booking.refundReason && (
+                             <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <p className="text-xs text-muted-foreground mt-1 truncate w-32 hover:w-auto hover:whitespace-normal cursor-help">
+                                        Reason: {booking.refundReason}
+                                    </p>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                    <p>{booking.refundReason}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        )}
+                    </div>
+                   </TableCell>
+                  <TableCell className="text-right">
                      <UiBadge
                         variant={
                             booking.status === 'pending_approval' ? 'secondary' :
@@ -355,6 +386,7 @@ export default function AdminBookingsPage() {
                             'destructive'
                         }
                         className={cn(
+                            "mb-1 block w-fit ml-auto", // Make badge block and align right
                             booking.status === 'scheduled' && 'bg-blue-100 text-blue-700',
                             booking.status === 'pending_approval' && 'bg-yellow-100 text-yellow-700',
                             booking.status === 'accepted' && 'bg-orange-100 text-orange-700',
@@ -363,34 +395,9 @@ export default function AdminBookingsPage() {
                     >
                         {booking.status.replace('_', ' ').toUpperCase()}
                     </UiBadge>
-                  </TableCell>
-                   <TableCell>
-                     <UiBadge variant={booking.paymentStatus === 'paid' ? 'default' : 'secondary'}
-                      className={cn(
-                        booking.paymentStatus === 'paid' && 'bg-green-100 text-green-700',
-                        booking.paymentStatus === 'pay_later_unpaid' && 'bg-gray-100 text-gray-700 line-through opacity-75',
-                        booking.paymentStatus === 'pay_later_pending' && 'bg-orange-100 text-orange-700'
-                      )}
-                     >
-                       {booking.paymentStatus.replace('_', ' ').toUpperCase()}
-                     </UiBadge>
-                   </TableCell>
-                   <TableCell>
-                    {booking.requestedRefund ? (
-                        <UiBadge variant="destructive">YES</UiBadge>
-                    ) : (
-                        <UiBadge variant="outline">NO</UiBadge>
-                    )}
-                    {booking.requestedRefund && booking.refundReason && (
-                        <p className="text-xs text-muted-foreground mt-1 truncate w-24 hover:w-auto hover:whitespace-normal" title={booking.refundReason}>
-                            Reason: {booking.refundReason}
-                        </p>
-                    )}
-                   </TableCell>
-                  <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
+                          <Button variant="ghost" className="h-8 w-8 p-0 mt-1">
                             <span className="sr-only">Open menu</span>
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
@@ -448,7 +455,7 @@ export default function AdminBookingsPage() {
                 </TableRow>
               );
             }) : (
-                 <TableRow><TableCell colSpan={8} className="text-center h-24">No bookings found matching the criteria.</TableCell></TableRow>
+                 <TableRow><TableCell colSpan={4} className="text-center h-24">No bookings found matching the criteria.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -493,9 +500,9 @@ export default function AdminBookingsPage() {
               onClick={() => {
                 if (bookingToCancel) {
                   handleAdminAction(bookingToCancel.id, 'cancel');
-                  setBookingToCancel(null); 
+                  setBookingToCancel(null);
                 }
-                setIsCancelAlertOpen(false); 
+                setIsCancelAlertOpen(false);
               }}>
               Confirm Cancellation
             </AlertDialogAction>
@@ -516,8 +523,8 @@ export default function AdminBookingsPage() {
             </DialogHeader>
             {selectedBookingForEdit && (
               <Form {...editBookingForm}>
-                <form 
-                  onSubmit={editBookingForm.handleSubmit(onEditBookingSubmit)} 
+                <form
+                  onSubmit={editBookingForm.handleSubmit(onEditBookingSubmit)}
                   className="flex-grow overflow-y-auto custom-scrollbar"
                   id="editBookingForm_id"
                 >
@@ -655,7 +662,7 @@ export default function AdminBookingsPage() {
             <DialogDesc>Manually create a booking. For group bookings, enter comma-separated emails.</DialogDesc>
           </DialogHeader>
           <Form {...createBookingForm}>
-            <form 
+            <form
               onSubmit={createBookingForm.handleSubmit(onCreateBookingSubmit)}
               className="flex-grow overflow-y-auto custom-scrollbar"
               id="createBookingForm_id"
@@ -792,6 +799,6 @@ export default function AdminBookingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </TooltipProvider>
   );
 }
