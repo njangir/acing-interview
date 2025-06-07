@@ -29,7 +29,7 @@ interface Conversation {
 export default function AdminMessagesPage() {
   const { toast } = useToast();
   const [forceUpdate, setForceUpdate] = useState(0); // To trigger re-calculation of memos
-  const [selectedConversation, setSelectedConversation]_useState<Conversation | null>(null);
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [replyText, setReplyText] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
