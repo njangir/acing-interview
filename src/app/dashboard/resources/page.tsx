@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -14,13 +15,13 @@ import { BookOpen } from 'lucide-react';
 // In a real app, this would come from a backend based on user authentication
 const getPurchasedServiceIds = (): string[] => {
   // For demo, assume user has purchased the first two services
-  return [MOCK_SERVICES[0].id, MOCK_SERVICES[1].id, 'general']; 
+  return [MOCK_SERVICES[0].id, MOCK_SERVICES[1].id, 'general'];
 };
 
 export default function MyResourcesPage() {
   const searchParams = useSearchParams();
   const initialCategory = searchParams.get('service') || 'all';
-  
+
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
   const [accessibleResources, setAccessibleResources] = useState<ResourceType[]>([]);
 
@@ -28,12 +29,12 @@ export default function MyResourcesPage() {
 
   useEffect(() => {
     // Filter resources based on purchased services
-    const filtered = MOCK_RESOURCES.filter(resource => 
+    const filtered = MOCK_RESOURCES.filter(resource =>
       purchasedServiceIds.includes(resource.serviceCategory)
     );
     setAccessibleResources(filtered);
   }, [purchasedServiceIds]);
-  
+
   const serviceCategories = useMemo(() => {
     const categories = new Set(accessibleResources.map(r => r.serviceCategory));
     return Array.from(categories).map(id => {
@@ -94,7 +95,7 @@ export default function MyResourcesPage() {
       </div>
 
       {displayedResources.length > 0 ? (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {displayedResources.map(resource => (
             <ResourceCard key={resource.id} resource={resource} />
           ))}

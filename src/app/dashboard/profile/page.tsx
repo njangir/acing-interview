@@ -152,7 +152,7 @@ export default function ProfilePage() {
               <CardContent className="space-y-6">
                 <div className="mb-6">
                     <FormLabel>Choose Your Avatar</FormLabel>
-                    <div className="mt-2 grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+                    <div className="mt-2 grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2 sm:gap-3">
                     {PREDEFINED_AVATARS.map(avatar => (
                         <button
                         key={avatar.id}
@@ -162,7 +162,7 @@ export default function ProfilePage() {
                             form.setValue('imageUrl', avatar.url);
                         }}
                         className={cn(
-                            "rounded-full overflow-hidden border-2 transition-all w-16 h-16 sm:w-20 sm:h-20",
+                            "rounded-full overflow-hidden border-2 transition-all w-16 h-16",
                             selectedAvatarForForm === avatar.url ? "border-primary ring-2 ring-primary" : "border-transparent hover:border-primary/50"
                         )}
                         aria-label={`Select avatar ${avatar.id}`}
@@ -170,8 +170,8 @@ export default function ProfilePage() {
                         <Image
                             src={avatar.url}
                             alt={`Avatar ${avatar.id}`}
-                            width={80}
-                            height={80}
+                            width={64}
+                            height={64}
                             className="aspect-square object-cover"
                             data-ai-hint={avatar.hint}
                         />
