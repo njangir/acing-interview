@@ -4,7 +4,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'; // Added SheetHeader, SheetTitle
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -68,40 +68,40 @@ export function Header() {
       if (booking.userEmail === currentUser.email) {
         let eventId: string | null = null;
         let message: string | null = null;
-        let eventTimestamp = new Date(booking.date);
+        let eventTimestamp = new Date(booking.date); // Default to booking date
         const href = '/dashboard/bookings';
+        const serviceName = booking.serviceName.length > 20 ? booking.serviceName.substring(0, 17) + '...' : booking.serviceName;
 
         if ((booking.status === 'accepted' || booking.status === 'scheduled')) {
           eventId = getNotificationEventId(booking.id, 'booking', booking.status);
-          message = `Your booking for '${booking.serviceName}' is now ${booking.status}.`;
-          
-          const service = MOCK_SERVICES.find(s => s.id === booking.serviceId);
-          const isPaid = booking.paymentStatus === 'paid';
-          const linkAddedEventId = getNotificationEventId(booking.id, 'booking', 'link_added');
-          if (isPaid && booking.meetingLink && !seenNotifications.includes(linkAddedEventId)) {
-             eventId = linkAddedEventId;
-             message = `Meeting link for '${booking.serviceName}' on ${booking.date} is available.`;
-             eventTimestamp = new Date(); 
-          }
+          message = `Booking for '${serviceName}' is ${booking.status}.`;
+           // Check if the link was *just* added or status *just* changed to scheduled with link
+           const linkAddedEventId = getNotificationEventId(booking.id, 'booking', 'link_added');
+           if (booking.meetingLink && !seenNotifications.includes(linkAddedEventId) && booking.paymentStatus === 'paid') {
+               eventId = linkAddedEventId; // Prioritize link added notification
+               message = `Meeting link for '${serviceName}' on ${booking.date} is available.`;
+               eventTimestamp = new Date(); // Use current time for "just now" feel
+           }
         } else if (booking.status === 'cancelled') {
           eventId = getNotificationEventId(booking.id, 'booking', 'cancelled');
-          message = `Your booking for '${booking.serviceName}' on ${booking.date} has been cancelled.`;
+          message = `Booking for '${serviceName}' on ${booking.date} was cancelled.`;
           eventTimestamp = new Date();
         } else if (booking.status === 'completed' && (booking.reportUrl || (booking.detailedFeedback && booking.detailedFeedback.length > 0))) {
           const feedbackReadyEventId = getNotificationEventId(booking.id, 'booking', 'feedback_ready');
           if (!seenNotifications.includes(feedbackReadyEventId)){
             eventId = feedbackReadyEventId;
-            message = `Feedback/Report for your session '${booking.serviceName}' is available.`;
+            message = `Feedback/Report for '${serviceName}' is ready.`;
             eventTimestamp = new Date(); 
           }
         }
         
+        // Refund processed notification
         if (booking.requestedRefund === false && booking.status === 'cancelled' && booking.paymentStatus === 'pay_later_unpaid') {
             const refundEventId = getNotificationEventId(booking.id, 'booking', 'refund_processed');
             if (!seenNotifications.includes(refundEventId)) {
                  currentActiveNotifications.push({
                     id: refundEventId,
-                    message: `Your refund for '${booking.serviceName}' has been processed.`,
+                    message: `Your refund for '${serviceName}' has been processed.`,
                     timestamp: new Date(), 
                     href,
                     type: 'booking',
@@ -109,15 +109,18 @@ export function Header() {
             }
         }
 
+
         if (eventId && message && !seenNotifications.includes(eventId)) {
           currentActiveNotifications.push({ id: eventId, message, timestamp: eventTimestamp, href, type: 'booking' });
         }
       }
     });
 
+    // Message notifications
     const userMessageThreads: { [key: string]: UserMessage[] } = {};
      MOCK_USER_MESSAGES.forEach(msg => {
         if (msg.userEmail === currentUser.email) {
+            // Group by original subject to form a thread
             const threadKey = msg.userEmail + (msg.subject.startsWith("Re:") ? msg.subject.substring(3).trim() : msg.subject.trim());
             if (!userMessageThreads[threadKey]) {
                  userMessageThreads[threadKey] = [];
@@ -130,17 +133,19 @@ export function Header() {
         const lastMessage = thread.sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime()).pop();
         if (lastMessage && lastMessage.senderType === 'admin') {
             const eventId = getNotificationEventId(lastMessage.id, 'message', 'admin_reply');
+            const subjectSnippet = lastMessage.subject.replace('Re: ','').substring(0,25);
             if (!seenNotifications.includes(eventId)) {
                 currentActiveNotifications.push({
                     id: eventId,
-                    message: `New reply from Admin in conversation: "${lastMessage.subject.replace('Re: ','')}"`,
+                    message: `Admin replied in: "${subjectSnippet}${subjectSnippet.length === 25 ? '...' : ''}"`,
                     timestamp: lastMessage.timestamp,
-                    href: '/dashboard/contact', 
+                    href: '/dashboard/contact', // Or a specific message thread page if implemented
                     type: 'message',
                 });
             }
         }
     });
+
 
     currentActiveNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
     setNotificationsToShow(currentActiveNotifications);
@@ -155,8 +160,8 @@ export function Header() {
 
  const handlePopoverOpenChange = (open: boolean) => {
     setIsNotificationPopoverOpen(open);
-    if (!open) {
-        calculateNotifications(); // Refresh count when popover closes
+    if (!open) { // When popover closes
+        calculateNotifications(); // Recalculate to ensure badge is up-to-date
     }
   };
 
@@ -167,8 +172,8 @@ export function Header() {
     const updatedSeenNotifications = Array.from(new Set([...seenNotifications, notificationId]));
     localStorage.setItem(`seenNotifications_${currentUser.email}`, JSON.stringify(updatedSeenNotifications));
     
+    // Instead of closing popover, just re-calculate to update list and count
     calculateNotifications(); 
-    // setIsNotificationPopoverOpen(false); // Close popover after click
   };
 
 
@@ -219,7 +224,7 @@ export function Header() {
   };
 
   const getOverallNotificationsLink = () => {
-    if (notificationsToShow.length === 0) return "/dashboard";
+    if (notificationsToShow.length === 0) return "/dashboard"; // Fallback if no active notifs shown
     const bookingNotifs = notificationsToShow.filter(n => n.type === 'booking').length;
     const messageNotifs = notificationsToShow.filter(n => n.type === 'message').length;
     if (bookingNotifs >= messageNotifs) return "/dashboard/bookings";
@@ -351,8 +356,11 @@ export function Header() {
                 <span className="sr-only">Toggle navigation menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[280px] sm:w-[320px] p-0">
-              <ScrollArea className="h-full">
+            <SheetContent side="right" className="w-[280px] sm:w-[320px] p-0 flex flex-col"> {/* Added flex flex-col */}
+              <SheetHeader className="p-4 border-b">
+                <SheetTitle>Menu</SheetTitle>
+              </SheetHeader>
+              <ScrollArea className="flex-grow"> {/* Added flex-grow */}
                 <nav className="grid gap-2 text-base font-medium p-4">
                   <Link href="/" className="flex items-center gap-2 text-lg font-semibold mb-4" onClick={() => setIsSheetOpen(false)}>
                     <Logo />
@@ -399,7 +407,7 @@ export function Header() {
                       </Link>
                   )}
 
-                  <div className="pt-4 mt-auto border-t"> {/* Added mt-auto here */}
+                  <div className="pt-4 mt-2 border-t"> {/* Adjusted mt-auto */}
                       {isLoggedIn ? (
                           <Button variant="outline" size="sm" onClick={() => { logout(); setIsSheetOpen(false);}} className="w-full">
                               <LogOut className="mr-2 h-4 w-4" /> Log Out
