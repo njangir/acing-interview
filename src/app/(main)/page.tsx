@@ -19,7 +19,7 @@ export default function HomePage() {
               Crack Your SSB Interview with Expert Guidance
             </h1>
             <p className="text-lg md:text-xl text-primary-foreground/80 animate-subtle-appear" style={{ animationDelay: '0.3s' }}>
-              Led by a 7-time SSB cleared professional. Get personalized mock interviews,
+              Led by a 4-time SSB recommended professional. Get personalized mock interviews,
               in-depth feedback, and proven strategies to achieve your armed forces dream.
             </p>
             <div className="animate-subtle-appear" style={{ animationDelay: '0.5s' }}>
@@ -35,7 +35,7 @@ export default function HomePage() {
               width={600}
               height={450}
               className="rounded-lg transition-transform duration-300 group-hover:scale-105"
-              data-ai-hint="military officer meeting"
+              data-ai-hint="interview coaching"
             />
           </div>
         </div>
@@ -49,7 +49,7 @@ export default function HomePage() {
           </h2>
           <div className="grid md:grid-cols-3 gap-8">
             {[
-              { icon: <Shield className="h-12 w-12 text-accent" />, title: "Expert Mentorship", description: "Guidance from a professional who has cleared SSB 7 times." },
+              { icon: <Shield className="h-12 w-12 text-accent" />, title: "Expert Mentorship", description: "Guidance from a professional who has been recommended for SSB 4 times." },
               { icon: <Target className="h-12 w-12 text-accent" />, title: "Realistic Mock Interviews", description: "Experience the actual SSB environment and get tailored feedback." },
               { icon: <CheckCircle className="h-12 w-12 text-accent" />, title: "Proven Success Strategies", description: "Learn techniques that work and boost your confidence." },
             ].map((item, index) => (
