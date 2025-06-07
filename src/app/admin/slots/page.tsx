@@ -27,7 +27,7 @@ export default function AdminSlotsPage() {
     const const_endTime = new Date(`1970-01-01T${end}:00`);
 
     if (currentTime >= const_endTime || intervalMin <= 0) {
-      return []; 
+      return [];
     }
 
     while (currentTime < const_endTime) {
@@ -46,27 +46,27 @@ export default function AdminSlotsPage() {
     let slotsToApply: string[] = [];
     if (actionType === 'set') {
       slotsToApply = customSlots || generateTimeSlots(startTime, endTime, interval);
-      if (!slotsToApply.length && !customSlots) { 
+      if (!slotsToApply.length && !customSlots) {
         toast({ title: "Invalid Time Range or Interval", description: "End time must be after start time, and interval must be positive.", variant: "destructive" });
         return;
       }
-    } 
+    }
 
     const updates: Record<string, string[]> = {};
     dates.forEach(date => {
       const dateString = format(date, 'yyyy-MM-dd');
-      AVAILABLE_SLOTS[dateString] = slotsToApply; 
+      AVAILABLE_SLOTS[dateString] = slotsToApply;
       updates[dateString] = slotsToApply;
     });
-    
+
     console.log(`Simulating ${actionType === 'set' ? 'update' : 'clearing'} for AVAILABLE_SLOTS with:`, updates);
-    
+
     toast({
       title: `Availability ${actionType === 'set' ? 'Updated' : 'Cleared'} (Simulated)`,
       description: `Slots for ${dates.length} date(s) have been ${actionType === 'set' ? 'set' : 'cleared'}. In a real app, this would be saved to a backend.`,
     });
     // Force re-render of calendar by changing selectedDate slightly if needed or use a dedicated state
-    setSelectedDate(new Date(selectedDate || Date.now())); 
+    setSelectedDate(new Date(selectedDate || Date.now()));
   };
 
   const handleMakeDateAvailable = () => {
@@ -84,7 +84,7 @@ export default function AdminSlotsPage() {
     }
     handleUpdateAvailability([selectedDate], [], 'clear');
   };
-  
+
   const handleQuickAction = (type: 'nextWeekAvailable' | 'nextWeekendAvailable' | 'nextWeekUnavailable' | 'nextWeekendUnavailable') => {
     const today = new Date();
     const dates: Date[] = [];
@@ -92,8 +92,8 @@ export default function AdminSlotsPage() {
     let slotsDefinition: string[] = [];
 
     if (type === 'nextWeekAvailable' || type === 'nextWeekUnavailable') {
-      let current = startOfWeek(addDays(today, 7), { weekStartsOn: 1 }); 
-      const end = endOfWeek(addDays(today, 7), { weekStartsOn: 1 }); 
+      let current = startOfWeek(addDays(today, 7), { weekStartsOn: 1 });
+      const end = endOfWeek(addDays(today, 7), { weekStartsOn: 1 });
       while(current <= end) {
         dates.push(new Date(current));
         current = addDays(current, 1);
@@ -160,7 +160,7 @@ export default function AdminSlotsPage() {
                 mode="single"
                 selected={selectedDate}
                 onSelect={setSelectedDate}
-                className="rounded-md border"
+                className="rounded-md border max-w-xs mx-auto"
                 disabled={(date) => isBefore(date, todayForCalendar)}
                 modifiers={modifiers}
                 modifiersClassNames={modifiersClassNames}
@@ -221,3 +221,4 @@ export default function AdminSlotsPage() {
     </>
   );
 }
+
