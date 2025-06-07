@@ -28,7 +28,7 @@ import { Badge as UiBadge } from '@/components/ui/badge'; // Renamed to avoid co
 import { cn } from '@/lib/utils';
 import { format, parse } from 'date-fns';
 import Link from 'next/link';
-import { ScrollArea } from '@/components/ui/scroll-area'; // Import ScrollArea
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const createBookingFormSchema = z.object({
   userEmails: z.string().min(1, { message: "At least one email address is required." }),
@@ -121,7 +121,7 @@ export default function AdminBookingsPage() {
     } else if (action === 'approve_refund' && bookingToUpdate.paymentStatus === 'paid' && bookingToUpdate.requestedRefund) {
       message = `Refund for booking ${bookingId} approved. Booking cancelled.`;
       bookingToUpdate.status = 'cancelled';
-      bookingToUpdate.paymentStatus = 'pay_later_unpaid';
+      bookingToUpdate.paymentStatus = 'pay_later_unpaid'; // Mark as unpaid/refunded
       bookingToUpdate.requestedRefund = false;
       bookingUpdated = true;
     }
@@ -459,23 +459,25 @@ export default function AdminBookingsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-
       <Dialog open={isEditBookingModalOpen} onOpenChange={(isOpen) => {
         setIsEditBookingModalOpen(isOpen);
         if (!isOpen) setSelectedBookingForEdit(null);
       }}>
-        <DialogContent className="sm:max-w-lg flex flex-col max-h-[calc(100vh-4rem)] p-0">
-            <DialogHeader className="p-6 pb-4 border-b">
+        <DialogContent className="sm:max-w-lg flex flex-col max-h-[calc(100vh-4rem)]">
+            <DialogHeader className="p-6 pb-4 border-b flex-shrink-0">
                 <DialogTitle>Edit Booking: {selectedBookingForEdit?.id}</DialogTitle>
                 <DialogDesc>
                     Modify details for {selectedBookingForEdit?.userName}'s booking of {selectedBookingForEdit?.serviceName}.
                 </DialogDesc>
             </DialogHeader>
             {selectedBookingForEdit && (
-            <ScrollArea className="flex-grow custom-scrollbar">
-              <div className="p-6 space-y-4">
-                <Form {...editBookingForm}>
-                  <form onSubmit={editBookingForm.handleSubmit(onEditBookingSubmit)}>
+              <Form {...editBookingForm}>
+                <form 
+                  onSubmit={editBookingForm.handleSubmit(onEditBookingSubmit)} 
+                  className="flex-grow overflow-y-auto custom-scrollbar"
+                  id="editBookingForm_id"
+                >
+                  <div className="p-6 space-y-4">
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <FormItem>
                         <FormLabel>User Name</FormLabel>
@@ -588,15 +590,14 @@ export default function AdminBookingsPage() {
                         </FormItem>
                       )}
                     />
-                    <DialogFooter className="p-6 pt-4 border-t sticky bottom-0 bg-background"> {/* Footer outside form, but part of scrollable if form is short, or fixed if form long */}
-                        <Button type="button" variant="outline" onClick={() => setIsEditBookingModalOpen(false)}>Cancel</Button>
-                        <Button type="submit">Save Changes</Button>
-                    </DialogFooter>
-                  </form>
-                </Form>
-              </div>
-            </ScrollArea>
+                  </div>
+                </form>
+              </Form>
             )}
+            <DialogFooter className="p-6 pt-4 border-t flex-shrink-0">
+                <Button type="button" variant="outline" onClick={() => setIsEditBookingModalOpen(false)}>Cancel</Button>
+                <Button type="submit" form="editBookingForm_id">Save Changes</Button>
+            </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -604,15 +605,18 @@ export default function AdminBookingsPage() {
         setIsCreateBookingModalOpen(isOpen);
         if (!isOpen) createBookingForm.reset();
       }}>
-        <DialogContent className="sm:max-w-lg flex flex-col max-h-[calc(100vh-4rem)] p-0">
-          <DialogHeader className="p-6 pb-4 border-b">
+        <DialogContent className="sm:max-w-lg flex flex-col max-h-[calc(100vh-4rem)]">
+          <DialogHeader className="p-6 pb-4 border-b flex-shrink-0">
             <DialogTitle>Create New Booking</DialogTitle>
             <DialogDesc>Manually create a booking. For group bookings, enter comma-separated emails.</DialogDesc>
           </DialogHeader>
-          <ScrollArea className="flex-grow custom-scrollbar">
-            <div className="p-6 space-y-4">
-              <Form {...createBookingForm}>
-                <form onSubmit={createBookingForm.handleSubmit(onCreateBookingSubmit)}>
+          <Form {...createBookingForm}>
+            <form 
+              onSubmit={createBookingForm.handleSubmit(onCreateBookingSubmit)}
+              className="flex-grow overflow-y-auto custom-scrollbar"
+              id="createBookingForm_id"
+            >
+              <div className="p-6 space-y-4">
                   <FormField
                     control={createBookingForm.control}
                     name="userName"
@@ -735,17 +739,17 @@ export default function AdminBookingsPage() {
                       </FormItem>
                     )}
                   />
-                   <DialogFooter className="p-6 pt-4 border-t sticky bottom-0 bg-background">
-                    <Button type="button" variant="outline" onClick={() => setIsCreateBookingModalOpen(false)}>Cancel</Button>
-                    <Button type="submit">Create Booking(s)</Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </div>
-          </ScrollArea>
+              </div>
+            </form>
+          </Form>
+          <DialogFooter className="p-6 pt-4 border-t flex-shrink-0">
+            <Button type="button" variant="outline" onClick={() => setIsCreateBookingModalOpen(false)}>Cancel</Button>
+            <Button type="submit" form="createBookingForm_id">Create Booking(s)</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
   );
 }
 
+    
