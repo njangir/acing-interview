@@ -4,7 +4,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Added useEffect
 
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from '@/components/ui/button';
@@ -14,9 +14,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { MailQuestion } from 'lucide-react';
-import { MOCK_USER_PROFILE_FOR_CONTACT } from '@/constants';
+import { MailQuestion, Loader2 } from 'lucide-react'; // Added Loader2
+import { MOCK_USER_MESSAGES } from '@/constants'; // For adding to mock messages
 import type { UserMessage } from '@/types';
+import { useAuth } from '@/hooks/use-auth'; // Import useAuth
 
 const contactFormSchema = z.object({
   subject: z.string().min(5, { message: "Subject must be at least 5 characters." }),
@@ -29,7 +30,8 @@ type ContactFormValues = z.infer<typeof contactFormSchema>;
 
 export default function ContactSupportPage() {
   const { toast } = useToast();
-  const [userProfile] = useState(MOCK_USER_PROFILE_FOR_CONTACT); // Simulate fetching user profile
+  const { currentUser } = useAuth(); // Get the current logged-in user
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
 
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactFormSchema),
@@ -41,21 +43,60 @@ export default function ContactSupportPage() {
     },
   });
 
+  useEffect(() => {
+    if (currentUser) {
+      setIsLoadingUser(false);
+    }
+  }, [currentUser]);
+
   function onSubmit(data: ContactFormValues) {
-    const newMessage: Omit<UserMessage, 'id' | 'timestamp' | 'status'> = { // Data to be sent to backend
-      userName: userProfile.name, 
-      userEmail: userProfile.email, 
+    if (!currentUser) {
+      toast({
+        title: "Error",
+        description: "User not found. Please log in again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newMessageEntry: UserMessage = { // Structure for MOCK_USER_MESSAGES
+      id: `msg-${Date.now()}`,
+      userName: currentUser.name,
+      userEmail: currentUser.email,
       subject: data.subject,
       messageBody: data.message,
+      timestamp: new Date(),
+      status: 'new', // New messages from user are marked as 'new'
+      senderType: 'user',
     };
     
-    console.log("Message submitted (simulated backend send):", newMessage); 
+    MOCK_USER_MESSAGES.push(newMessageEntry); // Add to our mock "database"
+    console.log("Message submitted (simulated backend send):", newMessageEntry);
+    
     toast({
       title: "Message Sent!",
       description: "Your message has been sent to our support team. We'll get back to you shortly.",
     });
-    form.reset(); 
+    form.reset();
   }
+
+  if (isLoadingUser) {
+    return (
+        <div className="container py-12 flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="ml-2 text-muted-foreground">Loading user details...</p>
+        </div>
+    );
+  }
+
+  if (!currentUser) {
+     return (
+        <div className="container py-12">
+            <PageHeader title="Contact Support" description="Please log in to contact support."/>
+        </div>
+     );
+  }
+
 
   return (
     <>
@@ -69,7 +110,7 @@ export default function ContactSupportPage() {
             <MailQuestion className="h-10 w-10 text-primary"/>
             <div>
                 <CardTitle className="font-headline text-2xl text-primary">Send a Message</CardTitle>
-                <CardDescription>Fill out the form below. Replies will be sent to: <strong>{userProfile.email}</strong></CardDescription>
+                <CardDescription>Fill out the form below. Replies will be sent to: <strong>{currentUser.email}</strong></CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -118,7 +159,7 @@ export default function ContactSupportPage() {
                         Confirm Contact Information
                       </FormLabel>
                       <FormDescription>
-                        My email (<strong className="text-foreground">{userProfile.email}</strong>) is correct, and I understand replies will be sent here.
+                        My email (<strong className="text-foreground">{currentUser.email}</strong>) is correct, and I understand replies will be sent here.
                       </FormDescription>
                       <FormMessage />
                     </div>
