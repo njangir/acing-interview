@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
@@ -48,13 +48,23 @@ export default function SlotSelectionPage() {
     }
   }, [serviceId, currentUser, router]);
 
+  // Memoize the stringified version of slots for the selected date to use as a dependency
+  const stringifiedSlotsForSelectedDate = useMemo(() => {
+    if (!selectedDate) return '[]'; // Default to empty array string if no date selected
+    const dateString = selectedDate.toISOString().split('T')[0];
+    return JSON.stringify(AVAILABLE_SLOTS[dateString] || []);
+  }, [selectedDate]); // This memo updates when selectedDate changes
+
   useEffect(() => {
     if (selectedDate) {
       const dateString = selectedDate.toISOString().split('T')[0];
       setAvailableTimes(AVAILABLE_SLOTS[dateString] || []);
-      setSelectedTime(null); // Reset time when date changes
+      setSelectedTime(null); // Reset time when date changes or its slots change
+    } else {
+      setAvailableTimes([]);
+      setSelectedTime(null);
     }
-  }, [selectedDate]);
+  }, [selectedDate, stringifiedSlotsForSelectedDate]); // Effect now also depends on the content of slots for the selected date
 
   const handleProceed = () => {
     if (!selectedDate || !selectedTime) {
@@ -162,9 +172,9 @@ export default function SlotSelectionPage() {
                 className="rounded-md border"
                 disabled={(date) => {
                   const dateString = date.toISOString().split('T')[0];
-                  const today = new Date();
-                  today.setHours(0,0,0,0); // Compare dates only, not time
-                  return date < today || !AVAILABLE_SLOTS[dateString] || AVAILABLE_SLOTS[dateString]?.length === 0;
+                  const currentDayStart = new Date(); 
+                  currentDayStart.setHours(0,0,0,0); // Compare dates only, not time
+                  return date < currentDayStart || !AVAILABLE_SLOTS[dateString] || AVAILABLE_SLOTS[dateString]?.length === 0;
                 }}
               />
             </div>
@@ -210,5 +220,3 @@ export default function SlotSelectionPage() {
     </>
   );
 }
-
-    
