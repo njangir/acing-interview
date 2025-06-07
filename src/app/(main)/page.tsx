@@ -1,9 +1,9 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ServiceCard } from '@/components/core/service-card';
 import { TestimonialCard } from '@/components/core/testimonial-card';
-import { MOCK_SERVICES, MOCK_TESTIMONIALS } from '@/constants';
+import { HomePageServiceList } from '@/components/core/home-page-service-list'; // Import the new component
+import { MOCK_TESTIMONIALS } from '@/constants'; // MOCK_SERVICES removed from here
 import { CheckCircle, Shield, Target } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -63,22 +63,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Services Section */}
-      <section id="services" className="py-16 bg-secondary">
-        <div className="container">
-          <h2 className="text-3xl font-bold text-center mb-12 font-headline text-primary">Our Services</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {MOCK_SERVICES.slice(0,3).map((service) => (
-              <ServiceCard key={service.id} service={service} />
-            ))}
-          </div>
-          <div className="text-center mt-12">
-            <Button asChild variant="outline" size="lg" className="border-primary text-primary hover:bg-primary/10">
-              <Link href="/services">View All Services</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
+      {/* Services Section - Now uses the client component */}
+      <HomePageServiceList />
 
       {/* Testimonials Section */}
       <section id="testimonials" className="py-16 bg-background">
