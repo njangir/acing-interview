@@ -28,6 +28,7 @@ import { Badge as UiBadge } from '@/components/ui/badge'; // Renamed to avoid co
 import { cn } from '@/lib/utils';
 import { format, parse } from 'date-fns';
 import Link from 'next/link';
+import { ScrollArea } from '@/components/ui/scroll-area'; // Import ScrollArea
 
 const createBookingFormSchema = z.object({
   userEmails: z.string().min(1, { message: "At least one email address is required." }),
@@ -463,31 +464,204 @@ export default function AdminBookingsPage() {
         setIsEditBookingModalOpen(isOpen);
         if (!isOpen) setSelectedBookingForEdit(null);
       }}>
-        <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
+        <DialogContent className="sm:max-w-lg flex flex-col max-h-[calc(100vh-4rem)] p-0">
+            <DialogHeader className="p-6 pb-4 border-b">
                 <DialogTitle>Edit Booking: {selectedBookingForEdit?.id}</DialogTitle>
                 <DialogDesc>
                     Modify details for {selectedBookingForEdit?.userName}'s booking of {selectedBookingForEdit?.serviceName}.
                 </DialogDesc>
             </DialogHeader>
             {selectedBookingForEdit && (
-              <Form {...editBookingForm}>
-                <form onSubmit={editBookingForm.handleSubmit(onEditBookingSubmit)} className="space-y-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormItem>
-                      <FormLabel>User Name</FormLabel>
-                      <Input value={selectedBookingForEdit.userName} readOnly disabled className="bg-muted/50" />
-                    </FormItem>
-                     <FormItem>
-                      <FormLabel>User Email</FormLabel>
-                      <Input value={selectedBookingForEdit.userEmail} readOnly disabled className="bg-muted/50" />
-                    </FormItem>
-                  </div>
+            <ScrollArea className="flex-grow custom-scrollbar">
+              <div className="p-6 space-y-4">
+                <Form {...editBookingForm}>
+                  <form onSubmit={editBookingForm.handleSubmit(onEditBookingSubmit)}>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <FormItem>
+                        <FormLabel>User Name</FormLabel>
+                        <Input value={selectedBookingForEdit.userName} readOnly disabled className="bg-muted/50" />
+                      </FormItem>
+                      <FormItem>
+                        <FormLabel>User Email</FormLabel>
+                        <Input value={selectedBookingForEdit.userEmail} readOnly disabled className="bg-muted/50" />
+                      </FormItem>
+                    </div>
+                    <FormField
+                      control={editBookingForm.control}
+                      name="date"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col mb-4">
+                          <FormLabel>Date</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant={"outline"}
+                                  className={cn(
+                                    "w-full pl-3 text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                >
+                                  {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1))}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editBookingForm.control}
+                      name="time"
+                      render={({ field }) => (
+                        <FormItem className="mb-4">
+                          <FormLabel>Time</FormLabel>
+                          <FormControl><Input placeholder="e.g., 02:00 PM" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editBookingForm.control}
+                      name="meetingLink"
+                      render={({ field }) => (
+                        <FormItem className="mb-4">
+                          <FormLabel>Meeting Link</FormLabel>
+                          <FormControl><Input type="url" placeholder="https://meet.google.com/..." {...field} /></FormControl>
+                          <FormMessage />
+                          {selectedBookingForEdit.status === 'accepted' && !field.value && (
+                              <p className="text-xs text-orange-600 mt-1">Provide a meeting link to change status to 'Scheduled'.</p>
+                          )}
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editBookingForm.control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem className="mb-4">
+                          <FormLabel>Booking Status</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="pending_approval">Pending Approval</SelectItem>
+                              <SelectItem value="accepted">Accepted (Needs Link)</SelectItem>
+                              <SelectItem value="scheduled">Scheduled (Link Added)</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
+                              <SelectItem value="cancelled">Cancelled</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editBookingForm.control}
+                      name="paymentStatus"
+                      render={({ field }) => (
+                        <FormItem className="mb-4">
+                          <FormLabel>Payment Status</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger><SelectValue placeholder="Select payment status" /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="paid">Paid</SelectItem>
+                              <SelectItem value="pay_later_pending">Pay Later Pending</SelectItem>
+                              <SelectItem value="pay_later_unpaid">Pay Later Unpaid/Refunded</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <DialogFooter className="p-6 pt-4 border-t sticky bottom-0 bg-background"> {/* Footer outside form, but part of scrollable if form is short, or fixed if form long */}
+                        <Button type="button" variant="outline" onClick={() => setIsEditBookingModalOpen(false)}>Cancel</Button>
+                        <Button type="submit">Save Changes</Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </div>
+            </ScrollArea>
+            )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCreateBookingModalOpen} onOpenChange={(isOpen) => {
+        setIsCreateBookingModalOpen(isOpen);
+        if (!isOpen) createBookingForm.reset();
+      }}>
+        <DialogContent className="sm:max-w-lg flex flex-col max-h-[calc(100vh-4rem)] p-0">
+          <DialogHeader className="p-6 pb-4 border-b">
+            <DialogTitle>Create New Booking</DialogTitle>
+            <DialogDesc>Manually create a booking. For group bookings, enter comma-separated emails.</DialogDesc>
+          </DialogHeader>
+          <ScrollArea className="flex-grow custom-scrollbar">
+            <div className="p-6 space-y-4">
+              <Form {...createBookingForm}>
+                <form onSubmit={createBookingForm.handleSubmit(onCreateBookingSubmit)}>
                   <FormField
-                    control={editBookingForm.control}
+                    control={createBookingForm.control}
+                    name="userName"
+                    render={({ field }) => (
+                      <FormItem className="mb-4">
+                        <FormLabel>User Name</FormLabel>
+                        <FormControl><Input placeholder="Full Name (will be same for all in group)" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={createBookingForm.control}
+                    name="userEmails"
+                    render={({ field }) => (
+                      <FormItem className="mb-4">
+                        <FormLabel>User Email(s)</FormLabel>
+                        <FormControl><Textarea placeholder="user@example.com, another@example.com" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={createBookingForm.control}
+                    name="serviceId"
+                    render={({ field }) => (
+                      <FormItem className="mb-4">
+                        <FormLabel>Service</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a service" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {MOCK_SERVICES.map((service) => (
+                              <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={createBookingForm.control}
                     name="date"
                     render={({ field }) => (
-                      <FormItem className="flex flex-col">
+                      <FormItem className="flex flex-col mb-4">
                         <FormLabel>Date</FormLabel>
                         <Popover>
                           <PopoverTrigger asChild>
@@ -519,10 +693,10 @@ export default function AdminBookingsPage() {
                     )}
                   />
                   <FormField
-                    control={editBookingForm.control}
+                    control={createBookingForm.control}
                     name="time"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="mb-4">
                         <FormLabel>Time</FormLabel>
                         <FormControl><Input placeholder="e.g., 02:00 PM" {...field} /></FormControl>
                         <FormMessage />
@@ -530,35 +704,20 @@ export default function AdminBookingsPage() {
                     )}
                   />
                   <FormField
-                    control={editBookingForm.control}
-                    name="meetingLink"
+                    control={createBookingForm.control}
+                    name="paymentStatus"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Meeting Link</FormLabel>
-                        <FormControl><Input type="url" placeholder="https://meet.google.com/..." {...field} /></FormControl>
-                        <FormMessage />
-                        {selectedBookingForEdit.status === 'accepted' && !field.value && (
-                             <p className="text-xs text-orange-600 mt-1">Provide a meeting link to change status to 'Scheduled'.</p>
-                        )}
-                      </FormItem>
-                    )}
-                  />
-                   <FormField
-                    control={editBookingForm.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Booking Status</FormLabel>
+                      <FormItem className="mb-4">
+                        <FormLabel>Payment Status</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
-                            <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select payment status" />
+                            </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="pending_approval">Pending Approval</SelectItem>
-                            <SelectItem value="accepted">Accepted (Needs Link)</SelectItem>
-                            <SelectItem value="scheduled">Scheduled (Link Added)</SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                            <SelectItem value="paid">Paid</SelectItem>
+                            <SelectItem value="pay_later_pending">Pay Later Pending</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -566,176 +725,27 @@ export default function AdminBookingsPage() {
                     )}
                   />
                   <FormField
-                    control={editBookingForm.control}
-                    name="paymentStatus"
+                    control={createBookingForm.control}
+                    name="meetingLink"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Payment Status</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger><SelectValue placeholder="Select payment status" /></SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="paid">Paid</SelectItem>
-                            <SelectItem value="pay_later_pending">Pay Later Pending</SelectItem>
-                            <SelectItem value="pay_later_unpaid">Pay Later Unpaid/Refunded</SelectItem>
-                          </SelectContent>
-                        </Select>
+                      <FormItem className="mb-4">
+                        <FormLabel>Meeting Link (Optional)</FormLabel>
+                        <FormControl><Input placeholder="https://meet.google.com/..." {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <DialogFooter>
-                      <Button type="button" variant="outline" onClick={() => setIsEditBookingModalOpen(false)}>Cancel</Button>
-                      <Button type="submit">Save Changes</Button>
+                   <DialogFooter className="p-6 pt-4 border-t sticky bottom-0 bg-background">
+                    <Button type="button" variant="outline" onClick={() => setIsCreateBookingModalOpen(false)}>Cancel</Button>
+                    <Button type="submit">Create Booking(s)</Button>
                   </DialogFooter>
                 </form>
               </Form>
-            )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isCreateBookingModalOpen} onOpenChange={(isOpen) => {
-        setIsCreateBookingModalOpen(isOpen);
-        if (!isOpen) createBookingForm.reset();
-      }}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Create New Booking</DialogTitle>
-            <DialogDesc>Manually create a booking. For group bookings, enter comma-separated emails.</DialogDesc>
-          </DialogHeader>
-          <Form {...createBookingForm}>
-            <form onSubmit={createBookingForm.handleSubmit(onCreateBookingSubmit)} className="space-y-4 py-4">
-              <FormField
-                control={createBookingForm.control}
-                name="userName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>User Name</FormLabel>
-                    <FormControl><Input placeholder="Full Name (will be same for all in group)" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={createBookingForm.control}
-                name="userEmails"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>User Email(s)</FormLabel>
-                    <FormControl><Textarea placeholder="user@example.com, another@example.com" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={createBookingForm.control}
-                name="serviceId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Service</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a service" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {MOCK_SERVICES.map((service) => (
-                          <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={createBookingForm.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1))}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={createBookingForm.control}
-                name="time"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Time</FormLabel>
-                    <FormControl><Input placeholder="e.g., 02:00 PM" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={createBookingForm.control}
-                name="paymentStatus"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payment Status</FormLabel>
-                     <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select payment status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="paid">Paid</SelectItem>
-                        <SelectItem value="pay_later_pending">Pay Later Pending</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={createBookingForm.control}
-                name="meetingLink"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Meeting Link (Optional)</FormLabel>
-                    <FormControl><Input placeholder="https://meet.google.com/..." {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsCreateBookingModalOpen(false)}>Cancel</Button>
-                <Button type="submit">Create Booking(s)</Button>
-              </DialogFooter>
-            </form>
-          </Form>
+            </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
     </>
   );
 }
+
