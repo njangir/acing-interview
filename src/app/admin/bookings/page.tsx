@@ -23,12 +23,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { MOCK_BOOKINGS, MOCK_SERVICES } from "@/constants";
 import type { Booking } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck, PlusCircle, CalendarIcon, Edit, Filter, InfoIcon, Video, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck, PlusCircle, CalendarIcon, Edit, Filter, InfoIcon, Video, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import { Badge as UiBadge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { format, parse } from 'date-fns';
 import Link from 'next/link';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 const ITEMS_PER_PAGE = 7;
@@ -65,6 +66,9 @@ export default function AdminBookingsPage() {
 
   const [isCancelAlertOpen, setIsCancelAlertOpen] = useState(false);
   const [bookingToCancel, setBookingToCancel] = useState<Booking | null>(null);
+
+  const [isViewFeedbackModalOpen, setIsViewFeedbackModalOpen] = useState(false);
+  const [selectedBookingForFeedback, setSelectedBookingForFeedback] = useState<Booking | null>(null);
 
 
   const createBookingForm = useForm<CreateBookingFormValues>({
@@ -147,6 +151,11 @@ export default function AdminBookingsPage() {
       setBookingToCancel(booking);
       setIsCancelAlertOpen(true);
     }
+  };
+
+  const openViewFeedbackModal = (booking: Booking) => {
+    setSelectedBookingForFeedback(booking);
+    setIsViewFeedbackModalOpen(true);
   };
 
   function onCreateBookingSubmit(data: CreateBookingFormValues) {
@@ -328,6 +337,7 @@ export default function AdminBookingsPage() {
             <TableBody>
               {paginatedBookings.length > 0 ? paginatedBookings.map((booking) => {
                 const showAsAddLink = booking.status === 'accepted' && booking.paymentStatus === 'paid' && !booking.meetingLink;
+                const hasFeedback = booking.status === 'completed' && (booking.detailedFeedback || booking.userFeedback);
                 return (
                 <TableRow key={booking.id}>
                   <TableCell>
@@ -386,7 +396,7 @@ export default function AdminBookingsPage() {
                             'destructive'
                         }
                         className={cn(
-                            "mb-1 block w-fit ml-auto", // Make badge block and align right
+                            "mb-1 block w-fit ml-auto", 
                             booking.status === 'scheduled' && 'bg-blue-100 text-blue-700',
                             booking.status === 'pending_approval' && 'bg-yellow-100 text-yellow-700',
                             booking.status === 'accepted' && 'bg-orange-100 text-orange-700',
@@ -422,6 +432,11 @@ export default function AdminBookingsPage() {
                             )}
                             {showAsAddLink ? 'Add Meeting Link & Schedule' : 'Edit Details / Reschedule'}
                           </DropdownMenuItem>
+                           {hasFeedback && (
+                            <DropdownMenuItem onClick={() => openViewFeedbackModal(booking)}>
+                              <Eye className="mr-2 h-4 w-4 text-purple-500" /> View Feedback
+                            </DropdownMenuItem>
+                          )}
                           {booking.status === 'pending_approval' && (
                             <DropdownMenuItem onClick={() => handleAdminAction(booking.id, 'accept')}>
                               <CheckCircle className="mr-2 h-4 w-4 text-green-500" /> Accept Request
@@ -799,6 +814,52 @@ export default function AdminBookingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={isViewFeedbackModalOpen} onOpenChange={(isOpen) => {
+        setIsViewFeedbackModalOpen(isOpen);
+        if (!isOpen) setSelectedBookingForFeedback(null);
+      }}>
+        <DialogContent className="sm:max-w-lg flex flex-col max-h-[calc(100vh-4rem)]">
+          <DialogHeader className="p-6 pb-4 border-b flex-shrink-0">
+            <DialogTitle>Feedback for Booking: {selectedBookingForFeedback?.id}</DialogTitle>
+            <DialogDesc>
+              User: {selectedBookingForFeedback?.userName} ({selectedBookingForFeedback?.userEmail}) <br/>
+              Service: {selectedBookingForFeedback?.serviceName}
+            </DialogDesc>
+          </DialogHeader>
+          <ScrollArea className="flex-grow overflow-y-auto custom-scrollbar p-6">
+            {selectedBookingForFeedback?.userFeedback && (
+              <div className="mb-6">
+                <h4 className="font-semibold text-md mb-2 text-primary">User's General Comments:</h4>
+                <p className="text-sm bg-muted/50 p-3 rounded-md whitespace-pre-wrap">{selectedBookingForFeedback.userFeedback}</p>
+              </div>
+            )}
+            {selectedBookingForFeedback?.detailedFeedback && selectedBookingForFeedback.detailedFeedback.length > 0 && (
+              <div>
+                <h4 className="font-semibold text-md mb-3 text-primary">Mentor's Skill Ratings & Comments:</h4>
+                <div className="space-y-3">
+                  {selectedBookingForFeedback.detailedFeedback.map((fb, index) => (
+                    <div key={index} className="border p-3 rounded-md bg-secondary/30">
+                      <p className="font-semibold text-sm">{fb.skill}: <span className="font-normal text-primary">{fb.rating}</span></p>
+                      {fb.comments && <p className="text-xs text-muted-foreground mt-1">Mentor Notes: {fb.comments}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {!selectedBookingForFeedback?.userFeedback && (!selectedBookingForFeedback?.detailedFeedback || selectedBookingForFeedback.detailedFeedback.length === 0) && (
+              <p className="text-sm text-muted-foreground text-center py-4">No feedback has been recorded for this booking yet.</p>
+            )}
+          </ScrollArea>
+          <DialogFooter className="p-6 pt-4 border-t flex-shrink-0">
+            <Button variant="outline" onClick={() => setIsViewFeedbackModalOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </TooltipProvider>
   );
 }
+
+
+    

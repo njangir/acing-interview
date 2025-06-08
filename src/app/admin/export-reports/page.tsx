@@ -33,8 +33,10 @@ export default function AdminExportReportsPage() {
       userEmail: booking.userEmail,
       meetingLink: booking.meetingLink,
       status: booking.status,
+      userFeedback: booking.userFeedback || null,
+      detailedMentorFeedback: booking.detailedFeedback || null,
     }));
-    downloadJSON(reportData, 'session_schedules_report.json');
+    downloadJSON(reportData, 'session_schedules_with_feedback_report.json');
   };
 
   const handleExportSalesReport = () => {
@@ -51,22 +53,30 @@ export default function AdminExportReportsPage() {
         paymentStatus: booking.paymentStatus,
         transactionId: booking.transactionId || 'N/A',
         status: booking.status,
+        userFeedback: booking.userFeedback || null,
+        detailedMentorFeedback: booking.detailedFeedback || null,
       };
     });
-    downloadJSON(reportData, 'sales_report.json');
+    downloadJSON(reportData, 'sales_with_feedback_report.json');
   };
 
   const handleExportUserData = () => {
-    const users: Record<string, { userName: string, email: string, bookings: number }> = {};
-    MOCK_BOOKINGS.forEach(booking => {
+    const users: Record<string, { userName: string, email: string, bookings: number, firstBookingDate?: string, lastBookingDate?: string }> = {};
+    // Sort bookings to easily find first/last dates
+    const sortedBookings = [...MOCK_BOOKINGS].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    sortedBookings.forEach(booking => {
       if (!users[booking.userEmail]) {
         users[booking.userEmail] = {
           userName: booking.userName,
           email: booking.userEmail,
           bookings: 0,
+          firstBookingDate: booking.date, // First encounter
+          lastBookingDate: booking.date,  // Will be updated
         };
       }
       users[booking.userEmail].bookings += 1;
+      users[booking.userEmail].lastBookingDate = booking.date; // Update with latest booking date
     });
     downloadJSON(Object.values(users), 'user_data_report.json');
   };
@@ -75,13 +85,13 @@ export default function AdminExportReportsPage() {
     <>
       <PageHeader
         title="Export Reports"
-        description="Download various reports in JSON format for analysis and record-keeping."
+        description="Download various reports in JSON format for analysis and record-keeping. Feedback data is now included."
       />
       <div className="grid md:grid-cols-1 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center"><DownloadCloud className="mr-2 h-5 w-5 text-primary" /> Session Schedules</CardTitle>
-            <CardDescription>Export a list of all booked sessions with their details.</CardDescription>
+            <CardTitle className="flex items-center"><DownloadCloud className="mr-2 h-5 w-5 text-primary" /> Session Schedules & Feedback</CardTitle>
+            <CardDescription>Export a list of all booked sessions with their details and any submitted feedback.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={handleExportSessionSchedules} className="w-full">Export Session Schedules (JSON)</Button>
@@ -90,8 +100,8 @@ export default function AdminExportReportsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center"><DownloadCloud className="mr-2 h-5 w-5 text-primary" /> Sales Report</CardTitle>
-            <CardDescription>Export a detailed report of sales, including payment status and transaction IDs.</CardDescription>
+            <CardTitle className="flex items-center"><DownloadCloud className="mr-2 h-5 w-5 text-primary" /> Sales Report with Feedback</CardTitle>
+            <CardDescription>Export a detailed report of sales, including payment status, transaction IDs, and any submitted feedback.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={handleExportSalesReport} className="w-full">Export Sales Report (JSON)</Button>
@@ -100,8 +110,8 @@ export default function AdminExportReportsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center"><DownloadCloud className="mr-2 h-5 w-5 text-primary" /> User Data</CardTitle>
-            <CardDescription>Export a list of users who have made bookings, along with their contact information and booking count.</CardDescription>
+            <CardTitle className="flex items-center"><DownloadCloud className="mr-2 h-5 w-5 text-primary" /> User Data Report</CardTitle>
+            <CardDescription>Export a list of users, their contact info, booking count, and first/last booking dates.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={handleExportUserData} className="w-full">Export User Data (JSON)</Button>
@@ -111,3 +121,6 @@ export default function AdminExportReportsPage() {
     </>
   );
 }
+
+
+    
