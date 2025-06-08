@@ -29,13 +29,27 @@ export default function AdminReportsPage() {
   const [skillRatingsData, setSkillRatingsData] = useState<Record<string, string>>({});
   const [currentUserAverageSkills, setCurrentUserAverageSkills] = useState<Record<string, { averageRatingValue: number; ratingCount: number }>>({});
 
-  const [submissionHistory, setSubmissionHistory] = useState<FeedbackSubmissionHistoryEntry[]>([]);
+  const [userNameFilter, setUserNameFilter] = useState<string>('');
   const [currentHistoryPage, setCurrentHistoryPage] = useState(1);
 
+  // This state will hold the full history and update when MOCK_SUBMISSION_HISTORY changes
+  const [fullSubmissionHistory, setFullSubmissionHistory] = useState<FeedbackSubmissionHistoryEntry[]>([]);
+
   useEffect(() => {
-    // Sort by most recent first
-    setSubmissionHistory([...MOCK_SUBMISSION_HISTORY].sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime()));
-  }, []); // Load initial history
+    // Initialize or update fullSubmissionHistory when MOCK_SUBMISSION_HISTORY might change
+    setFullSubmissionHistory([...MOCK_SUBMISSION_HISTORY].sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime()));
+  }, []); // Re-run if MOCK_SUBMISSION_HISTORY reference changes (though it's a const, direct mutation happens)
+
+  const filteredSubmissionHistory = useMemo(() => {
+    let filtered = fullSubmissionHistory;
+    if (userNameFilter.trim() !== '') {
+      filtered = filtered.filter(entry =>
+        entry.userName.toLowerCase().includes(userNameFilter.toLowerCase())
+      );
+    }
+    return filtered;
+  }, [fullSubmissionHistory, userNameFilter]);
+
 
   const completedBookings = useMemo(() => {
     return MOCK_BOOKINGS.filter(booking => booking.status === 'completed');
@@ -71,7 +85,7 @@ export default function AdminReportsPage() {
       const userPreviousCompletedBookingsWithFeedback = MOCK_BOOKINGS.filter(
         b => b.userEmail === userEmail &&
              b.status === 'completed' &&
-             b.id !== selectedBookingDetails.id && 
+             b.id !== selectedBookingDetails.id &&
              b.detailedFeedback && b.detailedFeedback.length > 0
       );
 
@@ -88,7 +102,7 @@ export default function AdminReportsPage() {
           }
         });
       });
-      
+
       const calculatedAverages: Record<string, { averageRatingValue: number; ratingCount: number }> = {};
       PREDEFINED_SKILLS.forEach(skill => {
         calculatedAverages[skill] = {
@@ -123,7 +137,7 @@ export default function AdminReportsPage() {
       });
       return;
     }
-     if (!reportFile && !selectedBookingDetails?.reportUrl) { 
+     if (!reportFile && !selectedBookingDetails?.reportUrl) {
       toast({
         title: "Missing Report",
         description: "Please upload a report PDF file or ensure one is already linked.",
@@ -135,26 +149,22 @@ export default function AdminReportsPage() {
     const assignedBadge = MOCK_BADGES.find(b => b.id === selectedBadgeId);
     const feedbackToSave = PREDEFINED_SKILLS.map(skill => ({
       skill,
-      rating: skillRatingsData[skill] || 'Satisfactory', 
-      comments: '', 
+      rating: skillRatingsData[skill] || 'Satisfactory',
+      comments: '',
     }));
 
-    console.log({
-      bookingId: selectedBookingId,
-      fileName: reportFile?.name,
-      fileSize: reportFile?.size,
-      comments,
-      assignedBadge: assignedBadge ? assignedBadge.name : 'None',
-      detailedFeedback: feedbackToSave,
-    });
+    let newReportUrl = selectedBookingDetails.reportUrl;
+    if (reportFile) {
+      newReportUrl = `/resources/mock_feedback_${selectedBookingId}_${reportFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}.pdf`;
+    }
 
     const bookingIndex = MOCK_BOOKINGS.findIndex(b => b.id === selectedBookingId);
     if (bookingIndex > -1) {
       MOCK_BOOKINGS[bookingIndex].detailedFeedback = feedbackToSave;
-      if (reportFile) {
-        MOCK_BOOKINGS[bookingIndex].reportUrl = `/resources/mock_feedback_${selectedBookingId}_${reportFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}.pdf`;
+      if (reportFile) { // Only update if new file is uploaded
+         MOCK_BOOKINGS[bookingIndex].reportUrl = newReportUrl;
       }
-      MOCK_BOOKINGS[bookingIndex].userFeedback = comments; 
+      MOCK_BOOKINGS[bookingIndex].userFeedback = comments;
     }
 
     if (assignedBadge && selectedBookingDetails) {
@@ -166,10 +176,8 @@ export default function AdminReportsPage() {
             userProfile.awardedBadges.push(assignedBadge);
         }
         localStorage.setItem(mockUserProfileKey, JSON.stringify(userProfile));
-        console.log(`Assigned badge "${assignedBadge.name}" to user ${selectedBookingDetails.userName} (simulated)`);
     }
 
-    // Add to history
     const historyEntry: FeedbackSubmissionHistoryEntry = {
       id: `hist-${Date.now()}`,
       submissionDate: new Date().toISOString(),
@@ -179,14 +187,15 @@ export default function AdminReportsPage() {
       reportFileName: reportFile ? reportFile.name : (selectedBookingDetails.reportUrl ? selectedBookingDetails.reportUrl.split('/').pop() : undefined),
       badgeAssignedName: assignedBadge ? assignedBadge.name : undefined,
     };
-    MOCK_SUBMISSION_HISTORY.unshift(historyEntry); // Add to the beginning for most recent first
-    setSubmissionHistory([...MOCK_SUBMISSION_HISTORY].sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime()));
-    
+    MOCK_SUBMISSION_HISTORY.unshift(historyEntry);
+    setFullSubmissionHistory([...MOCK_SUBMISSION_HISTORY].sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime()));
+    setCurrentHistoryPage(1); // Reset to first page after new submission
+
     toast({
       title: "Feedback Processed",
       description: `Feedback for booking ID ${selectedBookingId} has been saved. ${reportFile ? 'Report uploaded.': ''} ${assignedBadge ? `Badge "${assignedBadge.name}" assigned.` : ''}`,
     });
-    
+
     setSelectedBookingId('');
     setReportFile(null);
     setComments('');
@@ -197,13 +206,12 @@ export default function AdminReportsPage() {
     if (fileInput) fileInput.value = '';
   };
 
-  // Pagination for History
-  const totalHistoryPages = Math.ceil(submissionHistory.length / ITEMS_PER_PAGE_HISTORY);
+  const totalHistoryPages = Math.ceil(filteredSubmissionHistory.length / ITEMS_PER_PAGE_HISTORY);
   const paginatedHistory = useMemo(() => {
     const startIndex = (currentHistoryPage - 1) * ITEMS_PER_PAGE_HISTORY;
     const endIndex = startIndex + ITEMS_PER_PAGE_HISTORY;
-    return submissionHistory.slice(startIndex, endIndex);
-  }, [currentHistoryPage, submissionHistory]);
+    return filteredSubmissionHistory.slice(startIndex, endIndex);
+  }, [currentHistoryPage, filteredSubmissionHistory]);
 
   const handlePreviousHistoryPage = () => {
     setCurrentHistoryPage((prev) => Math.max(prev - 1, 1));
@@ -230,11 +238,11 @@ export default function AdminReportsPage() {
             <div className="space-y-2">
               <Label htmlFor="bookingSelect">Select Booking</Label>
               <Select value={selectedBookingId} onValueChange={(value) => {
-                setSelectedBookingId(value); 
-                setSelectedBadgeId(''); 
+                setSelectedBookingId(value);
+                setSelectedBadgeId('');
                 setSkillRatingsData({});
                 setComments(MOCK_BOOKINGS.find(b => b.id === value)?.userFeedback || '');
-                setReportFile(null); 
+                setReportFile(null);
                 const fileInput = document.getElementById('reportFile') as HTMLInputElement;
                 if (fileInput) fileInput.value = '';
               }}>
@@ -259,7 +267,7 @@ export default function AdminReportsPage() {
               {reportFile && <p className="text-xs text-muted-foreground">Selected: {reportFile.name}</p>}
               {!reportFile && selectedBookingDetails?.reportUrl && <p className="text-xs text-muted-foreground">Current report: <a href={selectedBookingDetails.reportUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">{selectedBookingDetails.reportUrl.split('/').pop()}</a> (Upload new to replace)</p>}
             </div>
-            
+
             {selectedBookingId && (
               <>
                 <Card className="p-4 bg-muted/20">
@@ -273,7 +281,7 @@ export default function AdminReportsPage() {
                       const avgDisplay = currentAvg && currentAvg.ratingCount > 0
                         ? `(Prior Avg: ${currentAvg.averageRatingValue}/${MAX_SKILL_RATING_VALUE})`
                         : `(No prior ratings)`;
-                      
+
                       return (
                         <div key={skill} className="space-y-1">
                           <div className="flex justify-between items-baseline">
@@ -310,7 +318,7 @@ export default function AdminReportsPage() {
                         rows={3}
                     />
                 </div>
-                
+
                 <div className="space-y-2">
                     <Label htmlFor="badgeSelect">Assign Badge (Optional)</Label>
                     <Select value={selectedBadgeId} onValueChange={setSelectedBadgeId}>
@@ -342,7 +350,16 @@ export default function AdminReportsPage() {
       <Card className="mt-8">
         <CardHeader>
           <CardTitle className="flex items-center"><History className="mr-2 h-5 w-5 text-primary" /> Submission History</CardTitle>
-          <CardDescription>History of all feedback and report submissions. Showing {paginatedHistory.length} of {submissionHistory.length} entries.</CardDescription>
+          <CardDescription>History of all feedback and report submissions. Showing {paginatedHistory.length} of {filteredSubmissionHistory.length} entries.</CardDescription>
+           <Input
+            placeholder="Filter by user name..."
+            value={userNameFilter}
+            onChange={(e) => {
+              setUserNameFilter(e.target.value);
+              setCurrentHistoryPage(1); // Reset to first page on filter change
+            }}
+            className="mt-2 max-w-sm"
+          />
         </CardHeader>
         <CardContent>
           <Table>
@@ -357,16 +374,24 @@ export default function AdminReportsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedHistory.length > 0 ? paginatedHistory.map((entry) => (
+              {paginatedHistory.length > 0 ? paginatedHistory.map((entry) => {
+                const bookingForLink = MOCK_BOOKINGS.find(b => b.id === entry.bookingId);
+                return (
                 <TableRow key={entry.id}>
                   <TableCell>{format(new Date(entry.submissionDate), 'MMM d, yyyy - h:mm a')}</TableCell>
                   <TableCell>{entry.bookingId}</TableCell>
                   <TableCell>{entry.userName}</TableCell>
                   <TableCell>{entry.serviceName}</TableCell>
                   <TableCell>
-                    {entry.reportFileName ? (
-                        <UiBadge variant="secondary" className="flex items-center gap-1 max-w-xs truncate">
-                            <FileSpreadsheet className="h-3 w-3"/> {entry.reportFileName}
+                    {entry.reportFileName && bookingForLink?.reportUrl ? (
+                      <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs">
+                        <a href={bookingForLink.reportUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 truncate max-w-[150px] sm:max-w-xs">
+                          <FileSpreadsheet className="h-3 w-3 flex-shrink-0"/> {entry.reportFileName}
+                        </a>
+                      </Button>
+                    ) : entry.reportFileName ? (
+                        <UiBadge variant="secondary" className="flex items-center gap-1 max-w-[150px] sm:max-w-xs truncate">
+                            <FileSpreadsheet className="h-3 w-3 flex-shrink-0"/> {entry.reportFileName} (No Link)
                         </UiBadge>
                     ) : (
                         <span className="text-xs text-muted-foreground">N/A</span>
@@ -382,9 +407,11 @@ export default function AdminReportsPage() {
                     )}
                   </TableCell>
                 </TableRow>
-              )) : (
+              )}) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center h-24">No submission history found.</TableCell>
+                  <TableCell colSpan={6} className="text-center h-24">
+                    {userNameFilter ? "No submissions match your filter." : "No submission history found."}
+                  </TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -417,3 +444,4 @@ export default function AdminReportsPage() {
     </>
   );
 }
+
