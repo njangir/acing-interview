@@ -37,6 +37,7 @@ export default function AdminReportsPage() {
 
   useEffect(() => {
     // Initialize or update fullSubmissionHistory when MOCK_SUBMISSION_HISTORY might change
+    // Sort by most recent submission first
     setFullSubmissionHistory([...MOCK_SUBMISSION_HISTORY].sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime()));
   }, []); // Re-run if MOCK_SUBMISSION_HISTORY reference changes (though it's a const, direct mutation happens)
 
@@ -149,12 +150,13 @@ export default function AdminReportsPage() {
     const assignedBadge = MOCK_BADGES.find(b => b.id === selectedBadgeId);
     const feedbackToSave = PREDEFINED_SKILLS.map(skill => ({
       skill,
-      rating: skillRatingsData[skill] || 'Satisfactory',
-      comments: '',
+      rating: skillRatingsData[skill] || 'Satisfactory', // Default if not rated
+      comments: '', // Comments not implemented in this form, but part of type
     }));
 
     let newReportUrl = selectedBookingDetails.reportUrl;
     if (reportFile) {
+      // Simulate a file URL, in a real app this would be an actual URL from a storage service
       newReportUrl = `/resources/mock_feedback_${selectedBookingId}_${reportFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}.pdf`;
     }
 
@@ -164,14 +166,16 @@ export default function AdminReportsPage() {
       if (reportFile) { // Only update if new file is uploaded
          MOCK_BOOKINGS[bookingIndex].reportUrl = newReportUrl;
       }
-      MOCK_BOOKINGS[bookingIndex].userFeedback = comments;
+      MOCK_BOOKINGS[bookingIndex].userFeedback = comments; // Save overall comments
     }
 
     if (assignedBadge && selectedBookingDetails) {
         const userEmail = selectedBookingDetails.userEmail;
+        // Simulate saving awarded badge to user profile (e.g., in localStorage for this mock)
         const mockUserProfileKey = `mockUserProfile_${userEmail}`;
         let userProfile = JSON.parse(localStorage.getItem(mockUserProfileKey) || '{}');
         if (!userProfile.awardedBadges) userProfile.awardedBadges = [];
+        // Add badge if not already present
         if (!userProfile.awardedBadges.find((b: BadgeType) => b.id === assignedBadge.id)) {
             userProfile.awardedBadges.push(assignedBadge);
         }
@@ -187,8 +191,8 @@ export default function AdminReportsPage() {
       reportFileName: reportFile ? reportFile.name : (selectedBookingDetails.reportUrl ? selectedBookingDetails.reportUrl.split('/').pop() : undefined),
       badgeAssignedName: assignedBadge ? assignedBadge.name : undefined,
     };
-    MOCK_SUBMISSION_HISTORY.unshift(historyEntry);
-    setFullSubmissionHistory([...MOCK_SUBMISSION_HISTORY].sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime()));
+    MOCK_SUBMISSION_HISTORY.unshift(historyEntry); // Add to the beginning for most recent first
+    setFullSubmissionHistory([...MOCK_SUBMISSION_HISTORY].sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())); // Re-sort and update state
     setCurrentHistoryPage(1); // Reset to first page after new submission
 
     toast({
@@ -196,6 +200,7 @@ export default function AdminReportsPage() {
       description: `Feedback for booking ID ${selectedBookingId} has been saved. ${reportFile ? 'Report uploaded.': ''} ${assignedBadge ? `Badge "${assignedBadge.name}" assigned.` : ''}`,
     });
 
+    // Reset form fields
     setSelectedBookingId('');
     setReportFile(null);
     setComments('');
@@ -206,6 +211,7 @@ export default function AdminReportsPage() {
     if (fileInput) fileInput.value = '';
   };
 
+  // Pagination for Submission History
   const totalHistoryPages = Math.ceil(filteredSubmissionHistory.length / ITEMS_PER_PAGE_HISTORY);
   const paginatedHistory = useMemo(() => {
     const startIndex = (currentHistoryPage - 1) * ITEMS_PER_PAGE_HISTORY;
@@ -239,10 +245,12 @@ export default function AdminReportsPage() {
               <Label htmlFor="bookingSelect">Select Booking</Label>
               <Select value={selectedBookingId} onValueChange={(value) => {
                 setSelectedBookingId(value);
-                setSelectedBadgeId('');
-                setSkillRatingsData({});
+                setSelectedBadgeId(''); // Reset badge selection when booking changes
+                setSkillRatingsData({}); // Reset skill ratings
+                // Load existing comments if any
                 setComments(MOCK_BOOKINGS.find(b => b.id === value)?.userFeedback || '');
-                setReportFile(null);
+                setReportFile(null); // Reset file input state
+                // Clear the actual file input field
                 const fileInput = document.getElementById('reportFile') as HTMLInputElement;
                 if (fileInput) fileInput.value = '';
               }}>
@@ -445,3 +453,4 @@ export default function AdminReportsPage() {
   );
 }
 
+    
