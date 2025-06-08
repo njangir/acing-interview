@@ -14,9 +14,13 @@ import { Input } from '@/components/ui/input';
 import { Logo } from '@/components/icons/logo';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from '@/hooks/use-auth'; // This will also need to be updated to use actual Firebase user
 import { Checkbox } from '@/components/ui/checkbox';
 
+// TODO: (Backend) Initialize Firebase in a central firebase.ts or similar config file
+// import { auth } from '@/lib/firebase'; // Assuming firebase.ts setup
+// import { signInWithEmailAndPassword } from 'firebase/auth';
+// import { doc, getDoc } from 'firebase/firestore'; // To fetch user profile from Firestore
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
@@ -30,7 +34,7 @@ export default function LoginPage() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login } = useAuth(); 
+  const { login: authContextLogin } = useAuth(); // Renamed to avoid conflict if using Firebase's login
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
@@ -43,21 +47,65 @@ export default function LoginPage() {
   async function onSubmit(data: LoginFormValues) {
     const redirectUrl = searchParams.get('redirect') || '/dashboard';
 
-    if (data.email === 'admin@example.com' && data.password === 'adminpass') { // Simple admin check
-      login({ email: data.email, name: 'Admin User', isAdmin: true });
+    // PRODUCTION TODO: Replace mock login with Firebase Authentication
+    try {
+      // const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+      // const firebaseUser = userCredential.user;
+
+      // if (firebaseUser) {
+      //   // Fetch user profile from Firestore to get roles (e.g., isAdmin) and other details
+      //   // BACKEND API NEEDED: Secure way to get user roles.
+      //   // Option 1: Firestore document for user profiles
+      //   // const userDocRef = doc(db, "users", firebaseUser.uid);
+      //   // const userDocSnap = await getDoc(userDocRef);
+      //   // let userData = { email: firebaseUser.email || '', name: firebaseUser.displayName || 'User', isAdmin: false, imageUrl: firebaseUser.photoURL || undefined };
+
+      //   // if (userDocSnap.exists()) {
+      //   //   const profileData = userDocSnap.data();
+      //   //   userData.name = profileData.name || userData.name;
+      //   //   userData.isAdmin = profileData.isAdmin || false;
+      //   //   userData.imageUrl = profileData.imageUrl || userData.imageUrl;
+      //   //   // Add any other relevant fields from your user profile document
+      //   // } else {
+      //   //   // Handle case where user exists in Auth but not in Firestore (e.g., create profile doc)
+      //   //   console.warn("User profile not found in Firestore, creating basic profile.");
+      //   //   // await setDoc(userDocRef, { email: firebaseUser.email, name: firebaseUser.displayName || 'New User', isAdmin: false, createdAt: serverTimestamp() });
+      //   // }
+
+      //   // Option 2: Use Firebase Custom Claims for isAdmin (set via backend/Cloud Function)
+      //   // const idTokenResult = await firebaseUser.getIdTokenResult();
+      //   // const isAdmin = idTokenResult.claims.admin === true;
+      //   // userData.isAdmin = isAdmin;
+
+      //   authContextLogin(userData); // Update auth context with real user data
+
+      //   toast({
+      //     title: 'Login Successful!',
+      //     description: 'Welcome back! Redirecting...',
+      //   });
+
+      //   if (userData.isAdmin) {
+      //     router.push(redirectUrl.startsWith('/admin') ? redirectUrl : '/admin');
+      //   } else {
+      //     router.push(redirectUrl.startsWith('/admin') ? '/dashboard' : redirectUrl);
+      //   }
+      // }
+    // MOCK LOGIN LOGIC - REMOVE/REPLACE THIS BLOCK
+    // ========================================================================
+    if (data.email === 'admin@example.com' && data.password === 'adminpass') {
+      authContextLogin({ email: data.email, name: 'Admin User', isAdmin: true, imageUrl: 'https://placehold.co/100x100/EBF4FF/76A9FA?text=AU' });
       toast({
         title: 'Admin Login Successful (Mock)',
         description: 'Welcome back, Admin! Redirecting...',
       });
       router.push(redirectUrl.startsWith('/admin') ? redirectUrl : '/admin');
-    } else if ((data.email === 'user@example.com' || data.email === 'aspirant@example.com') && data.password === 'userpass') { // Regular user or aspirant
+    } else if ((data.email === 'user@example.com' || data.email === 'aspirant@example.com') && data.password === 'userpass') {
        const userName = data.email === 'aspirant@example.com' ? 'Aspirant TestUser' : 'Regular User';
-       login({ email: data.email, name: userName, isAdmin: false });
+       authContextLogin({ email: data.email, name: userName, isAdmin: false, imageUrl: data.email === 'aspirant@example.com' ? 'https://placehold.co/100x100/FFF0EB/FA9F76?text=AT' : 'https://placehold.co/100x100/EBFFF2/76FA91?text=RU' });
        toast({
         title: 'Login Successful (Mock)',
         description: 'Welcome back! Redirecting...',
       });
-      // Prevent non-admin to admin redirect, allow aspirant to go to dashboard (or original redirect)
       router.push(redirectUrl.startsWith('/admin') ? '/dashboard' : redirectUrl);
     }
      else {
@@ -66,6 +114,35 @@ export default function LoginPage() {
         description: 'Invalid email or password. Mock users: user@example.com or aspirant@example.com (userpass) or admin@example.com (adminpass)',
         variant: 'destructive',
       });
+    }
+    // ========================================================================
+    // END OF MOCK LOGIN LOGIC
+
+    } catch (error: any) {
+      console.error("Login error:", error);
+      //   let errorMessage = "Login failed. Please check your credentials and try again.";
+      //   if (error.code) { // Firebase error codes
+      //     switch (error.code) {
+      //       case 'auth/user-not-found':
+      //       case 'auth/wrong-password':
+      //       case 'auth/invalid-credential': // For newer SDK versions
+      //         errorMessage = "Invalid email or password.";
+      //         break;
+      //       case 'auth/invalid-email':
+      //         errorMessage = "Please enter a valid email address.";
+      //         break;
+      //       case 'auth/too-many-requests':
+      //           errorMessage = "Access temporarily disabled due to too many failed login attempts. Please try again later.";
+      //           break;
+      //       default:
+      //         errorMessage = `Login failed: ${error.message}`;
+      //     }
+      //   }
+      // toast({
+      //   title: 'Login Failed',
+      //   description: errorMessage,
+      //   variant: 'destructive',
+      // });
     }
   }
 
@@ -79,7 +156,8 @@ export default function LoginPage() {
           <CardTitle className="text-2xl font-headline text-primary">Welcome Back</CardTitle>
           <CardDescription>
             Enter your credentials to access your account. <br/>
-            (Try user@example.com, aspirant@example.com / userpass OR admin@example.com / adminpass)
+            {/* PRODUCTION TODO: Remove mock user hint in production */}
+            (Mock: user@example.com / userpass OR admin@example.com / adminpass)
           </CardDescription>
         </CardHeader>
         <Form {...form}>
@@ -149,3 +227,4 @@ export default function LoginPage() {
     </div>
   );
 }
+    
