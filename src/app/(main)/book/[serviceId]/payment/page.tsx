@@ -16,6 +16,12 @@ import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 
+// PRODUCTION TODO: Import Firebase and Firestore methods:
+// import { db } from '@/lib/firebase';
+// import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, runTransaction } from 'firebase/firestore';
+// import { functions } from '@/lib/firebase'; // If using Firebase Functions for backend logic
+// import { httpsCallable } from 'firebase/functions';
+
 type PaymentOption = 'payNow' | 'payLater';
 
 export default function PaymentPage() {
@@ -25,59 +31,119 @@ export default function PaymentPage() {
   const serviceId = params.serviceId as string;
   const bookingIdFromQuery = searchParamsHook.get('bookingId'); 
   const { toast } = useToast();
-  const { currentUser } = useAuth();
+  const { currentUser, loadingAuth } = useAuth(); // Added loadingAuth
   
   const [service, setService] = useState<Service | null>(null);
-  const [bookingDetails, setBookingDetails] = useState<any>(null); // Slot details
-  const [userDetails, setUserDetails] = useState<any>(null); // User info
-  const [isLoading, setIsLoading] = useState(false);
+  const [bookingDetails, setBookingDetails] = useState<any>(null); // Slot details from localStorage or query
+  const [userDetails, setUserDetails] = useState<any>(null); // User info from localStorage or currentUser
+  const [isLoading, setIsLoading] = useState(false); // General loading for page actions
+  const [isDataLoading, setIsDataLoading] = useState(true); // Specific for initial data load
   const [error, setError] = useState<string | null>(null);
   const [paymentOption, setPaymentOption] = useState<PaymentOption>('payNow');
 
   useEffect(() => {
-    const currentService = MOCK_SERVICES.find(s => s.id === serviceId);
-    if (currentService) {
-      setService(currentService);
-    } else {
-      setError("Service not found.");
+    if (loadingAuth) {
+      setIsDataLoading(true);
+      return;
+    }
+    if (!currentUser) {
+      setIsDataLoading(false);
+      setError("User not authenticated. Please login.");
+      // router.push(`/login?redirect=/book/${serviceId}/payment${bookingIdFromQuery ? `?bookingId=${bookingIdFromQuery}` : ''}`);
+      return;
     }
 
-    if (bookingIdFromQuery) {
-      const existingBooking = MOCK_BOOKINGS.find(b => b.id === bookingIdFromQuery && b.serviceId === serviceId);
-      if (existingBooking) {
-        setBookingDetails({
-            date: existingBooking.date,
-            time: existingBooking.time,
-            serviceId: existingBooking.serviceId,
-        });
-        setUserDetails({ 
-            name: existingBooking.userName,
-            email: existingBooking.userEmail,
-            phone: existingBooking.userEmail, 
-        });
-      } else {
-        setError("Existing booking information not found. Please try again or start a new booking.");
+    const loadInitialData = async () => {
+      setIsDataLoading(true);
+      setError(null);
+      try {
+        // PRODUCTION TODO: Fetch service details from Firestore
+        // const serviceDocRef = doc(db, "services", serviceId);
+        // const serviceSnap = await getDoc(serviceDocRef);
+        // if (serviceSnap.exists()) {
+        //   setService({ id: serviceSnap.id, ...serviceSnap.data() } as Service);
+        // } else {
+        //   setError("Service not found.");
+        //   setIsDataLoading(false);
+        //   return;
+        // }
+        const currentService = MOCK_SERVICES.find(s => s.id === serviceId);
+        if (currentService) {
+          setService(currentService);
+        } else {
+          setError("Service not found.");
+          setIsDataLoading(false);
+          return;
+        }
+
+        if (bookingIdFromQuery) {
+          // PRODUCTION TODO: Fetch existing booking from Firestore
+          // const bookingDocRef = doc(db, "bookings", bookingIdFromQuery);
+          // const bookingSnap = await getDoc(bookingDocRef);
+          // if (bookingSnap.exists() && bookingSnap.data().serviceId === serviceId && bookingSnap.data().uid === currentUser.uid) {
+          //   const bookingData = bookingSnap.data() as Booking;
+          //   setBookingDetails({
+          //       date: bookingData.date,
+          //       time: bookingData.time,
+          //       serviceId: bookingData.serviceId,
+          //       serviceName: bookingData.serviceName, // Get from fetched booking
+          //       servicePrice: currentService?.price, // Get from fetched service
+          //   });
+          //   setUserDetails({ 
+          //       name: bookingData.userName, // or currentUser.name
+          //       email: bookingData.userEmail, // or currentUser.email
+          //   });
+          //   if(bookingData.paymentStatus === 'paid') {
+          //       setError("This booking has already been paid.");
+          //   }
+          // } else {
+          //   setError("Existing booking information not found or does not match. Please try again or start a new booking.");
+          //   setIsDataLoading(false);
+          //   return;
+          // }
+          const existingBooking = MOCK_BOOKINGS.find(b => b.id === bookingIdFromQuery && b.serviceId === serviceId && b.userEmail === currentUser.email);
+          if (existingBooking) {
+            setBookingDetails({
+                date: existingBooking.date,
+                time: existingBooking.time,
+                serviceId: existingBooking.serviceId,
+                serviceName: existingBooking.serviceName,
+                servicePrice: currentService?.price,
+            });
+            setUserDetails({ 
+                name: existingBooking.userName,
+                email: existingBooking.userEmail,
+            });
+            if(existingBooking.paymentStatus === 'paid') {
+                setError("This booking has already been paid.");
+            }
+          } else {
+            setError("Existing booking information not found or does not match. Please try again or start a new booking.");
+            setIsDataLoading(false); return;
+          }
+        } else {
+            // PRODUCTION TODO: Data passed from previous page (slots) should ideally be through secure means or state,
+            // not just localStorage if sensitive. Or, a "pending_payment" booking doc could be created on slot selection.
+            const storedBookingDetails = localStorage.getItem('bookingDetails');
+            if (storedBookingDetails) {
+              setBookingDetails(JSON.parse(storedBookingDetails));
+            } else {
+              setError("Booking slot information not found.");
+              router.push(`/book/${serviceId}/slots`); 
+              setIsDataLoading(false); return;
+            }
+            // User details would primarily come from currentUser context
+            setUserDetails({name: currentUser.name, email: currentUser.email});
+        }
+      } catch (err) {
+        console.error("Error loading payment page data:", err);
+        setError("Failed to load payment details. Please try again.");
       }
-    } else {
-        const storedBookingDetails = localStorage.getItem('bookingDetails');
-        if (storedBookingDetails) {
-          setBookingDetails(JSON.parse(storedBookingDetails));
-        } else {
-          setError("Booking slot information not found.");
-          router.push(`/book/${serviceId}/slots`); 
-          return;
-        }
+      setIsDataLoading(false);
+    };
 
-        const storedUserDetails = localStorage.getItem('userDetails');
-        if (storedUserDetails) {
-          setUserDetails(JSON.parse(storedUserDetails));
-        } else {
-          setError("User details not found.");
-           router.push(`/book/${serviceId}/slots`); 
-          return;
-        }
-    }
-  }, [serviceId, bookingIdFromQuery, router]);
+    loadInitialData();
+  }, [serviceId, bookingIdFromQuery, router, currentUser, loadingAuth]);
 
   const handlePaymentOrConfirmation = async () => {
     setIsLoading(true);
@@ -90,91 +156,130 @@ export default function PaymentPage() {
     }
     
     let paymentSuccess = true;
-    let newBookingStatus: Booking['status'];
-    let newPaymentStatus: Booking['paymentStatus'];
+    let newBookingStatus: Booking['status'] = 'pending_approval';
+    let newPaymentStatus: Booking['paymentStatus'] = 'pay_later_pending';
     let transactionId: string | null = null;
-    let finalMeetingLink: string = '';
+    let finalMeetingLink: string = ''; // Usually set by admin later
 
     if (paymentOption === 'payNow') {
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate payment processing
+      // PRODUCTION TODO: Payment Gateway Integration
+      // 1. Call backend API to create a payment order (e.g., /api/payment/create-order)
+      //    Payload: { serviceId: service.id, amount: service.price, userId: currentUser.uid, bookingId: bookingIdFromQuery (if exists) }
+      //    const createOrder = httpsCallable(functions, 'createPaymentOrder');
+      //    const orderResult = await createOrder({ serviceId: service.id, amount: service.price, userId: currentUser.uid, bookingId: bookingIdFromQuery });
+      //    const { orderId, gatewayKey } = orderResult.data;
+
+      // 2. Initialize Payment Gateway SDK on client-side with orderId & key
+      //    const options = { key: gatewayKey, amount: service.price * 100, currency: "INR", name: "Armed Forces Interview Ace", order_id: orderId,
+      //      handler: async (response) => {
+      //        // Payment successful, response contains paymentId, orderId, signature
+      //        // 3. Call backend API to verify payment and confirm booking (e.g., /api/booking/confirm)
+      //        //    Payload: { paymentId: response.razorpay_payment_id, orderId: response.razorpay_order_id, signature: response.razorpay_signature, bookingId: bookingIdFromQuery }
+      //        //    const confirmBookingCall = httpsCallable(functions, 'confirmBooking');
+      //        //    const bookingConfirmationResult = await confirmBookingCall({...});
+      //        //    if (bookingConfirmationResult.data.success) {
+      //        //       transactionId = bookingConfirmationResult.data.transactionId;
+      //        //       newPaymentStatus = 'paid';
+      //        //       newBookingStatus = bookingConfirmationResult.data.bookingStatus; // e.g., 'accepted' or 'scheduled'
+      //        //       finalMeetingLink = bookingConfirmationResult.data.meetingLink || '';
+      //        //       proceedToConfirmationPage(newBookingStatus, newPaymentStatus, transactionId, finalMeetingLink);
+      //        //    } else { setError("Failed to confirm booking after payment."); setIsLoading(false); }
+      //      },
+      //      prefill: { name: userDetails.name, email: userDetails.email },
+      //      theme: { color: '#2563EB' } // Your primary color
+      //    };
+      //    const rzp = new window.Razorpay(options);
+      //    rzp.on('payment.failed', (response) => { setError("Payment failed: " + response.error.description); setIsLoading(false); });
+      //    rzp.open();
+      //    // For simulation, we skip rzp.open() and directly proceed
+      //    return; // Actual payment flow would handle the rest via callbacks. This is for demo.
+
+      // MOCK PAYMENT SIMULATION
+      await new Promise(resolve => setTimeout(resolve, 1500)); 
       paymentSuccess = Math.random() > 0.1; // 90% success rate
 
       if (paymentSuccess) {
-        newPaymentStatus = 'paid';
         transactionId = "mock_txn_" + Date.now();
-
+        newPaymentStatus = 'paid';
+        
         if (bookingIdFromQuery) { // Paying for an existing 'pay_later_pending' booking
+            // PRODUCTION TODO: Update existing booking in Firestore
+            // const bookingDocRef = doc(db, "bookings", bookingIdFromQuery);
+            // await updateDoc(bookingDocRef, {
+            //   paymentStatus: 'paid',
+            //   transactionId: transactionId,
+            //   status: MOCK_BOOKINGS.find(b=>b.id===bookingIdFromQuery)?.meetingLink ? 'scheduled' : 'accepted', // Adjust based on if link exists
+            //   updatedAt: serverTimestamp()
+            // });
+            // newBookingStatus = MOCK_BOOKINGS.find(b=>b.id===bookingIdFromQuery)?.meetingLink ? 'scheduled' : 'accepted';
             const bookingIndex = MOCK_BOOKINGS.findIndex(b => b.id === bookingIdFromQuery);
             if (bookingIndex !== -1) {
                 MOCK_BOOKINGS[bookingIndex].paymentStatus = 'paid';
                 MOCK_BOOKINGS[bookingIndex].transactionId = transactionId;
-                // Status becomes 'accepted', or 'scheduled' if admin already added a link
                 MOCK_BOOKINGS[bookingIndex].status = MOCK_BOOKINGS[bookingIndex].meetingLink ? 'scheduled' : 'accepted';
                 newBookingStatus = MOCK_BOOKINGS[bookingIndex].status;
                 finalMeetingLink = MOCK_BOOKINGS[bookingIndex].meetingLink || '';
-            } else {
-                setError("Could not find the booking to update. Please try again.");
-                setIsLoading(false);
-                return;
-            }
+            } else { setError("Could not find the booking to update."); setIsLoading(false); return; }
         } else { // New booking, paid now
             newBookingStatus = 'accepted'; // Admin needs to provide link
-            finalMeetingLink = ''; // No meeting link generated here
         }
         toast({
           title: "Payment Successful!",
           description: newBookingStatus === 'accepted' ? "Your booking is paid. Admin will schedule and provide meeting link." : "Your booking is confirmed. Redirecting...",
-          variant: "default",
         });
       } else {
-        setError("Payment failed. Please try again.");
-        toast({
-          title: "Payment Failed",
-          description: "There was an issue processing your payment. Please try again.",
-          variant: "destructive",
-        });
+        setError("Payment failed. Please try again or choose 'Pay Later'.");
+        toast({ title: "Payment Failed", description: "There was an issue processing your payment.", variant: "destructive" });
         setIsLoading(false);
         return;
       }
-    } else { // Pay Later (always a new booking)
+    } else { // Pay Later
       if (bookingIdFromQuery) { 
           setError("Pay Later option is not available for existing bookings being paid now.");
           setIsLoading(false);
           return;
       }
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate short processing
       newPaymentStatus = 'pay_later_pending';
-      newBookingStatus = 'pending_approval'; // Admin needs to approve
-      finalMeetingLink = ''; // No meeting link
-      transactionId = null;
+      newBookingStatus = 'pending_approval';
       toast({
         title: "Booking Tentatively Confirmed!",
         description: "Your slot is reserved. Payment will be due before the session if approved. Redirecting...",
-        variant: "default",
       });
     }
 
-    if (paymentSuccess) {
-      if (!bookingIdFromQuery) { // If it's a brand new booking, add it to MOCK_BOOKINGS
-        const newBookingId = `booking-${Date.now()}`;
+    if (paymentSuccess) { // This means either PayNow was successful or PayLater was chosen
+      if (!bookingIdFromQuery) { // If it's a brand new booking, create it in Firestore
+        const newBookingId = `booking-${Date.now()}`; // PRODUCTION TODO: Use Firestore auto-generated ID
+        // const newBookingRef = doc(collection(db, "bookings")); // Firestore auto-ID
+        // const newBookingId = newBookingRef.id;
+
         const newBookingEntry: Booking = {
           id: newBookingId,
+          uid: currentUser.uid, // Link to authenticated user
           serviceName: service.name,
           serviceId: service.id,
           date: bookingDetails.date,
           time: bookingDetails.time,
           userName: userDetails.name,
-          userEmail: currentUser.email,
+          userEmail: currentUser.email, // Use authenticated user's email
           meetingLink: finalMeetingLink, 
           status: newBookingStatus,
           paymentStatus: newPaymentStatus,
           transactionId: transactionId,
           requestedRefund: false,
+          // createdAt: serverTimestamp(), // Firestore server timestamp
+          // updatedAt: serverTimestamp(),
+          // For mock:
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         };
-        MOCK_BOOKINGS.push(newBookingEntry);
+        // PRODUCTION TODO: await setDoc(newBookingRef, newBookingEntry);
+        MOCK_BOOKINGS.push(newBookingEntry); // Mock
       }
-      // For existing bookings, MOCK_BOOKINGS was updated directly in the 'payNow' block.
+      // For existing bookings, Firestore update was handled in 'payNow' block.
 
+      // Store details for confirmation page. PRODUCTION: Could pass bookingId and fetch on confirmation page.
       localStorage.setItem('confirmationDetails', JSON.stringify({
         serviceName: service.name,
         date: bookingDetails.date,
@@ -183,7 +288,7 @@ export default function PaymentPage() {
         meetingLink: finalMeetingLink,
         transactionId: transactionId,
         paymentStatus: newPaymentStatus,
-        status: newBookingStatus, // Pass the actual booking status
+        status: newBookingStatus,
       }));
       router.push(`/book/confirmation`);
     }
@@ -191,22 +296,47 @@ export default function PaymentPage() {
     setIsLoading(false);
   };
 
-  if (error && (!service || !bookingDetails || !userDetails)) {
+  const proceedToConfirmationPage = (status: Booking['status'], paymentStatus: Booking['paymentStatus'], txnId: string | null, meetingLink: string) => {
+    // This function would be called from payment gateway success handler in production
+    if (!service || !bookingDetails || !userDetails) return;
+    localStorage.setItem('confirmationDetails', JSON.stringify({
+        serviceName: service.name,
+        date: bookingDetails.date,
+        time: bookingDetails.time,
+        userName: userDetails.name,
+        meetingLink: meetingLink,
+        transactionId: txnId,
+        paymentStatus: paymentStatus,
+        status: status,
+      }));
+    router.push(`/book/confirmation`);
+    setIsLoading(false);
+  }
+
+
+  if (isDataLoading || loadingAuth) {
+    return <div className="container py-12"><Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" /></div>;
+  }
+
+  if (error && (!service || !bookingDetails)) { // Critical error
      return (
       <div className="container py-12">
         <Alert variant="destructive">
           <XCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error} Please start the booking process again from the service selection or slot page.</AlertDescription>
+          <AlertDescription>{error} Please start the booking process again.</AlertDescription>
            <Button onClick={() => router.push('/services')} className="mt-4">Go to Services</Button>
         </Alert>
       </div>
     );
   }
-
-  if (!service || !bookingDetails || !userDetails) {
-    return <div className="container py-12">Loading payment details...</div>;
+  
+  if (!service || !bookingDetails || !userDetails) { // Should be caught by isDataLoading, but as fallback
+    return <div className="container py-12">Loading payment details... Ensure you are logged in and have selected a slot.</div>;
   }
+  
+  const existingBookingPaid = bookingIdFromQuery && MOCK_BOOKINGS.find(b=>b.id===bookingIdFromQuery)?.paymentStatus === 'paid';
+
 
   return (
     <>
@@ -235,14 +365,20 @@ export default function PaymentPage() {
             <RadioGroup 
                 onValueChange={(value: PaymentOption) => setPaymentOption(value)} 
                 className="space-y-2"
+                // If paying for an existing booking, 'Pay Now' is the only option.
+                // Otherwise, respect the user's choice or default to 'Pay Now'.
                 value={bookingIdFromQuery ? 'payNow' : paymentOption} 
             >
               <Label className="font-semibold text-md">Payment Options:</Label>
               <div className="flex items-center space-x-2 p-3 border rounded-md hover:border-primary transition-colors">
-                <RadioGroupItem value="payNow" id="payNow" disabled={bookingIdFromQuery && MOCK_BOOKINGS.find(b=>b.id===bookingIdFromQuery)?.paymentStatus === 'paid'} />
+                <RadioGroupItem 
+                    value="payNow" 
+                    id="payNow" 
+                    disabled={existingBookingPaid} // Disable if already paid
+                />
                 <Label htmlFor="payNow" className="flex-1 cursor-pointer">Pay Now & Confirm Slot</Label>
               </div>
-              {!bookingIdFromQuery && ( 
+              {!bookingIdFromQuery && ( // 'Pay Later' only for new bookings
                 <div className="flex items-center space-x-2 p-3 border rounded-md hover:border-primary transition-colors">
                     <RadioGroupItem value="payLater" id="payLater" />
                     <Label htmlFor="payLater" className="flex-1 cursor-pointer">Pay Later (Tentative, Requires Approval)</Label>
@@ -262,14 +398,15 @@ export default function PaymentPage() {
             
             {paymentOption === 'payNow' && (
                 <div className="text-center pt-4">
-                <Image src="https://placehold.co/300x80.png?text=Mock+Razorpay+Gateway" alt="Mock Razorpay Gateway" width={300} height={80} className="mx-auto rounded border" data-ai-hint="payment gateway logo"/>
+                {/* PRODUCTION TODO: Replace with actual payment gateway button/integration (e.g., Razorpay button) */}
+                <Image src="https://placehold.co/300x80.png?text=Mock+Payment+Gateway" alt="Mock Payment Gateway" width={300} height={80} className="mx-auto rounded border" data-ai-hint="payment gateway logo"/>
                 </div>
             )}
 
-             {error && (
+             {error && ( // General error display if not critical
               <Alert variant="destructive" className="mt-4">
                 <XCircle className="h-4 w-4" />
-                <AlertTitle>Payment Error</AlertTitle>
+                <AlertTitle>Error</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
@@ -277,7 +414,7 @@ export default function PaymentPage() {
           <CardFooter>
             <Button 
               onClick={handlePaymentOrConfirmation} 
-              disabled={isLoading || (bookingIdFromQuery && MOCK_BOOKINGS.find(b=>b.id===bookingIdFromQuery)?.paymentStatus === 'paid')} 
+              disabled={isLoading || existingBookingPaid} 
               size="lg" 
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
             >
