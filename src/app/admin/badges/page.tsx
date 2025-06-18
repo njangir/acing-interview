@@ -17,10 +17,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MOCK_BADGES } from "@/constants";
+import { MOCK_BADGES } from "@/constants"; // Keep for fallback
 import type { Badge } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Edit, Trash2, Award as AwardIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Award as AwardIcon, ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
+
+// PRODUCTION TODO: Import Firebase and Firestore methods
+// import { db } from '@/lib/firebase';
+// import { collection, doc, addDoc, setDoc, updateDoc, deleteDoc, getDocs, onSnapshot, serverTimestamp } from 'firebase/firestore';
 
 const ITEMS_PER_PAGE = 7;
 
@@ -39,7 +43,11 @@ const defaultPlaceholderImage = "https://placehold.co/100x100.png?text=Badge";
 
 export default function AdminBadgesPage() {
   const { toast } = useToast();
-  const [badges, setBadges] = useState<Badge[]>(MOCK_BADGES);
+  const [allBadgesData, setAllBadgesData] = useState<Badge[]>([]); // Initialize with empty array
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentBadge, setCurrentBadge] = useState<Badge | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -57,6 +65,65 @@ export default function AdminBadgesPage() {
   });
 
   useEffect(() => {
+    setIsLoading(true);
+    setError(null);
+    // PRODUCTION TODO: Fetch badges from Firestore
+    // Option 1: Fetch once
+    /*
+    const fetchBadges = async () => {
+      try {
+        const badgesColRef = collection(db, 'badges');
+        // const q = query(badgesColRef, orderBy('name', 'asc')); // Example ordering
+        const badgesSnap = await getDocs(badgesColRef); // or await getDocs(q);
+        const fetchedBadges = badgesSnap.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            // Ensure timestamp fields are handled (e.g., toDate().toISOString())
+            // createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
+            // updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : new Date().toISOString(),
+          } as Badge;
+        });
+        setAllBadgesData(fetchedBadges);
+      } catch (err) {
+        console.error("Error fetching badges:", err);
+        setError("Failed to load badges. Displaying mock data as fallback.");
+        setAllBadgesData([...MOCK_BADGES]); // Fallback to mock
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchBadges();
+    */
+
+    // Option 2: Real-time updates with onSnapshot (preferred for admin dashboards)
+    /*
+    const badgesColRef = collection(db, 'badges');
+    // const q = query(badgesColRef, orderBy('name', 'asc'));
+    const unsubscribe = onSnapshot(badgesColRef, (querySnapshot) => { // Use q for ordering
+      const fetchedBadges = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Badge));
+      setAllBadgesData(fetchedBadges);
+      setIsLoading(false);
+      setError(null);
+    }, (err) => {
+      console.error("Error with real-time badges listener:", err);
+      setError("Failed to load badges in real-time. Displaying mock data.");
+      setAllBadgesData([...MOCK_BADGES]); // Fallback
+      setIsLoading(false);
+    });
+    return () => unsubscribe(); // Cleanup listener
+    */
+
+    // MOCK IMPLEMENTATION:
+    setTimeout(() => {
+      setAllBadgesData([...MOCK_BADGES]); // Use a copy for local state
+      setIsLoading(false);
+    }, 500);
+
+  }, []);
+
+  useEffect(() => {
     if (currentBadge) {
       form.reset({
         name: currentBadge.name,
@@ -67,19 +134,19 @@ export default function AdminBadgesPage() {
         dataAiHint: currentBadge.dataAiHint,
       });
     } else {
-      form.reset({ 
+      form.reset({
         name: '', description: '', force: 'General', rankName: '', imageUrl: '', dataAiHint: '',
       });
     }
   }, [currentBadge, form, isModalOpen]);
 
-  const totalPages = Math.ceil(badges.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(allBadgesData.length / ITEMS_PER_PAGE);
 
   const paginatedBadges = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const endIndex = startIndex + ITEMS_PER_PAGE;
-    return badges.slice(startIndex, endIndex);
-  }, [currentPage, badges]);
+    return allBadgesData.slice(startIndex, endIndex);
+  }, [currentPage, allBadgesData]);
 
   const handlePreviousPage = () => {
     setCurrentPage((prev) => Math.max(prev - 1, 1));
@@ -88,7 +155,6 @@ export default function AdminBadgesPage() {
   const handleNextPage = () => {
     setCurrentPage((prev) => Math.min(prev + 1, totalPages));
   };
-
 
   const handleAddNew = () => {
     setCurrentBadge(null);
@@ -100,41 +166,95 @@ export default function AdminBadgesPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (badgeId: string) => {
-    const badgeIndex = MOCK_BADGES.findIndex(b => b.id === badgeId);
-    if (badgeIndex > -1) {
-      MOCK_BADGES.splice(badgeIndex, 1);
-    }
-    setBadges([...MOCK_BADGES]); 
-    toast({ title: "Badge Deleted", description: "The badge has been removed." });
-    if (currentPage > Math.ceil(MOCK_BADGES.length / ITEMS_PER_PAGE) && MOCK_BADGES.length > 0) {
-      setCurrentPage(Math.ceil(MOCK_BADGES.length / ITEMS_PER_PAGE));
-    } else if (MOCK_BADGES.length === 0) {
-      setCurrentPage(1);
+  const handleDelete = async (badgeId: string, badgeName: string) => {
+    try {
+      // PRODUCTION TODO: Delete badge document from Firestore
+      // const badgeDocRef = doc(db, "badges", badgeId);
+      // await deleteDoc(badgeDocRef);
+
+      // MOCK:
+      const badgeIndexInMock = MOCK_BADGES.findIndex(b => b.id === badgeId);
+      if (badgeIndexInMock > -1) {
+        MOCK_BADGES.splice(badgeIndexInMock, 1);
+      }
+      setAllBadgesData(prev => prev.filter(b => b.id !== badgeId)); // Update local state
+
+      toast({ title: "Badge Deleted", description: `Badge "${badgeName}" has been removed.` });
+      // Adjust pagination if necessary
+      if (currentPage > Math.ceil(allBadgesData.length / ITEMS_PER_PAGE) && allBadgesData.length > 0) {
+        setCurrentPage(Math.ceil(allBadgesData.length / ITEMS_PER_PAGE));
+      } else if (allBadgesData.length === 0) {
+        setCurrentPage(1);
+      }
+    } catch (err) {
+      console.error("Error deleting badge:", err);
+      toast({ title: "Delete Failed", description: `Could not delete badge "${badgeName}".`, variant: "destructive"});
     }
   };
 
-  function onSubmit(data: BadgeFormValues) {
-    const newBadgeData: Badge = {
-      id: currentBadge?.id || `badge-${Date.now()}`,
+  async function onSubmit(data: BadgeFormValues) {
+    setIsSubmitting(true);
+    const badgeDataToSave: Omit<Badge, 'id' | 'createdAt' | 'updatedAt'> = {
       ...data,
       imageUrl: data.imageUrl || defaultPlaceholderImage,
       dataAiHint: data.dataAiHint || 'badge icon',
     };
 
-    if (currentBadge) {
-      const badgeIndex = MOCK_BADGES.findIndex(b => b.id === currentBadge.id);
-      if (badgeIndex > -1) {
-        MOCK_BADGES[badgeIndex] = newBadgeData;
+    try {
+      if (currentBadge) {
+        // PRODUCTION TODO: Update existing badge document in Firestore
+        // const badgeDocRef = doc(db, "badges", currentBadge.id);
+        // await updateDoc(badgeDocRef, { ...badgeDataToSave, updatedAt: serverTimestamp() });
+        
+        // MOCK:
+        const updatedBadgeWithId = { ...badgeDataToSave, id: currentBadge.id, createdAt: currentBadge.createdAt, updatedAt: new Date().toISOString() } as Badge;
+        const mockIndex = MOCK_BADGES.findIndex(b => b.id === currentBadge.id);
+        if (mockIndex > -1) MOCK_BADGES[mockIndex] = updatedBadgeWithId;
+        setAllBadgesData(prev => prev.map(b => b.id === currentBadge.id ? updatedBadgeWithId : b));
+
+        toast({ title: "Badge Updated", description: `${data.name} has been updated.` });
+      } else {
+        // PRODUCTION TODO: Add new badge document to Firestore
+        // const docRef = await addDoc(collection(db, "badges"), { ...badgeDataToSave, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        // const newBadgeWithId = { ...badgeDataToSave, id: docRef.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Badge;
+
+        // MOCK:
+        const newBadgeWithId = { ...badgeDataToSave, id: `badge-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Badge;
+        MOCK_BADGES.push(newBadgeWithId);
+        setAllBadgesData(prev => [...prev, newBadgeWithId]);
+
+        toast({ title: "Badge Added", description: `${data.name} has been created.` });
       }
-      toast({ title: "Badge Updated", description: `${newBadgeData.name} has been updated.` });
-    } else {
-      MOCK_BADGES.push(newBadgeData);
-      toast({ title: "Badge Added", description: `${newBadgeData.name} has been created.` });
+      setIsModalOpen(false);
+    } catch (err) {
+      console.error("Error saving badge:", err);
+      toast({ title: "Save Failed", description: "Could not save badge details.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
     }
-    setBadges([...MOCK_BADGES]); 
-    setIsModalOpen(false);
   }
+
+  if (isLoading) {
+    return (
+      <div className="container py-12 flex justify-center items-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2 text-muted-foreground">Loading badges...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container py-12">
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
 
   return (
     <>
@@ -150,7 +270,7 @@ export default function AdminBadgesPage() {
       <Card>
         <CardHeader>
           <CardTitle>All Badges</CardTitle>
-          <CardDescription>View and manage all available badges. Showing {paginatedBadges.length} of {badges.length}</CardDescription>
+          <CardDescription>View and manage all available badges. Showing {paginatedBadges.length} of {allBadgesData.length}</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -167,13 +287,13 @@ export default function AdminBadgesPage() {
               {paginatedBadges.length > 0 ? paginatedBadges.map((badge) => (
                 <TableRow key={badge.id}>
                   <TableCell>
-                    <Image 
-                        src={badge.imageUrl || defaultPlaceholderImage} 
-                        alt={badge.name} 
-                        width={40} 
-                        height={40} 
+                    <Image
+                        src={badge.imageUrl || defaultPlaceholderImage}
+                        alt={badge.name}
+                        width={40}
+                        height={40}
                         className="rounded-md border"
-                        data-ai-hint={badge.dataAiHint}
+                        data-ai-hint={badge.dataAiHint || 'badge icon'}
                     />
                   </TableCell>
                   <TableCell className="font-medium">{badge.name}</TableCell>
@@ -198,7 +318,7 @@ export default function AdminBadgesPage() {
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(badge.id)} className="bg-destructive hover:bg-destructive/90">
+                          <AlertDialogAction onClick={() => handleDelete(badge.id, badge.name)} className="bg-destructive hover:bg-destructive/90">
                             Delete Badge
                           </AlertDialogAction>
                         </AlertDialogFooter>
@@ -329,8 +449,11 @@ export default function AdminBadgesPage() {
                 )}
               />
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                <Button type="submit">{currentBadge ? 'Save Changes' : 'Create Badge'}</Button>
+                <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {currentBadge ? 'Save Changes' : 'Create Badge'}
+                </Button>
               </DialogFooter>
             </form>
           </Form>
@@ -339,3 +462,6 @@ export default function AdminBadgesPage() {
     </>
   );
 }
+
+
+    
