@@ -1,23 +1,28 @@
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react'; // Added useEffect
+import { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription as DialogDesc, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { MOCK_USER_MESSAGES, MOCK_USER_PROFILE_FOR_CONTACT } from "@/constants";
+import { MOCK_USER_MESSAGES, MOCK_USER_PROFILE_FOR_CONTACT } from "@/constants"; // MOCK_USER_MESSAGES for fallback
 import type { UserMessage } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, Send, CornerDownRight, User, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Mail, Send, CornerDownRight, User, Shield, ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
+import { Badge as UiBadge } from '@/components/ui/badge'; // Renamed to avoid conflict if Badge type is also used
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/use-auth'; // For admin user details
+
+// PRODUCTION TODO: Import Firebase and Firestore methods
+// import { db } from '@/lib/firebase';
+// import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, where, writeBatch, getDocs } from 'firebase/firestore';
 
 const ITEMS_PER_PAGE = 5;
-const POLLING_INTERVAL = 5000; // 5 seconds
+// const POLLING_INTERVAL = 5000; // Replaced by Firestore real-time updates recommendation
 
 interface Conversation {
   userEmail: string;
@@ -27,74 +32,115 @@ interface Conversation {
   lastMessageSnippet: string;
   messages: UserMessage[];
   status: UserMessage['status'];
+  // Potentially add a unique conversation ID if not just grouping by email/subject
+  conversationId?: string; 
 }
 
 export default function AdminMessagesPage() {
   const { toast } = useToast();
-  const [forceUpdate, setForceUpdate] = useState(0);
+  const { currentUser: adminUser } = useAuth();
+  
+  const [allMessagesData, setAllMessagesData] = useState<UserMessage[]>(MOCK_USER_MESSAGES); // Holds fetched or mock messages
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [replyText, setReplyText] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
-    const intervalId = setInterval(() => {
-      setForceUpdate(prev => prev + 1);
-    }, POLLING_INTERVAL);
+    setIsLoading(true);
+    setError(null);
 
-    return () => clearInterval(intervalId); // Cleanup interval on component unmount
-  }, []);
+    // PRODUCTION TODO: Fetch messages from Firestore using onSnapshot for real-time updates.
+    // This replaces the polling mechanism.
+    /*
+    const messagesColRef = collection(db, 'userMessages');
+    const q = query(messagesColRef, orderBy('timestamp', 'desc')); // Adjust orderBy as needed
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const fetchedMessages = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp), // Ensure timestamp is a Date object
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : new Date().toISOString(),
+        } as UserMessage;
+      });
+      setAllMessagesData(fetchedMessages);
+      setIsLoading(false);
+      setError(null);
+    }, (err) => {
+      console.error("Error with real-time messages listener:", err);
+      setError("Failed to load messages in real-time. Displaying potentially stale data.");
+      setAllMessagesData(MOCK_USER_MESSAGES); // Fallback to mock for UI
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe(); // Cleanup listener on component unmount
+    */
+
+    // MOCK: Simulate initial fetch
+    setTimeout(() => {
+        setAllMessagesData([...MOCK_USER_MESSAGES]); // Use a copy for local state
+        setIsLoading(false);
+    }, 500);
+
+  }, []); // Empty dependency array for initial fetch / listener setup
 
   const groupedMessages = useMemo(() => {
     const groups: Record<string, UserMessage[]> = {};
-    const sortedMessages = [...MOCK_USER_MESSAGES].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    // Ensure messages are sorted by timestamp if not already by Firestore query
+    const sortedMessages = [...allMessagesData].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
     sortedMessages.forEach(msg => {
-        if (!groups[msg.userEmail]) {
-            groups[msg.userEmail] = [];
+        // Define a conversation key, e.g., based on userEmail and original subject
+        const conversationKey = msg.userEmail + (msg.subject.replace(/^Re: /i, '').trim());
+        if (!groups[conversationKey]) {
+            groups[conversationKey] = [];
         }
-        groups[msg.userEmail].push(msg);
+        groups[conversationKey].push(msg);
     });
     return groups;
-  }, [forceUpdate]);
+  }, [allMessagesData]);
 
   const allConversationList = useMemo((): Conversation[] => {
-    return Object.entries(groupedMessages).map(([userEmail, messages]) => {
+    return Object.entries(groupedMessages).map(([conversationKey, messages]) => {
         const lastMessage = messages[messages.length - 1];
-        let convStatus: UserMessage['status'] = 'read';
+        let convStatus: UserMessage['status'] = 'read'; // Default to read
 
-        if (lastMessage.senderType === 'user') {
-            const adminRepliesExist = messages.some(m => m.senderType === 'admin' && m.timestamp > lastMessage.timestamp);
-            if (!adminRepliesExist) {
-                convStatus = lastMessage.status;
+        const latestUserMessage = messages.slice().reverse().find(m => m.senderType === 'user');
+        if (latestUserMessage) {
+            if (latestUserMessage.status === 'new') {
+                convStatus = 'new';
             } else {
-                convStatus = 'replied';
+                // If latest user message is not 'new', check if admin has replied after it
+                const adminRepliedAfter = messages.some(m => m.senderType === 'admin' && new Date(m.timestamp) > new Date(latestUserMessage.timestamp));
+                convStatus = adminRepliedAfter ? 'replied' : 'read'; // 'read' if no admin reply after last user message
             }
         } else {
-            convStatus = 'replied';
+            // If no user messages, it's likely an admin-initiated thread or an anomaly
+            convStatus = 'replied'; // Or handle as appropriate
         }
         
-        const latestUserNewMessage = messages.slice().reverse().find(m => m.senderType === 'user' && m.status === 'new');
-        if (latestUserNewMessage) {
-            const hasAdminRepliedAfterIt = messages.some(m => m.senderType === 'admin' && m.timestamp > latestUserNewMessage.timestamp);
-            if (!hasAdminRepliedAfterIt) {
-                convStatus = 'new';
-            }
-        }
-
-
         return {
-            userEmail,
+            conversationId: conversationKey, // Use the generated key as an ID
+            userEmail: messages[0].userEmail,
             userName: messages[0].userName,
-            subject: messages[0].subject,
-            lastMessageTimestamp: lastMessage.timestamp,
-            lastMessageSnippet: `${lastMessage.senderType === 'admin' ? 'Admin: ' : ''}${lastMessage.messageBody.substring(0, 40)}${lastMessage.messageBody.length > 40 ? "..." : ""}`,
+            subject: messages[0].subject.replace(/^Re: /i, '').trim(),
+            lastMessageTimestamp: new Date(lastMessage.timestamp),
+            lastMessageSnippet: `${lastMessage.senderType === 'admin' ? (lastMessage.adminName || 'Admin') + ': ' : ''}${lastMessage.messageBody.substring(0, 40)}${lastMessage.messageBody.length > 40 ? "..." : ""}`,
             messages,
             status: convStatus,
         };
-    }).sort((a,b) => {
-        if (a.status === 'new' && b.status !== 'new') return -1;
-        if (b.status === 'new' && a.status !== 'new') return 1;
+    }).sort((a,b) => { // Sort by status ('new' first), then by last message time
+        const statusOrder = { new: 0, read: 1, replied: 2, closed: 3 };
+        if (statusOrder[a.status] !== statusOrder[b.status]) {
+            return statusOrder[a.status] - statusOrder[b.status];
+        }
         return b.lastMessageTimestamp.getTime() - a.lastMessageTimestamp.getTime();
     });
   }, [groupedMessages]);
@@ -116,67 +162,177 @@ export default function AdminMessagesPage() {
   };
 
 
-  const handleViewConversation = (conversation: Conversation) => {
+  const handleViewConversation = async (conversation: Conversation) => {
     setSelectedConversation(conversation);
     setReplyText('');
     setIsModalOpen(true);
 
-    let updated = false;
-    MOCK_USER_MESSAGES.forEach(msg => {
-        if (msg.userEmail === conversation.userEmail && msg.senderType === 'user' && msg.status === 'new') {
-            msg.status = 'read';
-            updated = true;
+    // PRODUCTION TODO: Mark user messages in this conversation as 'read' in Firestore
+    /*
+    const batch = writeBatch(db);
+    let messagesToUpdate = false;
+    conversation.messages.forEach(msg => {
+        if (msg.senderType === 'user' && msg.status === 'new') {
+            const msgRef = doc(db, "userMessages", msg.id);
+            batch.update(msgRef, { status: 'read', updatedAt: serverTimestamp() });
+            messagesToUpdate = true;
         }
     });
-    if (updated) setForceUpdate(p => p + 1);
+    if (messagesToUpdate) {
+        try {
+            await batch.commit();
+            // If not using onSnapshot, you might need to manually update local state or re-fetch.
+            // For MOCK, we update directly:
+             MOCK_USER_MESSAGES.forEach(mockMsg => {
+                if (conversation.messages.some(m => m.id === mockMsg.id && m.senderType === 'user' && mockMsg.status === 'new')) {
+                    mockMsg.status = 'read';
+                    mockMsg.updatedAt = new Date().toISOString();
+                }
+            });
+            setAllMessagesData([...MOCK_USER_MESSAGES]); // Trigger re-memoization
+            toast({ title: "Conversation Updated", description: "Messages marked as read."});
+        } catch (err) {
+            console.error("Error marking messages as read:", err);
+            toast({ title: "Error", description: "Could not update message statuses.", variant: "destructive" });
+        }
+    }
+    */
+    // MOCK Implementation:
+    let updatedInMock = false;
+    MOCK_USER_MESSAGES.forEach(msg => {
+        if (msg.userEmail === conversation.userEmail && 
+            msg.subject.replace(/^Re: /i, '').trim() === conversation.subject &&
+            msg.senderType === 'user' && msg.status === 'new') {
+            msg.status = 'read';
+            msg.updatedAt = new Date().toISOString();
+            updatedInMock = true;
+        }
+    });
+    if (updatedInMock) setAllMessagesData([...MOCK_USER_MESSAGES]);
   };
 
-  const handleSendReply = () => {
-    if (!selectedConversation || !replyText.trim()) {
+  const handleSendReply = async () => {
+    if (!selectedConversation || !replyText.trim() || !adminUser) {
       toast({
         title: "Cannot Send",
-        description: "Reply text cannot be empty.",
+        description: "Reply text cannot be empty or admin user not found.",
         variant: "destructive",
       });
       return;
     }
 
-    const newAdminMessage: UserMessage = {
-      id: `msg-${Date.now()}`,
-      userName: selectedConversation.userName,
+    const newAdminMessageData: Omit<UserMessage, 'id' | 'createdAt' | 'updatedAt'> = {
+      uid: adminUser.uid, // UID of the admin sending the message
+      userName: selectedConversation.userName, // Keep track of user context
       userEmail: selectedConversation.userEmail,
       subject: `Re: ${selectedConversation.subject}`,
       messageBody: replyText,
-      timestamp: new Date(),
-      status: 'replied',
+      timestamp: new Date(), // For Firestore, use serverTimestamp() for 'createdAt'
+      status: 'replied', // Admin replies are typically 'replied'
       senderType: 'admin',
-      adminName: 'Admin Support',
+      adminName: adminUser.name || 'Admin Support',
     };
 
-    MOCK_USER_MESSAGES.push(newAdminMessage);
-    
-     MOCK_USER_MESSAGES.forEach(msg => {
-        if (msg.userEmail === selectedConversation.userEmail && msg.senderType === 'user' && (msg.status === 'new' || msg.status === 'read')) {
-            msg.status = 'replied';
-        }
-    });
+    try {
+        // PRODUCTION TODO: Add newAdminMessageData to 'userMessages' collection in Firestore
+        // const docRef = await addDoc(collection(db, "userMessages"), { 
+        //   ...newAdminMessageData, 
+        //   timestamp: serverTimestamp(), // Use server timestamp for sorting/consistency
+        //   createdAt: serverTimestamp(), 
+        //   updatedAt: serverTimestamp() 
+        // });
+        // const newAdminMessageWithId = { ...newAdminMessageData, id: docRef.id, timestamp: new Date() } as UserMessage;
 
-    setForceUpdate(p => p + 1);
-    
-    toast({
-      title: "Reply Sent",
-      description: `Your reply to ${selectedConversation.userName} has been sent.`,
-    });
-    
-    setSelectedConversation(prev => prev ? {
-        ...prev,
-        messages: [...prev.messages, newAdminMessage].sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime()),
-        status: 'replied',
-        lastMessageTimestamp: newAdminMessage.timestamp,
-        lastMessageSnippet: `${newAdminMessage.senderType === 'admin' ? 'Admin: ' : ''}${newAdminMessage.messageBody.substring(0, 40)}${newAdminMessage.messageBody.length > 40 ? "..." : ""}`,
-    } : null);
-    setReplyText('');
+        // MOCK Implementation:
+        const newAdminMessageWithId = { 
+            ...newAdminMessageData, 
+            id: `msg-admin-${Date.now()}`, 
+            timestamp: new Date(), // Local date for mock
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        } as UserMessage;
+        MOCK_USER_MESSAGES.push(newAdminMessageWithId);
+        
+        // PRODUCTION TODO: Update status of user messages in this conversation to 'replied'
+        // const userMessagesToUpdateQuery = query(
+        //   collection(db, "userMessages"),
+        //   where("userEmail", "==", selectedConversation.userEmail),
+        //   where("subject", "==", selectedConversation.subject), // Or match by conversationId
+        //   where("senderType", "==", "user"),
+        //   where("status", "in", ["new", "read"])
+        // );
+        // const userMessagesSnapshot = await getDocs(userMessagesToUpdateQuery);
+        // const batch = writeBatch(db);
+        // userMessagesSnapshot.forEach(doc => {
+        //   batch.update(doc.ref, { status: 'replied', updatedAt: serverTimestamp() });
+        // });
+        // await batch.commit();
+
+        // MOCK Implementation for updating user messages status:
+        MOCK_USER_MESSAGES.forEach(msg => {
+            if (msg.userEmail === selectedConversation.userEmail && 
+                msg.subject.replace(/^Re: /i, '').trim() === selectedConversation.subject &&
+                msg.senderType === 'user' && (msg.status === 'new' || msg.status === 'read')) {
+                msg.status = 'replied';
+                msg.updatedAt = new Date().toISOString();
+            }
+        });
+        setAllMessagesData([...MOCK_USER_MESSAGES]); // This will trigger re-memoization
+        
+        toast({
+          title: "Reply Sent",
+          description: `Your reply to ${selectedConversation.userName} has been sent.`,
+        });
+        
+        // Optimistically update selectedConversation for UI
+        const updatedSelectedConvMessages = [...(selectedConversation.messages || []), newAdminMessageWithId].sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        setSelectedConversation(prev => prev ? {
+            ...prev,
+            messages: updatedSelectedConvMessages,
+            status: 'replied', // Conversation status is now 'replied'
+            lastMessageTimestamp: newAdminMessageWithId.timestamp,
+            lastMessageSnippet: `${newAdminMessageWithId.senderType === 'admin' ? (newAdminMessageWithId.adminName || 'Admin') + ': ' : ''}${newAdminMessageWithId.messageBody.substring(0, 40)}${newAdminMessageWithId.messageBody.length > 40 ? "..." : ""}`,
+        } : null);
+        setReplyText('');
+        // If not using onSnapshot, call a re-fetch or rely on local state update
+    } catch (err) {
+        console.error("Error sending reply:", err);
+        toast({ title: "Send Failed", description: "Could not send reply.", variant: "destructive" });
+    }
   };
+
+
+  if (isLoading) {
+    return (
+      <>
+        <PageHeader
+          title="User Conversations"
+          description="View and respond to user inquiries."
+        />
+        <div className="container py-12 flex justify-center items-center min-h-[300px]">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <PageHeader
+          title="User Conversations"
+          description="View and respond to user inquiries."
+        />
+        <div className="container py-12">
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Error Loading Messages</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -196,7 +352,7 @@ export default function AdminMessagesPage() {
             <div className="space-y-3">
               {paginatedConversationList.map((conv) => (
                 <Card
-                    key={conv.userEmail}
+                    key={conv.conversationId || conv.userEmail + conv.subject} // Use conversationId if available
                     className="hover:shadow-md transition-shadow cursor-pointer"
                     onClick={() => handleViewConversation(conv)}
                 >
@@ -208,18 +364,19 @@ export default function AdminMessagesPage() {
                                 From: {conv.userName} ({conv.userEmail})
                             </CardDescription>
                         </div>
-                        <Badge variant={
-                            conv.status === 'new' ? 'destructive' :
-                            conv.status === 'replied' ? 'default' :
-                            'secondary'
+                        <UiBadge variant={
+                            conv.status === 'new' ? 'destructive' : // Destructive for 'new' to catch attention
+                            conv.status === 'replied' ? 'default' : // Default for 'replied'
+                            'secondary' // Secondary for 'read' or other statuses
                         }
                         className={cn(
-                            conv.status === 'new' && 'bg-accent text-accent-foreground',
-                            conv.status === 'replied' && 'bg-green-100 text-green-700'
+                            conv.status === 'new' && 'bg-accent text-accent-foreground animate-pulse',
+                            conv.status === 'replied' && 'bg-green-100 text-green-700',
+                            conv.status === 'read' && 'bg-muted/70 text-muted-foreground'
                         )}
                         >
                         {conv.status.toUpperCase()}
-                        </Badge>
+                        </UiBadge>
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0 pb-3">
@@ -266,12 +423,12 @@ export default function AdminMessagesPage() {
           setIsModalOpen(isOpen);
           if (!isOpen) setSelectedConversation(null);
       }}>
-        <DialogContent className="sm:max-w-2xl h-[80vh] flex flex-col">
+        <DialogContent className="sm:max-w-2xl h-[calc(100vh-8rem)] md:h-[80vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Conversation with: {selectedConversation?.userName}</DialogTitle>
-            <DialogDescription>
+            <DialogDesc>
               Subject: {selectedConversation?.subject} ({selectedConversation?.userEmail})
-            </DialogDescription>
+            </DialogDesc>
           </DialogHeader>
           <ScrollArea className="flex-grow p-4 border rounded-md my-4 bg-muted/20 custom-scrollbar">
             <div className="space-y-4">
@@ -279,8 +436,8 @@ export default function AdminMessagesPage() {
                 <div
                     key={message.id}
                     className={cn(
-                        "p-3 rounded-lg max-w-[80%]",
-                        message.senderType === 'user' ? "bg-primary/10 text-foreground self-start mr-auto" : "bg-secondary text-secondary-foreground self-end ml-auto"
+                        "p-3 rounded-lg max-w-[80%] text-sm",
+                        message.senderType === 'user' ? "bg-card text-card-foreground self-start mr-auto shadow-sm border" : "bg-primary/90 text-primary-foreground self-end ml-auto shadow-sm"
                     )}
                 >
                     <div className="flex items-center gap-2 mb-1">
@@ -288,14 +445,14 @@ export default function AdminMessagesPage() {
                             <User className="h-4 w-4 text-primary" /> :
                             <Shield className="h-4 w-4 text-accent" />
                         }
-                        <span className="font-semibold text-sm">
+                        <span className="font-semibold text-xs">
                             {message.senderType === 'user' ? message.userName : message.adminName || 'Admin'}
                         </span>
-                        <span className="text-xs text-muted-foreground">
-                            {message.timestamp.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit'})}
+                        <span className="text-xs text-muted-foreground/80">
+                            {new Date(message.timestamp).toLocaleTimeString('en-US', { day: 'numeric', month:'short', hour: '2-digit', minute: '2-digit'})}
                         </span>
                     </div>
-                  <p className="text-sm whitespace-pre-wrap">{message.messageBody}</p>
+                  <p className="whitespace-pre-wrap">{message.messageBody}</p>
                 </div>
               ))}
             </div>
@@ -307,7 +464,7 @@ export default function AdminMessagesPage() {
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
               placeholder="Type your reply here..."
-              rows={4}
+              rows={3}
               className="mb-2"
             />
              <DialogFooter>
@@ -322,4 +479,3 @@ export default function AdminMessagesPage() {
     </>
   );
 }
-
