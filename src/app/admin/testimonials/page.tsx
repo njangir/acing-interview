@@ -18,13 +18,17 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { MOCK_TESTIMONIALS, MOCK_BADGES, MOCK_SERVICES, PREDEFINED_AVATARS, MOCK_BOOKINGS } from "@/constants";
+import { MOCK_TESTIMONIALS, MOCK_BADGES, MOCK_SERVICES, PREDEFINED_AVATARS, MOCK_BOOKINGS } from "@/constants"; // Keep for fallback/initial display
 import type { Testimonial, Badge as BadgeType, UserProfile, Service } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { Check, X, Eye, EyeOff, Filter, ShieldAlert, CheckCircle2, PlusCircle, Briefcase, Upload, Users, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, X, Eye, EyeOff, Filter, ShieldAlert, CheckCircle2, PlusCircle, Briefcase, Upload, Users, ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+
+// PRODUCTION TODO: Import Firebase and Firestore methods
+// import { db } from '@/lib/firebase';
+// import { collection, doc, addDoc, updateDoc, getDocs, onSnapshot, query, orderBy, where, serverTimestamp } from 'firebase/firestore';
 
 const ITEMS_PER_PAGE = 7;
 
@@ -70,16 +74,82 @@ interface SelectableUser {
 
 export default function AdminTestimonialsPage() {
   const { toast } = useToast();
-  const [testimonials, setTestimonials] = useState<Testimonial[]>(MOCK_TESTIMONIALS);
+  const [allTestimonialsData, setAllTestimonialsData] = useState<Testimonial[]>(MOCK_TESTIMONIALS);
+  const [allBadgesData, setAllBadgesData] = useState<BadgeType[]>(MOCK_BADGES);
+  const [allServicesData, setAllServicesData] = useState<Service[]>(MOCK_SERVICES);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [filterBadgeId, setFilterBadgeId] = useState<string>('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isNameEmailEditable, setIsNameEmailEditable] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+
+  useEffect(() => {
+    setIsLoading(true);
+    setError(null);
+
+    const fetchData = async () => {
+      try {
+        // PRODUCTION TODO: Fetch testimonials from Firestore
+        // const testimonialsQuery = query(collection(db, 'testimonials'), orderBy('status'), orderBy('createdAt', 'desc'));
+        // const testimonialsSnap = await getDocs(testimonialsQuery);
+        // const fetchedTestimonials = testimonialsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Testimonial));
+        // setAllTestimonialsData(fetchedTestimonials);
+        setAllTestimonialsData(MOCK_TESTIMONIALS); // Mock
+
+        // PRODUCTION TODO: Fetch badges from Firestore
+        // const badgesSnap = await getDocs(collection(db, 'badges'));
+        // const fetchedBadges = badgesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BadgeType));
+        // setAllBadgesData(fetchedBadges);
+        setAllBadgesData(MOCK_BADGES); // Mock
+
+        // PRODUCTION TODO: Fetch services from Firestore
+        // const servicesSnap = await getDocs(collection(db, 'services'));
+        // const fetchedServices = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
+        // setAllServicesData(fetchedServices);
+        setAllServicesData(MOCK_SERVICES); // Mock
+
+      } catch (err) {
+        console.error("Error fetching admin testimonials data:", err);
+        setError("Failed to load data. Please try again.");
+        // Fallback to mocks
+        setAllTestimonialsData(MOCK_TESTIMONIALS);
+        setAllBadgesData(MOCK_BADGES);
+        setAllServicesData(MOCK_SERVICES);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+    // For real-time updates, use onSnapshot:
+    /*
+    const testimonialsColRef = collection(db, 'testimonials');
+    const q = query(testimonialsColRef, orderBy('status'), orderBy('createdAt', 'desc')); // Example ordering
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const fetchedTestimonials = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Testimonial));
+      setAllTestimonialsData(fetchedTestimonials);
+      setIsLoading(false);
+    }, (err) => {
+      console.error("Error with real-time testimonials listener:", err);
+      setError("Failed to load testimonials in real-time.");
+      setAllTestimonialsData(MOCK_TESTIMONIALS); // Fallback
+      setIsLoading(false);
+    });
+    return () => unsubscribe(); // Cleanup listener
+    */
+  }, []);
 
 
   const selectableUsers = useMemo((): SelectableUser[] => {
+    // PRODUCTION TODO: This should ideally fetch from a "userProfiles" collection or be based on a more robust user list.
+    // Using MOCK_BOOKINGS to derive users is a temporary mock strategy.
     const usersMap = new Map<string, SelectableUser>();
-    MOCK_BOOKINGS.forEach(booking => {
+    MOCK_BOOKINGS.forEach(booking => { // MOCK_BOOKINGS is still used here for user list derivation
       if (booking.userEmail && !usersMap.has(booking.userEmail)) {
         let avatarUrl = PREDEFINED_AVATARS[0].url; 
         try {
@@ -93,7 +163,7 @@ export default function AdminTestimonialsPage() {
         } catch (e) { console.error("Error parsing profile for user list", e); }
         
         usersMap.set(booking.userEmail, {
-          id: booking.userEmail,
+          id: booking.userEmail, // Using email as ID for mock
           name: booking.userName,
           email: booking.userEmail,
           avatarUrl: avatarUrl,
@@ -101,7 +171,7 @@ export default function AdminTestimonialsPage() {
       }
     });
     return Array.from(usersMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, []);
+  }, []); // This will not update if MOCK_BOOKINGS changes unless the component re-renders
 
 
   const adminForm = useForm<AdminTestimonialFormValues>({
@@ -156,35 +226,64 @@ export default function AdminTestimonialsPage() {
   }, [watchedSelectedUserId, adminForm, selectableUsers]);
 
 
-  const handleApprovalToggle = (testimonialId: string, currentStatus: Testimonial['status']) => {
-    const testimonialIndex = MOCK_TESTIMONIALS.findIndex(t => t.id === testimonialId);
-    if (testimonialIndex === -1) return;
-
+  const handleApprovalToggle = async (testimonialId: string, currentStatus: Testimonial['status']) => {
     const newStatus = currentStatus === 'approved' ? 'pending' : 'approved';
-    MOCK_TESTIMONIALS[testimonialIndex].status = newStatus;
-    setTestimonials([...MOCK_TESTIMONIALS]); 
-    toast({
-      title: "Testimonial Status Updated",
-      description: `Testimonial ${testimonialId} is now ${newStatus}.`,
-    });
+    try {
+      // PRODUCTION TODO: Update testimonial status in Firestore
+      // const testimonialDocRef = doc(db, "testimonials", testimonialId);
+      // await updateDoc(testimonialDocRef, { status: newStatus, updatedAt: serverTimestamp() });
+      
+      // MOCK:
+      const testimonialIndex = MOCK_TESTIMONIALS.findIndex(t => t.id === testimonialId);
+      if (testimonialIndex !== -1) {
+        MOCK_TESTIMONIALS[testimonialIndex].status = newStatus;
+        setAllTestimonialsData([...MOCK_TESTIMONIALS]);
+      }
+      
+      toast({
+        title: "Testimonial Status Updated",
+        description: `Testimonial ${testimonialId} is now ${newStatus}.`,
+      });
+    } catch (err) {
+      console.error("Error updating testimonial status:", err);
+      toast({ title: "Update Failed", description: "Could not update testimonial status.", variant: "destructive" });
+    }
   };
 
-  const handleReject = (testimonialId: string) => {
-    const testimonialIndex = MOCK_TESTIMONIALS.findIndex(t => t.id === testimonialId);
-    if (testimonialIndex === -1) return;
-    
-    MOCK_TESTIMONIALS[testimonialIndex].status = 'rejected';
-    setTestimonials([...MOCK_TESTIMONIALS]); 
-    toast({
-      title: "Testimonial Rejected",
-      description: `Testimonial ${testimonialId} has been rejected.`,
-      variant: "destructive"
-    });
+  const handleReject = async (testimonialId: string) => {
+    try {
+      // PRODUCTION TODO: Update testimonial status to 'rejected' in Firestore
+      // const testimonialDocRef = doc(db, "testimonials", testimonialId);
+      // await updateDoc(testimonialDocRef, { status: 'rejected', updatedAt: serverTimestamp() });
+
+      // MOCK:
+      const testimonialIndex = MOCK_TESTIMONIALS.findIndex(t => t.id === testimonialId);
+      if (testimonialIndex !== -1) {
+        MOCK_TESTIMONIALS[testimonialIndex].status = 'rejected';
+        setAllTestimonialsData([...MOCK_TESTIMONIALS]);
+      }
+      
+      toast({
+        title: "Testimonial Rejected",
+        description: `Testimonial ${testimonialId} has been rejected.`,
+        variant: "destructive"
+      });
+    } catch (err) {
+      console.error("Error rejecting testimonial:", err);
+      toast({ title: "Rejection Failed", description: "Could not reject testimonial.", variant: "destructive" });
+    }
   };
 
   const allFilteredTestimonials = useMemo(() => {
-    let filtered = [...MOCK_TESTIMONIALS]; 
+    let filtered = [...allTestimonialsData]; 
     if (filterBadgeId !== 'all') {
+      // PRODUCTION TODO: This filtering logic is based on mock localStorage.
+      // In production, if filtering by user badges is needed, it would require:
+      // 1. Fetching user profiles that have this badge.
+      // 2. Then fetching testimonials for those users.
+      // OR, denormalizing some badge info into the testimonial document (less ideal).
+      // OR, more complex Firestore queries if testimonials store `uid`.
+      console.warn("Filtering by badge is using mock localStorage data and is not production-ready.");
       filtered = filtered.filter(testimonial => {
         if (!testimonial.userEmail) return false;
         const mockUserProfileKey = `mockUserProfile_${testimonial.userEmail}`;
@@ -201,7 +300,7 @@ export default function AdminTestimonialsPage() {
         const statusOrder = { pending: 0, approved: 1, rejected: 2 };
         return statusOrder[a.status] - statusOrder[b.status];
     });
-  }, [testimonials, filterBadgeId]); 
+  }, [allTestimonialsData, filterBadgeId]); 
 
   const totalPages = Math.ceil(allFilteredTestimonials.length / ITEMS_PER_PAGE);
 
@@ -220,14 +319,27 @@ export default function AdminTestimonialsPage() {
   };
   
   useEffect(() => {
-    setCurrentPage(1); // Reset to first page when filter changes
+    setCurrentPage(1); 
   }, [filterBadgeId]);
 
-  function onAdminSubmit(data: AdminTestimonialFormValues) {
-    const selectedService = MOCK_SERVICES.find(s => s.id === data.serviceId);
+  async function onAdminSubmit(data: AdminTestimonialFormValues) {
+    setIsSubmitting(true);
+    const selectedService = allServicesData.find(s => s.id === data.serviceId);
 
-    const newTestimonial: Testimonial = {
-      id: `testimonial-admin-${Date.now()}`,
+    // PRODUCTION TODO: Determine UID if user is selected.
+    // This logic needs to be robust. If a user is selected from `selectableUsers`,
+    // we need their actual UID from Firestore (not just email which is used as ID in mock).
+    // For 'manual' entry without a UID, you might store it as an anonymous testimonial or require admin to find/assign UID.
+    let userUid: string | undefined = undefined;
+    if (data.selectedUserId && data.selectedUserId !== "manual") {
+        // In mock, `selectableUsers.id` is userEmail. In production, it should be UID.
+        // For this mock, we'll just log it.
+        console.log("Selected user's email (used as ID in mock):", data.selectedUserId);
+        // Example: userUid = await getUidForEmail(data.userEmail); // This function would query Firestore
+    }
+
+    const newTestimonialData: Omit<Testimonial, 'id' | 'createdAt' | 'updatedAt'> & { uid?: string } = {
+      uid: userUid, // Store UID
       name: data.name,
       userEmail: data.userEmail || undefined,
       batch: data.batch || undefined,
@@ -245,21 +357,43 @@ export default function AdminTestimonialsPage() {
       status: data.approvalStatus,
     };
 
-    MOCK_TESTIMONIALS.push(newTestimonial); 
-    setTestimonials([...MOCK_TESTIMONIALS]);
+    try {
+        // PRODUCTION TODO: Add new testimonial to Firestore
+        // const docRef = await addDoc(collection(db, "testimonials"), { 
+        //   ...newTestimonialData, 
+        //   createdAt: serverTimestamp(), 
+        //   updatedAt: serverTimestamp() 
+        // });
+        // const newTestimonialWithId = { ...newTestimonialData, id: docRef.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Testimonial;
 
-    toast({
-      title: "Testimonial Added!",
-      description: `Testimonial from ${data.name} has been successfully added.`,
-    });
-    setIsCreateModalOpen(false);
-    adminForm.reset({
-        selectedUserId: "manual", name: "", userEmail: "", serviceId: "", story: "", batch: "",
-        submissionStatus: 'aspirant', selectedForce: undefined, interviewLocation: "", numberOfAttempts: undefined,
-        profileImageUrl: PREDEFINED_AVATARS[0].url, profileImageDataAiHint: PREDEFINED_AVATARS[0].hint,
-        bodyImageUrl: "", bodyImageDataAiHint: "", approvalStatus: 'approved',
-    });
-    setIsNameEmailEditable(true);
+        // MOCK:
+        const newTestimonialWithId = { 
+            ...newTestimonialData, 
+            id: `testimonial-admin-${Date.now()}`, 
+            createdAt: new Date().toISOString(), 
+            updatedAt: new Date().toISOString() 
+        } as Testimonial;
+        MOCK_TESTIMONIALS.push(newTestimonialWithId); 
+        setAllTestimonialsData([...MOCK_TESTIMONIALS]); // If not using onSnapshot
+
+        toast({
+          title: "Testimonial Added!",
+          description: `Testimonial from ${data.name} has been successfully added.`,
+        });
+        setIsCreateModalOpen(false);
+        adminForm.reset({
+            selectedUserId: "manual", name: "", userEmail: "", serviceId: "", story: "", batch: "",
+            submissionStatus: 'aspirant', selectedForce: undefined, interviewLocation: "", numberOfAttempts: undefined,
+            profileImageUrl: PREDEFINED_AVATARS[0].url, profileImageDataAiHint: PREDEFINED_AVATARS[0].hint,
+            bodyImageUrl: "", bodyImageDataAiHint: "", approvalStatus: 'approved',
+        });
+        setIsNameEmailEditable(true);
+    } catch (err) {
+        console.error("Error adding testimonial:", err);
+        toast({ title: "Creation Failed", description: "Could not add testimonial.", variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
+    }
   }
 
   const handleOpenCreateModal = () => {
@@ -272,6 +406,27 @@ export default function AdminTestimonialsPage() {
     setIsNameEmailEditable(true);
     setIsCreateModalOpen(true);
   };
+
+  if (isLoading) {
+    return (
+      <div className="container py-12 flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Loading testimonials data...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container py-12">
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Error Loading Data</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
 
   return (
@@ -289,7 +444,7 @@ export default function AdminTestimonialsPage() {
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Users (No Badge Filter)</SelectItem>
-                        {MOCK_BADGES.map((badge: BadgeType) => (
+                        {allBadgesData.map((badge: BadgeType) => (
                         <SelectItem key={badge.id} value={badge.id}>
                             {badge.force !== "General" && <span className='text-xs text-muted-foreground mr-1'>[{badge.force}]</span>} {badge.name}
                         </SelectItem>
@@ -306,6 +461,7 @@ export default function AdminTestimonialsPage() {
           <CardTitle>Testimonial Submissions</CardTitle>
           <CardDescription>
             Showing {paginatedTestimonials.length} of {allFilteredTestimonials.length} testimonials.
+            {filterBadgeId !== 'all' && <span className="block text-xs text-orange-600">Note: Badge filter is currently using mock data and may not reflect live user badge assignments.</span>}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -381,7 +537,7 @@ export default function AdminTestimonialsPage() {
               )}
             </TableBody>
           </Table>
-          {MOCK_TESTIMONIALS.length === 0 && filterBadgeId === 'all' && ( 
+          {allTestimonialsData.length === 0 && filterBadgeId === 'all' && ( 
             <p className="text-center text-muted-foreground py-4">No testimonials submitted yet.</p>
           )}
         </CardContent>
@@ -489,7 +645,7 @@ export default function AdminTestimonialsPage() {
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Select service" /></SelectTrigger></FormControl>
                       <SelectContent>
-                        {MOCK_SERVICES.map(service => (<SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>))}
+                        {allServicesData.map(service => (<SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -613,8 +769,11 @@ export default function AdminTestimonialsPage() {
                 )}
               />
               <DialogFooter className="pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>Cancel</Button>
-                <Button type="submit">Create Testimonial</Button>
+                <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isSubmitting ? 'Adding...' : 'Create Testimonial'}
+                </Button>
               </DialogFooter>
             </form>
           </Form>
