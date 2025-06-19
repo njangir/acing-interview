@@ -19,6 +19,10 @@ import { MOCK_USER_MESSAGES } from '@/constants'; // For adding to mock messages
 import type { UserMessage } from '@/types';
 import { useAuth } from '@/hooks/use-auth'; // Import useAuth
 
+// PRODUCTION TODO: Import Firebase and Firestore methods
+// import { db } from '@/lib/firebase';
+// import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+
 const contactFormSchema = z.object({
   subject: z.string().min(5, { message: "Subject must be at least 5 characters." }),
   message: z.string().min(20, { message: "Message must be at least 20 characters." }),
@@ -30,8 +34,8 @@ type ContactFormValues = z.infer<typeof contactFormSchema>;
 
 export default function ContactSupportPage() {
   const { toast } = useToast();
-  const { currentUser } = useAuth(); // Get the current logged-in user
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const { currentUser, loadingAuth } = useAuth(); // Get the current logged-in user and loading state
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactFormSchema),
@@ -43,13 +47,7 @@ export default function ContactSupportPage() {
     },
   });
 
-  useEffect(() => {
-    if (currentUser) {
-      setIsLoadingUser(false);
-    }
-  }, [currentUser]);
-
-  function onSubmit(data: ContactFormValues) {
+  async function onSubmit(data: ContactFormValues) {
     if (!currentUser) {
       toast({
         title: "Error",
@@ -59,28 +57,53 @@ export default function ContactSupportPage() {
       return;
     }
 
-    const newMessageEntry: UserMessage = { // Structure for MOCK_USER_MESSAGES
-      id: `msg-${Date.now()}`,
+    setIsSubmitting(true);
+
+    const newMessageData: Omit<UserMessage, 'id' | 'createdAt' | 'updatedAt'> = {
+      uid: currentUser.uid,
       userName: currentUser.name,
       userEmail: currentUser.email,
       subject: data.subject,
       messageBody: data.message,
-      timestamp: new Date(),
-      status: 'new', // New messages from user are marked as 'new'
+      timestamp: new Date(), // For Firestore, use serverTimestamp() for 'createdAt'
+      status: 'new',
       senderType: 'user',
     };
     
-    MOCK_USER_MESSAGES.push(newMessageEntry); // Add to our mock "database"
-    console.log("Message submitted (simulated backend send):", newMessageEntry);
-    
-    toast({
-      title: "Message Sent!",
-      description: "Your message has been sent to our support team. We'll get back to you shortly.",
-    });
-    form.reset();
+    try {
+      // PRODUCTION TODO: Add new message document to Firestore 'userMessages' collection
+      // const messagesColRef = collection(db, "userMessages");
+      // await addDoc(messagesColRef, {
+      //   ...newMessageData,
+      //   timestamp: serverTimestamp(), // Use server timestamp for consistent ordering
+      //   createdAt: serverTimestamp(),
+      //   updatedAt: serverTimestamp(),
+      // });
+
+      // MOCK: Add to MOCK_USER_MESSAGES array for prototype
+      MOCK_USER_MESSAGES.push({
+        ...newMessageData,
+        id: `msg-user-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as UserMessage);
+      console.log("Message submitted (simulated backend send):", newMessageData);
+      // END MOCK
+
+      toast({
+        title: "Message Sent!",
+        description: "Your message has been sent to our support team. We'll get back to you shortly.",
+      });
+      form.reset();
+    } catch (error) {
+      console.error("Error submitting message:", error);
+      toast({ title: "Submission Failed", description: "Could not send your message. Please try again.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
-  if (isLoadingUser) {
+  if (loadingAuth) {
     return (
         <div className="container py-12 flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -191,7 +214,10 @@ export default function ContactSupportPage() {
               />
             </CardContent>
             <CardFooter>
-              <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">Send Message</Button>
+              <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {isSubmitting ? 'Sending...' : 'Send Message'}
+              </Button>
             </CardFooter>
           </form>
         </Form>
@@ -199,3 +225,4 @@ export default function ContactSupportPage() {
     </>
   );
 }
+
