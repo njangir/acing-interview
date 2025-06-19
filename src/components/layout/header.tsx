@@ -18,6 +18,11 @@ import type { Booking, UserMessage } from '@/types';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 
+// PRODUCTION TODO: For a production notification system:
+// - Notifications should ideally be fetched from a dedicated Firestore collection (e.g., "userNotifications/{userId}/notifications").
+// - These notifications would be created by backend triggers (Cloud Functions) in response to events like new messages, booking status changes, etc.
+// - The "seen" status of notifications should also be stored in Firestore for persistence across devices.
+
 const mainSiteNavItems: Array<{ href: string; label: string; icon: LucideIcon }> = [
   { href: '/', label: 'Home Base', icon: Home },
   { href: '/services', label: 'Training Ops', icon: Briefcase },
@@ -26,13 +31,14 @@ const mainSiteNavItems: Array<{ href: string; label: string; icon: LucideIcon }>
 ];
 
 interface NotificationItem {
-  id: string;
+  id: string; // Unique ID for the notification event (e.g., "booking-booking1-status-scheduled")
   message: string;
   timestamp: Date;
   href: string;
   type: 'booking' | 'message';
 }
 
+// Helper to create consistent notification event IDs
 const getNotificationEventId = (itemId: string, type: string, subType?: string): string => {
   return `${type}-${itemId}${subType ? `-${subType}` : ''}`;
 };
@@ -43,18 +49,19 @@ export function Header() {
   const isLoggedIn = !!currentUser;
   const pathname = usePathname();
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
-  const [isMounted, setIsMounted] = useState(false); // For client-side rendering
+  const [isMounted, setIsMounted] = useState(false);
 
   const [notificationCount, setNotificationCount] = useState(0);
   const [notificationsToShow, setNotificationsToShow] = useState<NotificationItem[]>([]);
   const [isNotificationPopoverOpen, setIsNotificationPopoverOpen] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true); // Component is mounted, safe to render client-side components
+    setIsMounted(true);
   }, []);
 
   const getSeenNotifications = useCallback((): string[] => {
     if (typeof window === 'undefined' || !currentUser) return [];
+    // For mock, using email. In production, use currentUser.uid for localStorage key or fetch from Firestore.
     const seen = localStorage.getItem(`seenNotifications_${currentUser.email}`);
     return seen ? JSON.parse(seen) : [];
   }, [currentUser]);
@@ -69,15 +76,21 @@ export function Header() {
     const seenNotifications = getSeenNotifications();
     const currentActiveNotifications: NotificationItem[] = [];
 
+    // PRODUCTION TODO: Fetch actual bookings and messages for the current user (currentUser.uid)
+    // from Firestore instead of using MOCK_BOOKINGS and MOCK_USER_MESSAGES.
+    // This logic would then process these fetched items to generate notifications.
+
+    // Mock processing of MOCK_BOOKINGS
     MOCK_BOOKINGS.forEach(booking => {
-      if (booking.userEmail === currentUser.email) {
+      if (booking.userEmail === currentUser.email) { // Filter for current user
         let eventId: string | null = null;
         let message: string | null = null;
-        let eventTimestamp = new Date(booking.date); // Default to booking date
+        let eventTimestamp = new Date(booking.date);
         const href = '/dashboard/bookings';
         const serviceName = booking.serviceName.length > 20 ? booking.serviceName.substring(0, 17) + '...' : booking.serviceName;
 
-        const initialBookingWasPaid = initialBookingWasPaidCheck(booking.id); // Simplified
+        // Mock check for initial payment status (simplified)
+        const bookingWasOriginallyPaid = booking.transactionId !== null && booking.paymentStatus !== 'pay_later_pending' && booking.paymentStatus !== 'pay_later_unpaid';
 
         if ((booking.status === 'accepted' || booking.status === 'scheduled')) {
           eventId = getNotificationEventId(booking.id, 'booking', booking.status);
@@ -86,7 +99,7 @@ export function Header() {
            if (booking.meetingLink && !seenNotifications.includes(linkAddedEventId) && booking.paymentStatus === 'paid') {
                eventId = linkAddedEventId;
                message = `Meeting link for '${serviceName}' on ${booking.date} is available.`;
-               eventTimestamp = new Date(); // Use current time for fresh notification
+               eventTimestamp = new Date();
            }
         } else if (booking.status === 'cancelled') {
           eventId = getNotificationEventId(booking.id, 'booking', 'cancelled');
@@ -101,7 +114,8 @@ export function Header() {
           }
         }
         
-        if (initialBookingWasPaid && booking.requestedRefund === false && booking.status === 'cancelled' && booking.paymentStatus === 'pay_later_unpaid') {
+        // Notification for refund processing (mock)
+        if (bookingWasOriginallyPaid && booking.requestedRefund === false && booking.status === 'cancelled' && (booking.paymentStatus === 'pay_later_unpaid' /* or a specific 'refunded' status */)) {
             const refundEventId = getNotificationEventId(booking.id, 'booking', 'refund_processed');
             const alreadyNotifiedRefund = currentActiveNotifications.some(n => n.id === refundEventId) || seenNotifications.includes(refundEventId);
             if (!alreadyNotifiedRefund) {
@@ -115,16 +129,16 @@ export function Header() {
             }
         }
 
-
         if (eventId && message && !seenNotifications.includes(eventId) && !currentActiveNotifications.some(n=>n.id === eventId)) {
           currentActiveNotifications.push({ id: eventId, message, timestamp: eventTimestamp, href, type: 'booking' });
         }
       }
     });
 
+    // Mock processing of MOCK_USER_MESSAGES
     const userMessageThreads: { [key: string]: UserMessage[] } = {};
      MOCK_USER_MESSAGES.forEach(msg => {
-        if (msg.userEmail === currentUser.email) {
+        if (msg.userEmail === currentUser.email) { // Filter for current user
             const threadKey = msg.userEmail + (msg.subject.startsWith("Re:") ? msg.subject.substring(3).trim() : msg.subject.trim());
             if (!userMessageThreads[threadKey]) {
                  userMessageThreads[threadKey] = [];
@@ -134,15 +148,15 @@ export function Header() {
     });
 
     Object.values(userMessageThreads).forEach(thread => {
-        const lastMessage = thread.sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime()).pop();
-        if (lastMessage && lastMessage.senderType === 'admin') {
+        const lastMessage = thread.sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).pop();
+        if (lastMessage && lastMessage.senderType === 'admin') { // Admin reply notification
             const eventId = getNotificationEventId(lastMessage.id, 'message', 'admin_reply');
             const subjectSnippet = lastMessage.subject.replace('Re: ','').substring(0,25);
             if (!seenNotifications.includes(eventId)  && !currentActiveNotifications.some(n=>n.id === eventId)) {
                 currentActiveNotifications.push({
                     id: eventId,
                     message: `Admin replied in: "${subjectSnippet}${subjectSnippet.length === 25 ? '...' : ''}"`,
-                    timestamp: lastMessage.timestamp,
+                    timestamp: new Date(lastMessage.timestamp),
                     href: '/dashboard/contact',
                     type: 'message',
                 });
@@ -150,45 +164,38 @@ export function Header() {
         }
     });
 
-
     currentActiveNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
     setNotificationsToShow(currentActiveNotifications);
     setNotificationCount(currentActiveNotifications.length);
 
   }, [isLoggedIn, isAdmin, currentUser, getSeenNotifications]);
 
-  // Placeholder for a more robust check if a booking was originally paid
-  const initialBookingWasPaidCheck = (bookingId: string): boolean => {
-    // In a real app, you'd check historical payment status or have a flag
-    const booking = MOCK_BOOKINGS.find(b => b.id === bookingId);
-    return booking?.transactionId !== null; // Simple check: if it had a transactionId, it was paid
-  };
 
   useEffect(() => {
     calculateNotifications();
-  }, [calculateNotifications, pathname]);
+  }, [calculateNotifications, pathname]); // Recalculate on path change too, e.g. if a notification leads to a page that resolves it
 
   const handleNotificationClick = (notificationId: string) => {
     if (typeof window === 'undefined' || !currentUser) return;
-
+    
+    // For mock, using email. In production, use currentUser.uid.
     const seenNotifications = getSeenNotifications();
     const updatedSeenNotifications = Array.from(new Set([...seenNotifications, notificationId]));
     localStorage.setItem(`seenNotifications_${currentUser.email}`, JSON.stringify(updatedSeenNotifications));
     
-    calculateNotifications(); // Recalculate to update list and count
-    // Popover can stay open or be closed based on UX preference
-    // setIsNotificationPopoverOpen(false); 
+    calculateNotifications();
   };
 
   const handlePopoverOpenChange = (open: boolean) => {
     setIsNotificationPopoverOpen(open);
-    if (open) { // When popover is opened, recalculate to show the latest
+    if (open) {
         calculateNotifications();
     }
   };
 
 
   React.useEffect(() => {
+    // Close mobile sheet on route change
     setIsSheetOpen(false);
   }, [pathname]);
 
@@ -196,14 +203,17 @@ export function Header() {
   const isAdminPath = pathname.startsWith('/admin');
 
   let contextualNavItems: Array<{ href: string; label: string; icon: LucideIcon }> = [];
-  let contextualNavTitle = "Field Menu";
+  let contextualNavTitle = "Field Menu"; // Default title for main site navigation
   
   if (isLoggedIn && !isAdmin) {
     if (isDashboardPath) {
       contextualNavTitle = "Officer Candidate HQ";
+      // Remove "My " prefix for brevity in mobile menu
       contextualNavItems = DASHBOARD_NAV_LINKS.map(link => ({...link, label: link.label.replace("My ", "")}));
     } else {
-      contextualNavItems = []; 
+      // When on main site pages, non-admin logged-in users still see "Field Menu"
+      // and main site nav items, plus a prominent link to their dashboard.
+      contextualNavItems = []; // Main site nav items will be primary
     }
   } else if (isAdmin && isAdminPath) {
     contextualNavTitle = "Admin Command";
@@ -214,16 +224,17 @@ export function Header() {
   const renderNavLinks = (items: Array<{ href: string; label: string; icon: LucideIcon }>) => {
     return items.map((link) => {
       const LinkIcon = link.icon;
+      // Adjusted isActive logic for more precise highlighting
       const isActive = pathname === link.href ||
-                       (link.href === '/dashboard' && isDashboardPath) ||
-                       (link.href === '/admin' && isAdminPath) ||
+                       (link.href === '/dashboard' && isDashboardPath && pathname.startsWith('/dashboard')) || // Highlight "Dashboard" if anywhere in dashboard
+                       (link.href === '/admin' && isAdminPath && pathname.startsWith('/admin')) || // Highlight "Admin" if anywhere in admin
                        (link.href !== '/' && link.href !== '/dashboard' && link.href !== '/admin' && pathname.startsWith(link.href) && link.href.length > 1);
       return (
         <Link
           key={link.href}
           href={link.href}
           className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
-                        isActive && "bg-primary/10 text-primary"
+                        isActive && "bg-primary/10 text-primary font-medium"
           )}
           onClick={() => setIsSheetOpen(false)}
         >
@@ -235,11 +246,13 @@ export function Header() {
   };
 
   const getOverallNotificationsLink = () => {
-    if (notificationsToShow.length === 0) return "/dashboard";
+    if (notificationsToShow.length === 0) return "/dashboard"; // Default if no specific preference
     const bookingNotifs = notificationsToShow.filter(n => n.type === 'booking').length;
     const messageNotifs = notificationsToShow.filter(n => n.type === 'message').length;
-    if (bookingNotifs >= messageNotifs) return "/dashboard/bookings";
-    return "/dashboard/contact";
+    // Prioritize booking notifications if they exist, otherwise message notifications, then default
+    if (bookingNotifs > 0) return "/dashboard/bookings";
+    if (messageNotifs > 0) return "/dashboard/contact";
+    return "/dashboard";
   };
 
   return (
@@ -248,6 +261,7 @@ export function Header() {
         <Link href="/" className="mr-6 flex items-center space-x-2">
           <Logo />
         </Link>
+        {/* Desktop Navigation */}
         <nav className="hidden md:flex gap-6 items-center">
           {mainSiteNavItems.map((link) => (
             <Link
@@ -261,7 +275,7 @@ export function Header() {
               {link.label}
             </Link>
           ))}
-          {isLoggedIn && !isAdmin && (
+          {isLoggedIn && !isAdmin && ( // Link to Dashboard for regular logged-in users
              <Link
               href="/dashboard"
               className={cn(
@@ -276,7 +290,7 @@ export function Header() {
         <div className="flex flex-1 items-center justify-end space-x-2">
           {isLoggedIn ? (
             <>
-              {currentUser && !isAdmin && (
+              {currentUser && !isAdmin && ( // Notification bell for regular users
                 <Popover open={isNotificationPopoverOpen} onOpenChange={handlePopoverOpenChange}>
                   <PopoverTrigger asChild>
                     <Button variant="ghost" size="icon" className="relative mr-1">
@@ -301,7 +315,7 @@ export function Header() {
                             variant="ghost" 
                             size="icon" 
                             className="h-6 w-6" 
-                            onClick={() => setIsNotificationPopoverOpen(false)}
+                            onClick={() => setIsNotificationPopoverOpen(false)} // Ensure popover closes
                             aria-label="Close notifications"
                         >
                             <XIcon className="h-4 w-4" />
@@ -316,11 +330,12 @@ export function Header() {
                             className="block p-3 hover:bg-accent/50 text-sm"
                             onClick={() => {
                               handleNotificationClick(item.id);
+                              setIsNotificationPopoverOpen(false); // Close popover on click
                             }} 
                           >
                             <p className="truncate font-medium text-foreground">{item.message}</p>
                             <p className="text-xs text-muted-foreground">
-                              {formatDistanceToNow(item.timestamp, { addSuffix: true })}
+                              {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
                             </p>
                           </Link>
                         ))
@@ -364,7 +379,7 @@ export function Header() {
               </Button>
             </>
           )}
-           {isAdmin && !isAdminPath && (
+           {isAdmin && !isAdminPath && ( // Link to Admin panel for admins if not already in admin section
              <Button asChild variant="outline" size="sm" className="hidden lg:flex border-primary text-primary hover:bg-primary/10 ml-2">
                 <Link href="/admin">
                   <ShieldCheck className="mr-2 h-4 w-4" /> Admin Command
@@ -372,7 +387,8 @@ export function Header() {
               </Button>
            )}
         </div>
-        {isMounted && ( // Conditionally render mobile menu trigger
+        {/* Mobile Menu Trigger - Conditionally rendered after mount */}
+        {isMounted && (
             <div className="md:hidden ml-2">
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetTrigger asChild>
@@ -391,16 +407,19 @@ export function Header() {
                         <Logo />
                     </Link>
 
+                    {/* Contextual Nav Section for Mobile */}
                     {contextualNavItems.length > 0 && (
                         <>
                             <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">{contextualNavTitle}</h3>
                             {renderNavLinks(contextualNavItems)}
                             <Separator className="my-2" />
-                            <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">Main Menu</h3>
-                            {renderNavLinks(mainSiteNavItems)}
+                            {/* Show main site links only if contextual nav is not the main site nav itself */}
+                            {(isDashboardPath || isAdminPath) && <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">Main Menu</h3>}
+                            {(isDashboardPath || isAdminPath) && renderNavLinks(mainSiteNavItems)}
                         </>
                     )}
 
+                    {/* If no specific contextual items (e.g., logged out, or logged-in user on main site) */}
                     {contextualNavItems.length === 0 && (
                         <>
                             <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">{contextualNavTitle}</h3>
@@ -408,30 +427,39 @@ export function Header() {
                         </>
                     )}
                     
+                    {/* Explicit link to Dashboard if logged in, not admin, and not on a dashboard page */}
                     {isLoggedIn && !isAdmin && !isDashboardPath && !contextualNavItems.some(item => item.href.startsWith('/dashboard')) && (
+                        <>
+                        <Separator className="my-2" />
                         <Link
                             href="/dashboard"
                             className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
-                                        (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) && "bg-primary/10 text-primary"
+                                        (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) && "bg-primary/10 text-primary font-medium"
                             )}
                             onClick={() => setIsSheetOpen(false)}
                         >
                             <LayoutDashboard className="h-5 w-5" />
                             Officer Candidate HQ
                         </Link>
+                        </>
                     )}
 
+                    {/* Explicit link to Admin Command if admin and not on an admin page */}
                     {isAdmin && !isAdminPath && (
+                        <>
+                        <Separator className="my-2" />
                         <Link
                             href="/admin"
-                            className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary mt-2 border-t pt-3",
-                                            isAdminPath && "bg-primary/10 text-primary")}
+                            className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
+                                            isAdminPath && "bg-primary/10 text-primary font-medium")}
                             onClick={() => setIsSheetOpen(false)}
                             >
                             <ShieldCheck className="h-5 w-5" /> Admin Command
                         </Link>
+                        </>
                     )}
 
+                    {/* Auth actions at the bottom */}
                     <div className="pt-4 mt-2 border-t">
                         {isLoggedIn ? (
                             <Button variant="outline" size="sm" onClick={() => { logout(); setIsSheetOpen(false);}} className="w-full">
