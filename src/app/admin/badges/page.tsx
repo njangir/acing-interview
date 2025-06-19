@@ -39,7 +39,7 @@ const badgeFormSchema = z.object({
 
 type BadgeFormValues = z.infer<typeof badgeFormSchema>;
 
-const defaultPlaceholderImage = "https://placehold.co/100x100.png?text=Badge";
+const defaultPlaceholderImage = "https://placehold.co/100x100.png";
 
 export default function AdminBadgesPage() {
   const { toast } = useToast();
@@ -462,6 +462,3 @@ export default function AdminBadgesPage() {
     </>
   );
 }
-
-
-    
