@@ -17,13 +17,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { MOCK_SERVICES, MOCK_TESTIMONIALS } from '@/constants';
-import { Edit2Icon, Award, MapPin, ListChecks, Briefcase, Upload } from 'lucide-react';
+import { MOCK_SERVICES, MOCK_TESTIMONIALS, PREDEFINED_AVATARS } from '@/constants'; // PREDEFINED_AVATARS for default user image
+import type { Testimonial, Service } from '@/types'; // Added Service type
+import { Edit2Icon, Award, MapPin, ListChecks, Briefcase, Upload, Loader2 } from 'lucide-react'; // Added Loader2
 import { useAuth } from '@/hooks/use-auth';
+
+// PRODUCTION TODO: Import Firebase and Firestore methods
+// import { db, storage } from '@/lib/firebase';
+// import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+// import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const testimonialFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
-  email: z.string().email("Please enter a valid email.").optional(),
+  email: z.string().email("Please enter a valid email.").optional().or(z.literal('')),
   serviceId: z.string({ required_error: "Please select the service you took." }),
   story: z.string().min(50, { message: "Testimonial must be at least 50 characters." }).max(1000, { message: "Testimonial cannot exceed 1000 characters." }),
   batch: z.string().optional(),
@@ -65,9 +71,11 @@ type TestimonialFormValues = z.infer<typeof testimonialFormSchema>;
 
 export default function SubmitTestimonialPage() {
   const { toast } = useToast();
-  const { currentUser } = useAuth();
+  const { currentUser, loadingAuth } = useAuth();
   const [bodyImageFile, setBodyImageFile] = useState<File | null>(null);
   const [bodyImagePreview, setBodyImagePreview] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [availableServices, setAvailableServices] = useState<Service[]>([]);
 
   const form = useForm<TestimonialFormValues>({
     resolver: zodResolver(testimonialFormSchema),
@@ -88,6 +96,15 @@ export default function SubmitTestimonialPage() {
   });
 
    useEffect(() => {
+    // PRODUCTION TODO: Fetch services from Firestore instead of MOCK_SERVICES
+    // const fetchServices = async () => {
+    //   const servicesCol = collection(db, 'services');
+    //   const servicesSnap = await getDocs(servicesCol);
+    //   setAvailableServices(servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
+    // };
+    // fetchServices();
+    setAvailableServices(MOCK_SERVICES); // Using mock for now
+
     if (currentUser) {
         form.reset({
             ...form.getValues(), // Preserve other potentially filled fields
@@ -118,23 +135,43 @@ export default function SubmitTestimonialPage() {
   };
 
 
-  function onSubmit(data: TestimonialFormValues) {
-    const selectedService = MOCK_SERVICES.find(s => s.id === data.serviceId);
+  async function onSubmit(data: TestimonialFormValues) {
+    if (!currentUser) {
+      toast({ title: "Authentication Error", description: "Please log in to submit a testimonial.", variant: "destructive" });
+      return;
+    }
+    setIsSubmitting(true);
+
+    const selectedService = availableServices.find(s => s.id === data.serviceId);
     let finalBodyImageUrl = data.bodyImageUrl; // Use if a URL was manually entered
 
+    // PRODUCTION TODO: Handle Image Upload to Firebase Storage
     if (bodyImageFile) {
-      // Simulate upload and get a URL. In a real app, this would be an async upload.
-      finalBodyImageUrl = `https://placehold.co/400x300.png?text=${encodeURIComponent(bodyImageFile.name.substring(0,15))}`;
-      console.log("Simulating upload of body image:", bodyImageFile.name);
+      try {
+        // const imageFileName = `${currentUser.uid}_testimonial_${Date.now()}_${bodyImageFile.name.replace(/\s+/g, '_')}`;
+        // const imageRef = storageRef(storage, `testimonials_body_images/${imageFileName}`);
+        // const uploadResult = await uploadBytes(imageRef, bodyImageFile);
+        // finalBodyImageUrl = await getDownloadURL(uploadResult.ref);
+        // console.log("Body image uploaded to Firebase Storage:", finalBodyImageUrl);
+
+        // MOCK: Simulate upload and URL generation
+        finalBodyImageUrl = `https://placehold.co/400x300.png?text=${encodeURIComponent(bodyImageFile.name.substring(0,15))}`;
+        console.log("Simulating upload of body image:", bodyImageFile.name, "URL:", finalBodyImageUrl);
+      } catch (uploadError) {
+        console.error("Error uploading body image:", uploadError);
+        toast({ title: "Image Upload Failed", description: "Could not upload your image. Please try again or submit without it.", variant: "destructive" });
+        setIsSubmitting(false);
+        return;
+      }
     }
 
-    const newTestimonial = {
-      id: `testimonial-${Date.now()}`,
+    const newTestimonialData: Omit<Testimonial, 'id' | 'createdAt' | 'updatedAt'> = {
+      uid: currentUser.uid, // Link testimonial to the authenticated user
       name: data.name,
       userEmail: data.email,
-      batch: data.batch,
+      batch: data.batch || undefined,
       story: data.story,
-      imageUrl: currentUser?.imageUrl || 'https://placehold.co/100x100.png', // User's profile avatar
+      imageUrl: currentUser.imageUrl || PREDEFINED_AVATARS[0].url, // User's profile avatar
       dataAiHint: 'person avatar', // AI hint for profile avatar
       serviceTaken: selectedService?.name || 'Unknown Service',
       serviceId: data.serviceId,
@@ -142,34 +179,74 @@ export default function SubmitTestimonialPage() {
       selectedForce: data.submissionStatus === 'selected_cleared' ? data.selectedForce : undefined,
       interviewLocation: data.submissionStatus === 'selected_cleared' ? data.interviewLocation : undefined,
       numberOfAttempts: data.submissionStatus === 'selected_cleared' ? data.numberOfAttempts : undefined,
-      bodyImageUrl: finalBodyImageUrl,
-      bodyImageDataAiHint: data.bodyImageDataAiHint,
-      status: 'pending' as const,
+      bodyImageUrl: finalBodyImageUrl || undefined,
+      bodyImageDataAiHint: data.bodyImageDataAiHint || undefined,
+      status: 'pending' as const, // Testimonials are pending approval by default
     };
 
-    MOCK_TESTIMONIALS.push(newTestimonial);
-    console.log("Testimonial submitted (simulated backend send):", newTestimonial);
+    try {
+      // PRODUCTION TODO: Add new testimonial document to Firestore
+      // const testimonialsColRef = collection(db, "testimonials");
+      // await addDoc(testimonialsColRef, {
+      //   ...newTestimonialData,
+      //   createdAt: serverTimestamp(),
+      //   updatedAt: serverTimestamp(),
+      // });
 
-    toast({
-      title: "Testimonial Submitted!",
-      description: "Thank you for sharing your experience. Your testimonial is pending review.",
-    });
-    form.reset({
-        name: currentUser?.name || "",
-        email: currentUser?.email || "",
-        serviceId: "",
-        story: "",
-        batch: "",
-        submissionStatus: undefined,
-        selectedForce: undefined,
-        interviewLocation: "",
-        numberOfAttempts: undefined,
-        bodyImageUrl: "",
-        bodyImageDataAiHint: "",
-        isNotRobot: false,
-    });
-    setBodyImageFile(null);
-    setBodyImagePreview(null);
+      // MOCK: Add to MOCK_TESTIMONIALS array
+      MOCK_TESTIMONIALS.push({
+        ...newTestimonialData,
+        id: `testimonial-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as Testimonial);
+      console.log("Testimonial submitted (simulated backend send):", newTestimonialData);
+      // END MOCK
+
+      toast({
+        title: "Testimonial Submitted!",
+        description: "Thank you for sharing your experience. Your testimonial is pending review.",
+      });
+      form.reset({
+          name: currentUser?.name || "",
+          email: currentUser?.email || "",
+          serviceId: "",
+          story: "",
+          batch: "",
+          submissionStatus: undefined,
+          selectedForce: undefined,
+          interviewLocation: "",
+          numberOfAttempts: undefined,
+          bodyImageUrl: "",
+          bodyImageDataAiHint: "",
+          isNotRobot: false,
+      });
+      setBodyImageFile(null);
+      setBodyImagePreview(null);
+    } catch (error) {
+      console.error("Error submitting testimonial to Firestore:", error);
+      toast({ title: "Submission Failed", description: "Could not save your testimonial. Please try again.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  if (loadingAuth) {
+    return (
+      <div className="container py-12 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2 text-muted-foreground">Loading user data...</p>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="container py-12">
+        <PageHeader title="Submit Testimonial" description="Please log in to share your success story."/>
+        {/* Optionally, add a login button or redirect */}
+      </div>
+    );
   }
 
   return (
@@ -223,18 +300,18 @@ export default function SubmitTestimonialPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Service Taken</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select the service you availed" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {MOCK_SERVICES.map(service => (
+                        {availableServices.length > 0 ? availableServices.map(service => (
                           <SelectItem key={service.id} value={service.id}>
                             {service.name}
                           </SelectItem>
-                        ))}
+                        )) : <SelectItem value="loading" disabled>Loading services...</SelectItem>}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -269,13 +346,13 @@ export default function SubmitTestimonialPage() {
               />
 
               <FormItem>
-                <FormLabel>Upload a Photo for Your Testimonial (Optional)</FormLabel>
+                <FormLabel htmlFor="bodyImage" className="flex items-center gap-2"><Upload className="h-4 w-4"/>Upload a Photo for Your Testimonial (Optional)</FormLabel>
                 <FormControl>
                     <Input id="bodyImage" type="file" accept="image/*" onChange={handleBodyImageChange} />
                 </FormControl>
                 {bodyImagePreview && (
                     <div className="mt-2">
-                        <Image src={bodyImagePreview} alt="Body image preview" width={200} height={150} className="rounded-md border object-contain" />
+                        <Image src={bodyImagePreview} alt="Body image preview" width={200} height={150} className="rounded-md border object-contain" data-ai-hint="user testimonial image" />
                     </div>
                 )}
                 <FormMessage />
@@ -409,8 +486,9 @@ export default function SubmitTestimonialPage() {
               />
             </CardContent>
             <CardFooter>
-              <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                <Edit2Icon className="mr-2 h-4 w-4"/> Submit Testimonial
+              <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Edit2Icon className="mr-2 h-4 w-4"/> {isSubmitting ? 'Submitting...' : 'Submit Testimonial'}
               </Button>
             </CardFooter>
           </form>
@@ -419,3 +497,4 @@ export default function SubmitTestimonialPage() {
     </>
   );
 }
+
