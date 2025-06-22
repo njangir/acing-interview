@@ -1,0 +1,86 @@
+rules_version='2'
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.isAdmin == true || 
+         request.auth.token.role == 'admin');
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isOwnerOrAdmin(userId) {
+      return isOwner(userId) || isAdmin();
+    }
+
+    // User Profiles - Users can read/write their own profile, admins can read all
+    match /userProfiles/{userId} {
+      allow read, write: if isOwnerOrAdmin(userId);
+      allow read: if isAdmin();
+    }
+
+    // Services - Publicly readable, writable only by admins
+    match /services/{serviceId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Bookings - Users can read/write their own bookings, admins can read all and update
+    match /bookings/{bookingId} {
+      allow read, write: if isOwner(resource.data.uid);
+      allow read, update: if isAdmin();
+      allow create: if isAuthenticated();
+    }
+
+    // Service Availability - Publicly readable, writable only by admins
+    match /serviceAvailability/{dateId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Testimonials - Users can create, admins can read/update status, approved ones are public
+    match /testimonials/{testimonialId} {
+      allow create: if isAuthenticated();
+      allow read: if resource.data.status == 'approved' || isOwner(resource.data.uid) || isAdmin();
+      allow update: if isOwner(resource.data.uid) || isAdmin();
+    }
+
+    // Resources - Readable by authenticated users, writable only by admins
+    match /resources/{resourceId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // User Messages - Users can create messages to admin, admins can read all and create replies
+    match /userMessages/{messageId} {
+      allow create: if isAuthenticated();
+      allow read: if isOwner(resource.data.uid) || isAdmin();
+      allow update: if isAdmin();
+    }
+
+    // Badges - Publicly readable, writable only by admins
+    match /badges/{badgeId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Feedback Submissions - Writable only by admins, readable by admins
+    match /feedbackSubmissions/{submissionId} {
+      allow read, write: if isAdmin();
+    }
+
+    // User Notifications - Users can only read/update 'seen' status for their own notifications
+    match /userNotifications/{notificationId} {
+      allow read, update: if isOwner(resource.data.userId);
+      allow write: if false; // Only backend functions should create notifications
+    }
+  }
+}
