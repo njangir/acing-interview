@@ -12,27 +12,59 @@ import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/fire
 import * as logger from "firebase-functions/logger";
 import { initializeApp } from "firebase-admin/app";
 import {getAuth} from "firebase-admin/auth";
-import {getFirestore, FieldValue} from "firebase-admin/firestore";
-import {getStorage} from "firebase-admin/storage";
+import {getFirestore, FieldValue, QueryDocumentSnapshot, DocumentData} from "firebase-admin/firestore";
+import Razorpay from "razorpay";
+import { config } from "firebase-functions";
+import * as crypto from "crypto";
 
 // Initialize Firebase Admin
-initializeApp();
+initializeApp();  
 
 const auth = getAuth();
 const db = getFirestore();
-const storage = getStorage();
+
+// Initialize Razorpay instance using Firebase config
+const razorpay = new Razorpay({
+  key_id: config().razorpay.key_id,
+  key_secret: config().razorpay.key_secret,
+});
+
+// Utility to check authentication
+function requireAuth(request: any) {
+  if (!request.auth) {
+    throw new Error("Unauthorized");
+  }
+}
+
+// Utility to check admin
+async function requireAdmin(request: any, auth: any) {
+  requireAuth(request);
+  let uid: string;
+  if (request.auth && request.auth.uid) {
+    uid = request.auth.uid;
+  } else {
+    throw new Error("Unauthorized");
+  }
+  const userRecord = await auth.getUser(uid);
+  const customClaims = userRecord.customClaims;
+  if (!customClaims?.isAdmin) {
+    throw new Error("Admin access required");
+  }
+}
 
 // User Profile Creation on Sign Up
 export const onUserCreate = onDocumentCreated("userProfiles/{userId}", async (event) => {
   const userId = event.params.userId;
-  const userData = event.data?.data();
-
+  if (!event.data) {
+    logger.error(`No event.data found for userId=${userId} in onUserCreate`);
+    return;
+  }
+  const userData = event.data.data();
   try {
     // Set custom claims for admin users (you can modify this logic)
     if (userData?.email === "admin@example.com") {
       await auth.setCustomUserClaims(userId, {isAdmin: true, role: "admin"});
     }
-
     logger.info(`User profile created for ${userId}`);
   } catch (error) {
     logger.error("Error in onUserCreate:", error);
@@ -42,42 +74,61 @@ export const onUserCreate = onDocumentCreated("userProfiles/{userId}", async (ev
 // Create Payment Order
 export const createPaymentOrder = onCall({maxInstances: 10}, async (request) => {
   const {bookingDetails, servicePrice, userId} = request.data;
-
-  if (!request.auth) {
-    throw new Error("Unauthorized");
-  }
+  requireAuth(request);
 
   try {
-    // TODO: Integrate with payment gateway (Razorpay/Stripe)
-    // For now, return mock payment order
-    const orderId = `order_${Date.now()}_${userId}`;
+    // Create a real Razorpay order
+    const options = {
+      amount: Math.round(servicePrice * 100), // amount in paise
+      currency: "INR",
+      receipt: `receipt_${Date.now()}_${userId}`,
+      payment_capture: 1,
+      notes: {
+        serviceName: bookingDetails.serviceName,
+        userId,
+      },
+    };
+    const order = await razorpay.orders.create(options);
+    logger.info(`Created Razorpay order: ${order.id} for booking: ${bookingDetails.serviceName} by user: ${userId}`);
     
     return {
       success: true,
-      orderId,
-      amount: servicePrice,
-      currency: "INR",
-      // gatewayKey: process.env.RAZORPAY_KEY_ID // Add your payment gateway key
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      gatewayKey: config().razorpay.key_id, // Send public key to client
+      message: "Payment order created successfully",
     };
   } catch (error) {
-    logger.error("Error creating payment order:", error);
+    logger.error(`Error creating payment order for userId=${userId}, serviceName=${bookingDetails?.serviceName}:`, error);
     throw new Error("Failed to create payment order");
   }
 });
 
+// Helper to verify payment signature using Razorpay's HMAC SHA256
+function verifyPaymentSignature(paymentId: string, orderId: string, signature: string): boolean {
+  const keySecret = config().razorpay.key_secret;
+  const generatedSignature = crypto
+    .createHmac("sha256", keySecret)
+    .update(orderId + "|" + paymentId)
+    .digest("hex");
+  logger.info(`Verifying payment: paymentId=${paymentId}, orderId=${orderId}, signature=${signature}, generatedSignature=${generatedSignature}`);
+  return generatedSignature === signature;
+}
+
 // Confirm Booking after Payment
 export const confirmBooking = onCall({maxInstances: 10}, async (request) => {
   const {paymentId, orderId, signature, bookingId} = request.data;
-
-  if (!request.auth) {
-    throw new Error("Unauthorized");
-  }
+  requireAuth(request);
 
   try {
-    // TODO: Verify payment with gateway
-    // const isValid = verifyPaymentSignature(paymentId, orderId, signature);
+    // Verify payment with gateway
+    const isValid = verifyPaymentSignature(paymentId, orderId, signature);
     
-    // For now, assume payment is valid
+    if (!isValid) {
+      throw new Error("Payment verification failed");
+    }
+
     const bookingRef = db.collection("bookings").doc(bookingId);
     await bookingRef.update({
       status: "accepted",
@@ -88,7 +139,7 @@ export const confirmBooking = onCall({maxInstances: 10}, async (request) => {
 
     // Create notification for user
     await db.collection("userNotifications").add({
-      userId: request.auth.uid,
+      userId: request.auth?.uid,
       message: "Your booking has been confirmed!",
       timestamp: FieldValue.serverTimestamp(),
       href: `/dashboard/bookings`,
@@ -98,28 +149,17 @@ export const confirmBooking = onCall({maxInstances: 10}, async (request) => {
 
     return {success: true};
   } catch (error) {
-    logger.error("Error confirming booking:", error);
+    logger.error(`Error confirming booking for bookingId=${bookingId}, userId=${request.auth?.uid}:`, error);
     throw new Error("Failed to confirm booking");
   }
 });
 
 // Update Booking Status (Admin Function)
 export const updateBookingStatus = onCall({maxInstances: 10}, async (request) => {
-  const {bookingId, status, meetingLink, adminUid} = request.data;
-
-  if (!request.auth) {
-    throw new Error("Unauthorized");
-  }
+  const {bookingId, status, meetingLink } = request.data;
+  await requireAdmin(request, auth);
 
   try {
-    // Verify admin status
-    const userRecord = await auth.getUser(request.auth.uid);
-    const customClaims = userRecord.customClaims;
-    
-    if (!customClaims?.isAdmin) {
-      throw new Error("Admin access required");
-    }
-
     const bookingRef = db.collection("bookings").doc(bookingId);
     const bookingDoc = await bookingRef.get();
     
@@ -151,28 +191,17 @@ export const updateBookingStatus = onCall({maxInstances: 10}, async (request) =>
 
     return {success: true};
   } catch (error) {
-    logger.error("Error updating booking status:", error);
+    logger.error(`Error updating booking status for bookingId=${bookingId}, userId=${request.auth?.uid}:`, error);
     throw new Error("Failed to update booking status");
   }
 });
 
 // Process Refund Request
 export const processRefundRequest = onCall({maxInstances: 10}, async (request) => {
-  const {bookingId, refundReason, adminUid} = request.data;
-
-  if (!request.auth) {
-    throw new Error("Unauthorized");
-  }
+  const {bookingId, refundReason } = request.data;
+  await requireAdmin(request, auth);
 
   try {
-    // Verify admin status
-    const userRecord = await auth.getUser(request.auth.uid);
-    const customClaims = userRecord.customClaims;
-    
-    if (!customClaims?.isAdmin) {
-      throw new Error("Admin access required");
-    }
-
     const bookingRef = db.collection("bookings").doc(bookingId);
     const bookingDoc = await bookingRef.get();
     
@@ -202,7 +231,7 @@ export const processRefundRequest = onCall({maxInstances: 10}, async (request) =
 
     return {success: true};
   } catch (error) {
-    logger.error("Error processing refund request:", error);
+    logger.error(`Error processing refund request for bookingId=${bookingId}, userId=${request.auth?.uid}:`, error);
     throw new Error("Failed to process refund request");
   }
 });
@@ -210,32 +239,21 @@ export const processRefundRequest = onCall({maxInstances: 10}, async (request) =
 // Export Reports (Admin Function)
 export const exportBookingsReport = onCall({maxInstances: 5}, async (request) => {
   const {startDate, endDate, status} = request.data;
-
-  if (!request.auth) {
-    throw new Error("Unauthorized");
-  }
+  await requireAdmin(request, auth);
 
   try {
-    // Verify admin status
-    const userRecord = await auth.getUser(request.auth.uid);
-    const customClaims = userRecord.customClaims;
-    
-    if (!customClaims?.isAdmin) {
-      throw new Error("Admin access required");
-    }
-
-    let query = db.collection("bookings");
+    let bookingsQuery: any = db.collection("bookings");
     
     if (startDate && endDate) {
-      query = query.where("date", ">=", startDate).where("date", "<=", endDate);
+      bookingsQuery = bookingsQuery.where("date", ">=", startDate).where("date", "<=", endDate);
     }
     
     if (status) {
-      query = query.where("status", "==", status);
+      bookingsQuery = bookingsQuery.where("status", "==", status);
     }
 
-    const snapshot = await query.get();
-    const bookings = snapshot.docs.map(doc => ({
+    const snapshot = await bookingsQuery.get();
+    const bookings = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
       id: doc.id,
       ...doc.data()
     }));
@@ -246,7 +264,7 @@ export const exportBookingsReport = onCall({maxInstances: 5}, async (request) =>
       count: bookings.length,
     };
   } catch (error) {
-    logger.error("Error exporting bookings report:", error);
+    logger.error(`Error exporting bookings report for userId=${request.auth?.uid}:`, error);
     throw new Error("Failed to export bookings report");
   }
 });
@@ -287,9 +305,12 @@ export const autoCancelUnpaidBookings = onRequest(async (req, res) => {
 
 // Notification triggers
 export const onBookingStatusChange = onDocumentUpdated("bookings/{bookingId}", async (event) => {
-  const beforeData = event.data?.before.data();
-  const afterData = event.data?.after.data();
-
+  if (!event.data || !event.data.before || !event.data.after) {
+    logger.error("Missing event.data.before or event.data.after in onBookingStatusChange");
+    return;
+  }
+  const beforeData = event.data.before.data();
+  const afterData = event.data.after.data();
   if (beforeData?.status !== afterData?.status) {
     try {
       await db.collection("userNotifications").add({
@@ -307,8 +328,11 @@ export const onBookingStatusChange = onDocumentUpdated("bookings/{bookingId}", a
 });
 
 export const onNewMessage = onDocumentCreated("userMessages/{messageId}", async (event) => {
-  const messageData = event.data?.data();
-
+  if (!event.data) {
+    logger.error("No event.data found in onNewMessage");
+    return;
+  }
+  const messageData = event.data.data();
   if (messageData?.senderType === "user") {
     try {
       // Create notification for admin

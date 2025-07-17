@@ -4,24 +4,24 @@
 
 ### Phase 1: Firebase Project Setup (30 minutes)
 
-1. **Create Firebase Project**
+1. **Create Firebase Project** (done)
    - Go to [Firebase Console](https://console.firebase.google.com/)
    - Create new project: "Armed Forces Interview Ace"
    - Enable Google Analytics (optional)
 
-2. **Configure Firebase Services**
+2. **Configure Firebase Services**  (done)
    - **Authentication**: Enable Email/Password authentication
    - **Firestore**: Create database in Native mode
    - **Storage**: Enable Firebase Storage
    - **Functions**: Enable Cloud Functions
 
-3. **Get Configuration**
+3. **Get Configuration** (done)
    - Go to Project Settings > General
    - Scroll to "Your apps" section
    - Click "Add app" > Web app
    - Copy the config object
 
-4. **Set Environment Variables**
+4. **Set Environment Variables** (done)
    ```bash
    # Create .env.local file
    cp env.example .env.local
@@ -39,17 +39,17 @@
 
 ### Phase 2: Deploy Firebase Backend (15 minutes)
 
-1. **Install Firebase CLI** (if not already installed)
+1. **Install Firebase CLI** (if not already installed) (done)
    ```bash
    npm install -g firebase-tools
    ```
 
-2. **Login to Firebase**
+2. **Login to Firebase** (done)
    ```bash
    firebase login
    ```
 
-3. **Initialize Firebase in project**
+3. **Initialize Firebase in project** (done)
    ```bash
    firebase init
    ```
@@ -60,7 +60,7 @@
    - Storage
    - Hosting (if you want to use Firebase Hosting)
 
-4. **Deploy Firebase resources**
+4. **Deploy Firebase resources** (inprogress)
    ```bash
    firebase deploy
    ```

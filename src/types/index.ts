@@ -9,7 +9,7 @@ export interface Service {
   features: string[];
   image?: string;
   dataAiHint?: string;
-  defaultForce?: 'Air Force' | 'Army' | 'Navy' | 'General';
+  defaultForce?: 'Air Force' | 'Army' | 'Navy' | 'Civillian';
   isBookable?: boolean; // New field
 }
 
