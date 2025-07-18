@@ -78,7 +78,10 @@ export function WeeklyScheduleView({
             const dailyBookings = bookingsToDisplay
               .filter((booking) => {
                 const bookingDateObj = parse(booking.date, 'yyyy-MM-dd', new Date());
-                return isSameDay(bookingDateObj, day) && (booking.status === 'upcoming' || booking.status === 'pending_approval');
+                return (
+                  isSameDay(bookingDateObj, day) &&
+                  (booking.status === 'scheduled' || booking.status === 'pending_approval')
+                );
               })
               .sort((a, b) => {
                 const parseTime = (timeStr: string) => {

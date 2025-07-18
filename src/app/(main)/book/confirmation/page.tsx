@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState, useRef } from 'react'; 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { CheckCircle, Calendar, Link as LinkIcon, AlertTriangle, Info } from 'lucide-react';
 import Link from 'next/link';
 import type { Booking } from '@/types'; // Import Booking type
+import { bookingService } from '@/lib/firebase-services';
+import { useAuth } from '@/hooks/use-auth';
 
 interface ConfirmationDetails {
   serviceName: string;
@@ -24,42 +26,46 @@ interface ConfirmationDetails {
 export default function BookingConfirmationPage() {
   const router = useRouter();
   const [details, setDetails] = useState<ConfirmationDetails | null>(null);
-  const effectGuard = useRef(false); 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { user, userProfile } = useAuth();
 
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      if (effectGuard.current) {
-        return; 
+    const fetchConfirmationDetails = async () => {
+      if (!user || !userProfile) {
+        setError("User not authenticated.");
+        return;
       }
-      effectGuard.current = true; 
-    }
 
-    if (details) {
-      return;
-    }
-
-    const storedDetails = localStorage.getItem('confirmationDetails');
-    if (storedDetails) {
       try {
-        const parsedDetails = JSON.parse(storedDetails) as ConfirmationDetails; // Ensure type
-        setDetails(parsedDetails);
-        localStorage.removeItem('bookingDetails');
-        localStorage.removeItem('userDetails');
-        localStorage.removeItem('confirmationDetails');
-      } catch (error) {
-        console.error("Error parsing confirmation details from localStorage:", error);
-        router.push('/services'); 
+        setLoading(true);
+        const booking = await bookingService.getBookingByTransactionId(userProfile.uid);
+        if (booking) {
+          setDetails(booking);
+        } else {
+          setError("Booking not found.");
+        }
+      } catch (err) {
+        setError("Failed to fetch booking details.");
+        console.error(err);
+      } finally {
+        setLoading(false);
       }
-    } else {
-      console.warn("No confirmationDetails found in localStorage on page load. Redirecting to services.");
-      if (!details) {
-         router.push('/services');
-      }
-    }
-  }, [router, details]); 
+    };
+
+    fetchConfirmationDetails();
+  }, [user, userProfile]);
+
+  if (loading) {
+    return <div className="container py-12">Loading confirmation...</div>;
+  }
+
+  if (error) {
+    return <div className="container py-12 text-center text-red-500">{error}</div>;
+  }
 
   if (!details) {
-    return <div className="container py-12">Loading confirmation...</div>;
+    return <div className="container py-12 text-center">No booking details found.</div>;
   }
 
   // Derive states from details.status and details.paymentStatus

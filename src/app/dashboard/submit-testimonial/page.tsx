@@ -17,10 +17,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { MOCK_SERVICES, MOCK_TESTIMONIALS, PREDEFINED_AVATARS } from '@/constants'; // PREDEFINED_AVATARS for default user image
+import { PREDEFINED_AVATARS } from '@/constants'; // PREDEFINED_AVATARS for default user image
 import type { Testimonial, Service } from '@/types'; // Added Service type
 import { Edit2Icon, Award, MapPin, ListChecks, Briefcase, Upload, Loader2 } from 'lucide-react'; // Added Loader2
 import { useAuth } from '@/hooks/use-auth';
+import { serviceService, testimonialService } from '@/lib/firebase-services';
 
 // PRODUCTION TODO: Import Firebase and Firestore methods
 // import { db, storage } from '@/lib/firebase';
@@ -71,7 +72,7 @@ type TestimonialFormValues = z.infer<typeof testimonialFormSchema>;
 
 export default function SubmitTestimonialPage() {
   const { toast } = useToast();
-  const { currentUser, loadingAuth } = useAuth();
+  const { user, loading } = useAuth();
   const [bodyImageFile, setBodyImageFile] = useState<File | null>(null);
   const [bodyImagePreview, setBodyImagePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,24 +96,16 @@ export default function SubmitTestimonialPage() {
     },
   });
 
-   useEffect(() => {
-    // PRODUCTION TODO: Fetch services from Firestore instead of MOCK_SERVICES
-    // const fetchServices = async () => {
-    //   const servicesCol = collection(db, 'services');
-    //   const servicesSnap = await getDocs(servicesCol);
-    //   setAvailableServices(servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
-    // };
-    // fetchServices();
-    setAvailableServices(MOCK_SERVICES); // Using mock for now
-
-    if (currentUser) {
+  useEffect(() => {
+    serviceService.getAllServices().then(setAvailableServices);
+    if (user) {
         form.reset({
-            ...form.getValues(), // Preserve other potentially filled fields
-            name: currentUser.name || "",
-            email: currentUser.email || "",
+            ...form.getValues(),
+            name: user.displayName || user.email || "",
+            email: user.email || "",
         });
     }
-  }, [currentUser, form]);
+  }, [user, form]);
 
   const submissionStatus = useWatch({
     control: form.control,
@@ -136,27 +129,18 @@ export default function SubmitTestimonialPage() {
 
 
   async function onSubmit(data: TestimonialFormValues) {
-    if (!currentUser) {
+    if (!user) {
       toast({ title: "Authentication Error", description: "Please log in to submit a testimonial.", variant: "destructive" });
       return;
     }
     setIsSubmitting(true);
-
     const selectedService = availableServices.find(s => s.id === data.serviceId);
-    let finalBodyImageUrl = data.bodyImageUrl; // Use if a URL was manually entered
-
+    let finalBodyImageUrl = data.bodyImageUrl;
     // PRODUCTION TODO: Handle Image Upload to Firebase Storage
     if (bodyImageFile) {
       try {
-        // const imageFileName = `${currentUser.uid}_testimonial_${Date.now()}_${bodyImageFile.name.replace(/\s+/g, '_')}`;
-        // const imageRef = storageRef(storage, `testimonials_body_images/${imageFileName}`);
-        // const uploadResult = await uploadBytes(imageRef, bodyImageFile);
-        // finalBodyImageUrl = await getDownloadURL(uploadResult.ref);
-        // console.log("Body image uploaded to Firebase Storage:", finalBodyImageUrl);
-
-        // MOCK: Simulate upload and URL generation
+        // ... image upload logic ...
         finalBodyImageUrl = `https://placehold.co/400x300.png?text=${encodeURIComponent(bodyImageFile.name.substring(0,15))}`;
-        console.log("Simulating upload of body image:", bodyImageFile.name, "URL:", finalBodyImageUrl);
       } catch (uploadError) {
         console.error("Error uploading body image:", uploadError);
         toast({ title: "Image Upload Failed", description: "Could not upload your image. Please try again or submit without it.", variant: "destructive" });
@@ -164,15 +148,14 @@ export default function SubmitTestimonialPage() {
         return;
       }
     }
-
-    const newTestimonialData: Omit<Testimonial, 'id' | 'createdAt' | 'updatedAt'> = {
-      uid: currentUser.uid, // Link testimonial to the authenticated user
+    const newTestimonialData: Omit<Testimonial, 'id'> = {
+      uid: user.uid,
       name: data.name,
       userEmail: data.email,
       batch: data.batch || undefined,
       story: data.story,
-      imageUrl: currentUser.imageUrl || PREDEFINED_AVATARS[0].url, // User's profile avatar
-      dataAiHint: 'person avatar', // AI hint for profile avatar
+      imageUrl: user.photoURL || PREDEFINED_AVATARS[0].url,
+      dataAiHint: 'person avatar',
       serviceTaken: selectedService?.name || 'Unknown Service',
       serviceId: data.serviceId,
       submissionStatus: data.submissionStatus,
@@ -181,35 +164,19 @@ export default function SubmitTestimonialPage() {
       numberOfAttempts: data.submissionStatus === 'selected_cleared' ? data.numberOfAttempts : undefined,
       bodyImageUrl: finalBodyImageUrl || undefined,
       bodyImageDataAiHint: data.bodyImageDataAiHint || undefined,
-      status: 'pending' as const, // Testimonials are pending approval by default
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
-
     try {
-      // PRODUCTION TODO: Add new testimonial document to Firestore
-      // const testimonialsColRef = collection(db, "testimonials");
-      // await addDoc(testimonialsColRef, {
-      //   ...newTestimonialData,
-      //   createdAt: serverTimestamp(),
-      //   updatedAt: serverTimestamp(),
-      // });
-
-      // MOCK: Add to MOCK_TESTIMONIALS array
-      MOCK_TESTIMONIALS.push({
-        ...newTestimonialData,
-        id: `testimonial-${Date.now()}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      } as Testimonial);
-      console.log("Testimonial submitted (simulated backend send):", newTestimonialData);
-      // END MOCK
-
+      await testimonialService.createTestimonial(newTestimonialData);
       toast({
         title: "Testimonial Submitted!",
         description: "Thank you for sharing your experience. Your testimonial is pending review.",
       });
       form.reset({
-          name: currentUser?.name || "",
-          email: currentUser?.email || "",
+          name: user?.displayName || user?.email || "",
+          email: user?.email || "",
           serviceId: "",
           story: "",
           batch: "",
@@ -231,7 +198,7 @@ export default function SubmitTestimonialPage() {
     }
   }
 
-  if (loadingAuth) {
+  if (loading) {
     return (
       <div className="container py-12 flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -239,12 +206,10 @@ export default function SubmitTestimonialPage() {
       </div>
     );
   }
-
-  if (!currentUser) {
+  if (!user) {
     return (
       <div className="container py-12">
         <PageHeader title="Submit Testimonial" description="Please log in to share your success story."/>
-        {/* Optionally, add a login button or redirect */}
       </div>
     );
   }

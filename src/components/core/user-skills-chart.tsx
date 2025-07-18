@@ -119,7 +119,7 @@ export function UserSkillsChart({ completedBookingsWithFeedback }: UserSkillsCha
   // Prepare a config that maps full skill names to their display names for the tooltip
   const tooltipChartConfig: ChartConfig = Object.fromEntries(
     Object.entries(chartConfig).concat(
-      chartData.map(item => [item.fullSkillName, { label: item.fullSkillName }]) // this part might not be strictly needed if tooltip auto-uses dataKey name
+      chartData.map(item => [item.fullSkillName, { label: item.fullSkillName, color: 'hsl(var(--chart-1))' }]) // this part might not be strictly needed if tooltip auto-uses dataKey name
     )
   );
 

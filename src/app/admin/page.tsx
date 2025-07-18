@@ -1,29 +1,54 @@
 
 'use client'; 
 
-import { useMemo } from 'react'; 
+import { useMemo, useEffect, useState } from 'react';
 import { PageHeader } from "@/components/core/page-header";
 import { Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-
-import { MOCK_BOOKINGS, MOCK_USER_MESSAGES, MOCK_SERVICES } from "@/constants";
 import { BellRing, TrendingUp, MessagesSquare, Star } from "lucide-react";
 import { WeeklyScheduleView } from '@/components/core/weekly-schedule-view';
+import { bookingService, serviceService, messageService } from '@/lib/firebase-services';
 
 export default function AdminOverviewPage() {
-  const newBookingRequests = useMemo(() => MOCK_BOOKINGS.filter(b => b.status === 'pending_approval').length, []);
-  
-  const totalSales = useMemo(() => MOCK_BOOKINGS.reduce((acc, booking) => {
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      try {
+        const [bookingsData, servicesData, messagesData] = await Promise.all([
+          bookingService.getAllBookings(),
+          serviceService.getAllServices(),
+          messageService.getAllMessages(),
+        ]);
+        setBookings(bookingsData);
+        setServices(servicesData);
+        setMessages(messagesData);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
+  const newBookingRequests = useMemo(() => bookings.filter((b: any) => b.status === 'pending_approval').length, [bookings]);
+  const totalSales = useMemo(() => bookings.reduce((acc: number, booking: any) => {
     if (booking.paymentStatus === 'paid') {
-      const service = MOCK_SERVICES.find(s => s.id === booking.serviceId); 
+      const service = services.find((s: any) => s.id === booking.serviceId);
       if (service) {
         return acc + service.price;
       }
     }
     return acc;
-  }, 0), []);
+  }, 0), [bookings, services]);
+  const newMessagesCount = useMemo(() => messages.filter((m: any) => m.status === 'new').length, [messages]);
+  const averageRating = "4.7/5 Stars";
 
-  const newMessagesCount = useMemo(() => MOCK_USER_MESSAGES.filter(m => m.status === 'new').length, []);
-  const averageRating = "4.7/5 Stars"; 
+  if (loading) {
+    return <div className="container py-12 flex items-center justify-center">Loading admin dashboard...</div>;
+  }
 
   return (
     <>
@@ -31,8 +56,6 @@ export default function AdminOverviewPage() {
         title="Admin Dashboard Overview"
         description="Welcome to the admin panel. Get quick insights and manage your application's operations from here."
       />
-      
-      
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
         <Card className="shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -75,13 +98,11 @@ export default function AdminOverviewPage() {
           </CardContent>
         </Card>
       </div>
-
       <WeeklyScheduleView
-        allBookings={MOCK_BOOKINGS}
+        allBookings={bookings}
         title="Admin - Weekly Bookings Overview"
         showUserName={true}
       />
-      
     </>
   );
 }

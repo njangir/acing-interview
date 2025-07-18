@@ -6,7 +6,7 @@ import { Logo } from '@/components/icons/logo';
 import { useAuth } from '@/hooks/use-auth';
 
 export function Footer() {
-  const { isLoggedIn } = useAuth(); // isLoggedIn derived from currentUser
+  const { user } = useAuth(); // Use currentUser instead of isLoggedIn
 
   return (
     <footer className="border-t bg-card text-card-foreground">
@@ -36,7 +36,7 @@ export function Footer() {
             <h3 className="text-lg font-semibold mb-4 font-headline">Contact Us</h3>
             <p className="text-sm text-muted-foreground">Email: info@afinterviewace.com</p>
             <p className="text-sm text-muted-foreground">Phone: +91 12345 67890</p>
-            {isLoggedIn && (
+            {user && (
               <p className="text-sm text-muted-foreground mt-2">
                 <Link href="/dashboard/contact" className="hover:text-foreground">Send us a message</Link>
               </p>

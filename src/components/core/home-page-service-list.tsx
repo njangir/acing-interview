@@ -2,24 +2,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MOCK_SERVICES } from '@/constants';
+import { serviceService } from '@/lib/firebase-services';
 import { ServiceCard } from '@/components/core/service-card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import type { Service } from '@/types';
 
 export function HomePageServiceList() {
-  // Use state to hold services, allowing re-render if MOCK_SERVICES reference or content changes
-  // This is a simplified way to try and react to mutations of the MOCK_SERVICES constant
-  const [services, setServices] = useState<Service[]>(MOCK_SERVICES.slice(0, 3));
+  const [services, setServices] = useState<Service[]>([]);
 
   useEffect(() => {
-    // This effect will run on mount and potentially if the component is forced to re-render.
-    // In a real app, you'd fetch fresh data or use a proper state management solution.
-    // For this mock, we re-set state from the (potentially mutated) MOCK_SERVICES.
-    setServices(MOCK_SERVICES.slice(0, 3));
-  }, []); // Empty dependency array means it runs once on mount, but MOCK_SERVICES itself is a module-level const.
-          // If MOCK_SERVICES is mutated and this component re-renders due to navigation, it *should* pick up the change.
+    serviceService.getAllServices().then(all => setServices(all.slice(0, 3)));
+  }, []);
 
   return (
     <section id="services" className="py-16 bg-secondary">

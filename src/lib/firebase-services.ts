@@ -39,7 +39,8 @@ import type {
   UserProfile, 
   UserMessage, 
   Badge,
-  FeedbackSubmissionHistoryEntry
+  FeedbackSubmissionHistoryEntry,
+  MentorProfileData
 } from '@/types';
 
 // Helper function to convert Firestore timestamps
@@ -226,6 +227,17 @@ export const serviceService = {
       console.error('Error uploading service image:', error);
       throw error;
     }
+  },
+
+  onServicesChange(callback: (services: Service[]) => void, errorCallback?: (err: any) => void) {
+    const q = query(collection(db, 'services'), orderBy('name', 'asc'));
+    return onSnapshot(q, (snapshot) => {
+      const services = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Service[];
+      callback(services);
+    }, errorCallback);
   }
 };
 
@@ -304,6 +316,39 @@ export const bookingService = {
       console.error('Error fetching booking:', error);
       throw error;
     }
+  },
+
+  async getBookingByTransactionId(transactionIdOrUid: string): Promise<Booking | null> {
+    try {
+      const q = query(collection(db, 'bookings'), where('transactionId', '==', transactionIdOrUid));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        const doc = snapshot.docs[0];
+        return { id: doc.id, ...convertTimestamps(doc.data()) } as Booking;
+      }
+      // Fallback: try by uid
+      const q2 = query(collection(db, 'bookings'), where('uid', '==', transactionIdOrUid), orderBy('createdAt', 'desc'), limit(1));
+      const snapshot2 = await getDocs(q2);
+      if (!snapshot2.empty) {
+        const doc = snapshot2.docs[0];
+        return { id: doc.id, ...convertTimestamps(doc.data()) } as Booking;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching booking by transactionId or uid:', error);
+      return null;
+    }
+  },
+
+  onBookingsChange(callback: (bookings: Booking[]) => void, errorCallback?: (err: any) => void) {
+    const q = query(collection(db, 'bookings'), orderBy('date', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+      const bookings = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...convertTimestamps(doc.data())
+      })) as Booking[];
+      callback(bookings);
+    }, errorCallback);
   }
 };
 
@@ -521,7 +566,18 @@ export const messageService = {
       console.error('Error updating message:', error);
       throw error;
     }
-  }
+  },
+
+  onMessagesChange(callback: (messages: UserMessage[]) => void, errorCallback?: (err: any) => void) {
+    const q = query(collection(db, 'userMessages'), orderBy('timestamp', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+      const messages = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...convertTimestamps(doc.data())
+      })) as UserMessage[];
+      callback(messages);
+    }, errorCallback);
+  },
 };
 
 // Badges
@@ -695,4 +751,60 @@ export const realtimeService = {
       callback(messages);
     });
   }
+}; 
+
+export const feedbackSubmissionService = {
+  async getAllSubmissions(): Promise<FeedbackSubmissionHistoryEntry[]> {
+    try {
+      const q = query(collection(db, 'feedbackSubmissions'), orderBy('submissionDate', 'desc'));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        submissionDate: doc.data().submissionDate?.toDate ? doc.data().submissionDate.toDate().toISOString() : doc.data().submissionDate,
+      })) as FeedbackSubmissionHistoryEntry[];
+    } catch (error) {
+      console.error('Error fetching feedback submissions:', error);
+      return [];
+    }
+  },
+  async createSubmission(entry: Omit<FeedbackSubmissionHistoryEntry, 'id' | 'submissionDate'>): Promise<string> {
+    try {
+      const docRef = await addDoc(collection(db, 'feedbackSubmissions'), {
+        ...entry,
+        createdAt: serverTimestamp(),
+        submissionDate: serverTimestamp(),
+      });
+      return docRef.id;
+    } catch (error) {
+      console.error('Error creating feedback submission:', error);
+      throw error;
+    }
+  },
+}; 
+
+export const mentorProfileService = {
+  async getMentorProfile(): Promise<MentorProfileData | null> {
+    try {
+      const docRef = doc(db, 'mentorProfile', 'main');
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) return null;
+      return docSnap.data() as MentorProfileData;
+    } catch (error) {
+      console.error('Error fetching mentor profile:', error);
+      return null;
+    }
+  },
+  async updateMentorProfile(profile: MentorProfileData): Promise<void> {
+    try {
+      const docRef = doc(db, 'mentorProfile', 'main');
+      await updateDoc(docRef, {
+        ...profile,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Error updating mentor profile:', error);
+      throw error;
+    }
+  },
 }; 

@@ -4,10 +4,31 @@
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MOCK_BOOKINGS, MOCK_SERVICES } from "@/constants";
 import { DownloadCloud } from 'lucide-react';
+import { bookingService, serviceService } from '@/lib/firebase-services';
+import { useEffect, useState } from 'react';
 
 export default function AdminExportReportsPage() {
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      try {
+        const [bookingsData, servicesData] = await Promise.all([
+          bookingService.getAllBookings(),
+          serviceService.getAllServices(),
+        ]);
+        setBookings(bookingsData);
+        setServices(servicesData);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
 
   const downloadJSON = (data: any, filename: string) => {
     const jsonStr = JSON.stringify(data, null, 2);
@@ -23,7 +44,7 @@ export default function AdminExportReportsPage() {
   };
 
   const handleExportSessionSchedules = () => {
-    const reportData = MOCK_BOOKINGS.map(booking => ({
+    const reportData = bookings.map((booking: any) => ({
       bookingId: booking.id,
       serviceName: booking.serviceName,
       date: booking.date,
@@ -39,8 +60,8 @@ export default function AdminExportReportsPage() {
   };
 
   const handleExportSalesReport = () => {
-    const reportData = MOCK_BOOKINGS.map(booking => {
-      const service = MOCK_SERVICES.find(s => s.id === booking.serviceId);
+    const reportData = bookings.map((booking: any) => {
+      const service = services.find((s: any) => s.id === booking.serviceId);
       return {
         bookingId: booking.id,
         serviceName: booking.serviceName,
@@ -61,24 +82,26 @@ export default function AdminExportReportsPage() {
 
   const handleExportUserData = () => {
     const users: Record<string, { userName: string, email: string, bookings: number, firstBookingDate?: string, lastBookingDate?: string }> = {};
-    // Sort bookings to easily find first/last dates
-    const sortedBookings = [...MOCK_BOOKINGS].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
+    const sortedBookings = [...bookings].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     sortedBookings.forEach(booking => {
       if (!users[booking.userEmail]) {
         users[booking.userEmail] = {
           userName: booking.userName,
           email: booking.userEmail,
           bookings: 0,
-          firstBookingDate: booking.date, // First encounter
-          lastBookingDate: booking.date,  // Will be updated
+          firstBookingDate: booking.date,
+          lastBookingDate: booking.date,
         };
       }
       users[booking.userEmail].bookings += 1;
-      users[booking.userEmail].lastBookingDate = booking.date; // Update with latest booking date
+      users[booking.userEmail].lastBookingDate = booking.date;
     });
     downloadJSON(Object.values(users), 'user_data_report.json');
   };
+
+  if (loading) {
+    return <div className="container py-12 flex items-center justify-center">Loading reports...</div>;
+  }
 
   return (
     <>

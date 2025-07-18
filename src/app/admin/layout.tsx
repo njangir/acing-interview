@@ -16,23 +16,22 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAdmin, currentUser } = useAuth(); // Use isAdmin and currentUser
+  const { user, userProfile } = useAuth();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
+  const isAdmin = userProfile?.roles?.includes('admin');
 
   useEffect(() => {
-    // currentUser might be null initially while loading from localStorage
-    if (currentUser === undefined) { // Still determining auth state
+    if (user === undefined || userProfile === undefined) {
       setIsLoading(true);
       return;
     }
-
     if (!isAdmin) {
       router.push('/login?redirect=/admin');
     } else {
       setIsLoading(false);
     }
-  }, [isAdmin, currentUser, router]);
+  }, [isAdmin, user, userProfile, router]);
 
   if (isLoading) { 
     return (
@@ -42,8 +41,6 @@ export default function AdminLayout({
       </div>
     );
   }
-  
-  // This check is technically redundant due to the useEffect redirect, but good for robustness
   if (!isAdmin && !isLoading) { 
      return (
       <div className="flex min-h-screen flex-col items-center justify-center">
@@ -51,7 +48,6 @@ export default function AdminLayout({
       </div>
     );
   }
-
   return (
     <div className="flex min-h-screen flex-col">
       <Header />

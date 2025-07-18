@@ -3,12 +3,44 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { TestimonialCard } from '@/components/core/testimonial-card';
 import { HomePageServiceList } from '@/components/core/home-page-service-list'; // Import the new component
-import { MOCK_TESTIMONIALS } from '@/constants'; // MOCK_SERVICES removed from here
+import { useEffect, useState } from 'react';
+import { serviceService, testimonialService } from '@/lib/firebase-services';
+import { useAuth } from '@/hooks/use-auth';
+import type { Service, Testimonial } from '@/types';
 import { CheckCircle, Shield, Target } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 
-export default function HomePage() {
+export default function MainHomePage() {
+  const { user, userProfile } = useAuth();
+  const [services, setServices] = useState<Service[]>([]);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsLoading(true);
+    setError(null);
+    Promise.all([
+      serviceService.getAllServices(),
+      testimonialService.getAllTestimonials()
+    ]).then(([services, testimonials]) => {
+      setServices(services);
+      setTestimonials(testimonials);
+      setIsLoading(false);
+    }).catch((err) => {
+      setError('Failed to load data.');
+      setIsLoading(false);
+    });
+  }, []);
+
+  if (isLoading) {
+    return <div className="container py-12 flex justify-center items-center min-h-[300px]"><span>Loading...</span></div>;
+  }
+  if (error) {
+    return <div className="container py-12 flex justify-center items-center min-h-[300px]"><span>{error}</span></div>;
+  }
+
   return (
     <>
       {/* Hero Section */}
@@ -71,7 +103,7 @@ export default function HomePage() {
         <div className="container">
           <h2 className="text-3xl font-bold text-center mb-12 font-headline text-primary">Success Stories</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {MOCK_TESTIMONIALS.filter(t => t.status === 'approved').slice(0,3).map((testimonial) => (
+            {testimonials.filter((t: Testimonial) => t.status === 'approved').slice(0,3).map((testimonial: Testimonial) => (
               <TestimonialCard key={testimonial.id} testimonial={testimonial} />
             ))}
           </div>

@@ -8,13 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { MOCK_SERVICES, MOCK_BOOKINGS } from "@/constants"; 
 import type { Service, Booking } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, XCircle, CreditCard, Info, CheckCircle } from 'lucide-react';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
+import { bookingService, serviceService } from '@/lib/firebase-services';
 
 // PRODUCTION TODO: Import Firebase and Firestore methods:
 // import { db } from '@/lib/firebase';
@@ -31,7 +31,7 @@ export default function PaymentPage() {
   const serviceId = params.serviceId as string;
   const bookingIdFromQuery = searchParamsHook.get('bookingId'); 
   const { toast } = useToast();
-  const { currentUser, loadingAuth } = useAuth(); // Added loadingAuth
+  const { user, loadingAuth } = useAuth(); // Use user and loadingAuth
   
   const [service, setService] = useState<Service | null>(null);
   const [bookingDetails, setBookingDetails] = useState<any>(null); // Slot details from localStorage or query
@@ -46,7 +46,7 @@ export default function PaymentPage() {
       setIsDataLoading(true);
       return;
     }
-    if (!currentUser) {
+    if (!user) {
       setIsDataLoading(false);
       setError("User not authenticated. Please login.");
       // router.push(`/login?redirect=/book/${serviceId}/payment${bookingIdFromQuery ? `?bookingId=${bookingIdFromQuery}` : ''}`);
@@ -67,7 +67,7 @@ export default function PaymentPage() {
         //   setIsDataLoading(false);
         //   return;
         // }
-        const currentService = MOCK_SERVICES.find(s => s.id === serviceId);
+        const currentService = await serviceService.getServiceById(serviceId);
         if (currentService) {
           setService(currentService);
         } else {
@@ -101,8 +101,8 @@ export default function PaymentPage() {
           //   setIsDataLoading(false);
           //   return;
           // }
-          const existingBooking = MOCK_BOOKINGS.find(b => b.id === bookingIdFromQuery && b.serviceId === serviceId && b.userEmail === currentUser.email);
-          if (existingBooking) {
+          const existingBooking = await bookingService.getBookingById(bookingIdFromQuery);
+          if (existingBooking && existingBooking.serviceId === serviceId && existingBooking.userEmail === user.email) {
             setBookingDetails({
                 date: existingBooking.date,
                 time: existingBooking.time,
@@ -133,7 +133,7 @@ export default function PaymentPage() {
               setIsDataLoading(false); return;
             }
             // User details would primarily come from currentUser context
-            setUserDetails({name: currentUser.name, email: currentUser.email});
+            setUserDetails({name: user.name, email: user.email});
         }
       } catch (err) {
         console.error("Error loading payment page data:", err);
@@ -143,13 +143,13 @@ export default function PaymentPage() {
     };
 
     loadInitialData();
-  }, [serviceId, bookingIdFromQuery, router, currentUser, loadingAuth]);
+  }, [serviceId, bookingIdFromQuery, router, user, loadingAuth]);
 
   const handlePaymentOrConfirmation = async () => {
     setIsLoading(true);
     setError(null);
 
-    if (!service || !bookingDetails || !userDetails || !currentUser) {
+    if (!service || !bookingDetails || !userDetails || !user) {
       setError("Critical booking information is missing or you are not logged in. Please start over.");
       setIsLoading(false);
       return;
@@ -256,13 +256,13 @@ export default function PaymentPage() {
 
         const newBookingEntry: Booking = {
           id: newBookingId,
-          uid: currentUser.uid, // Link to authenticated user
+          uid: user.uid, // Link to authenticated user
           serviceName: service.name,
           serviceId: service.id,
           date: bookingDetails.date,
           time: bookingDetails.time,
           userName: userDetails.name,
-          userEmail: currentUser.email, // Use authenticated user's email
+          userEmail: user.email, // Use authenticated user's email
           meetingLink: finalMeetingLink, 
           status: newBookingStatus,
           paymentStatus: newPaymentStatus,

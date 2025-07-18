@@ -5,7 +5,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { PageHeader } from "@/components/core/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MOCK_BOOKINGS, MOCK_SERVICES, MOCK_RESOURCES, PREDEFINED_AVATARS } from "@/constants";
+import { bookingService, serviceService, resourceService } from '@/lib/firebase-services';
 import type { Resource as ResourceType, UserProfile, Badge as BadgeType, Booking } from '@/types';
 import { BookingCard } from "@/components/core/booking-card";
 import Link from "next/link";
@@ -16,50 +16,28 @@ import { WeeklyScheduleView } from '@/components/core/weekly-schedule-view';
 import { UserSkillsChart } from '@/components/core/user-skills-chart';
 
 
-const getPurchasedServiceIds = (): string[] => {
-  return [MOCK_SERVICES[0]?.id, MOCK_SERVICES[1]?.id, 'general'].filter(Boolean) as string[];
-};
+// const getPurchasedServiceIds = (): string[] => {
+//   return [MOCK_SERVICES[0]?.id, MOCK_SERVICES[1]?.id, 'general'].filter(Boolean) as string[];
+// };
 
 
 export default function DashboardOverviewPage() {
-  const { currentUser } = useAuth();
+  const { user, userProfile, loading } = useAuth();
   const [latestBadge, setLatestBadge] = useState<BadgeType | null>(null);
-  const [userProfileData, setUserProfileData] = useState<UserProfile | null>(null);
+  const [userBookings, setUserBookings] = useState<Booking[]>([]);
+  const [accessibleResourcesCount, setAccessibleResourcesCount] = useState(0);
 
   useEffect(() => {
-    if (currentUser?.email) {
-      const mockUserProfileKey = `mockUserProfile_${currentUser.email}`;
-      const storedProfile = localStorage.getItem(mockUserProfileKey);
-      if (storedProfile) {
-        try {
-          const parsedProfile: UserProfile = JSON.parse(storedProfile);
-          setUserProfileData(parsedProfile); // Store the full profile
-          if (parsedProfile.awardedBadges && parsedProfile.awardedBadges.length > 0) {
-            setLatestBadge(parsedProfile.awardedBadges[parsedProfile.awardedBadges.length - 1]);
-          }
-        } catch (error) {
-          console.error("Error parsing user profile for badges:", error);
-        }
-      } else {
-        // Fallback to currentUser from auth context if no specific profile in localStorage
-        setUserProfileData({
-          uid: currentUser.uid || '', // Provide a fallback if uid is missing
-          name: currentUser.name,
-          email: currentUser.email,
-          phone: '', // Placeholder or fetch if available
-          imageUrl: currentUser.imageUrl || PREDEFINED_AVATARS[0].url,
-          awardedBadges: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      }
+    if (!user) return;
+    bookingService.getUserBookings(user.uid).then(setUserBookings);
+    resourceService.getResources().then(resources => {
+      // Optionally filter by user's purchased services if needed
+      setAccessibleResourcesCount(resources.length);
+    });
+    if (userProfile && userProfile.awardedBadges && userProfile.awardedBadges.length > 0) {
+      setLatestBadge(userProfile.awardedBadges[userProfile.awardedBadges.length - 1]);
     }
-  }, [currentUser]);
-
-  const userBookings = useMemo(() => {
-    if (!currentUser) return [];
-    return MOCK_BOOKINGS.filter(b => b.userEmail === currentUser.email);
-  }, [currentUser]);
+  }, [user, userProfile]);
 
   const upcomingBookings = useMemo(() => {
     return userBookings.filter(
@@ -69,7 +47,7 @@ export default function DashboardOverviewPage() {
         b.status === 'accepted'
     );
   }, [userBookings]);
-  
+
   const completedBookingsWithFeedback = useMemo(() => {
     return userBookings.filter(
       (booking): booking is Booking & { detailedFeedback: NonNullable<Booking['detailedFeedback']> } =>
@@ -77,24 +55,20 @@ export default function DashboardOverviewPage() {
     );
   }, [userBookings]);
 
-
-  const accessibleResourcesCount = useMemo(() => {
-    const purchasedServiceIds = getPurchasedServiceIds();
-    const filtered = MOCK_RESOURCES.filter(resource =>
-      purchasedServiceIds.includes(resource.serviceCategory)
-    );
-    return filtered.length;
-  }, []);
-
+  if (loading) {
+    return <div className="container py-12 flex items-center justify-center">Loading...</div>;
+  }
+  if (!user || !userProfile) {
+    return <div className="container py-12 flex items-center justify-center">Please log in to view your dashboard.</div>;
+  }
 
   return (
     <>
       <PageHeader
-        title={`Reporting for duty, Officer Candidate ${currentUser?.name?.split(' ')[0] || 'User'}!`}
+        title={`Reporting for duty, Officer Candidate ${userProfile?.name?.split(' ')[0] || 'User'}!`}
         description="Review your mission objectives, access training materials, and track your progress."
       />
       <div className="space-y-8">
-
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
           <Card className="shadow xl:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -122,14 +96,14 @@ export default function DashboardOverviewPage() {
             </CardHeader>
             <CardContent className="flex flex-col items-center text-center">
                 <Image
-                    src={userProfileData?.imageUrl || currentUser?.imageUrl || PREDEFINED_AVATARS[0].url}
-                    alt={userProfileData?.name || currentUser?.name || "User Avatar"}
+                    src={userProfile?.imageUrl || ''}
+                    alt={userProfile?.name || "User Avatar"}
                     width={60}
                     height={60}
                     className="rounded-full mb-2 border-2 border-primary"
                     data-ai-hint="user avatar"
                 />
-                <p className="text-md font-semibold text-primary">{userProfileData?.name || currentUser?.name || 'User Name'}</p>
+                <p className="text-md font-semibold text-primary">{userProfile?.name || 'User Name'}</p>
                <Link href="/dashboard/profile" className="text-xs text-muted-foreground hover:text-primary flex items-center mt-1">
                 Update Dossier <Edit className="ml-1 h-3 w-3"/>
               </Link>
@@ -165,21 +139,14 @@ export default function DashboardOverviewPage() {
             </CardContent>
           </Card>
         </div>
-
-        {currentUser && (
-          <WeeklyScheduleView
-            allBookings={MOCK_BOOKINGS}
-            currentUserEmail={currentUser.email}
-            title="My Weekly Ops Schedule"
-          />
-        )}
-
-        {currentUser && (
-          <div className="mt-8">
-            <UserSkillsChart completedBookingsWithFeedback={completedBookingsWithFeedback} />
-          </div>
-        )}
-
+        <WeeklyScheduleView
+          allBookings={userBookings}
+          currentUserEmail={userProfile.email}
+          title="My Weekly Ops Schedule"
+        />
+        <div className="mt-8">
+          <UserSkillsChart completedBookingsWithFeedback={completedBookingsWithFeedback} />
+        </div>
         <div>
           <h2 className="text-2xl font-semibold mb-4 font-headline text-primary mt-8">Next Debriefing Session</h2>
           {upcomingBookings.length > 0 ? (

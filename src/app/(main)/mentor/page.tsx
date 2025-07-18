@@ -1,52 +1,50 @@
-
-// import { getDoc, doc } from 'firebase/firestore';
-// import { db } from '@/lib/firebase'; // Assuming you have a firebase.ts config file
+"use client";
+import { useEffect, useState } from 'react';
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MENTOR_PROFILE } from "@/constants"; // Keep for now for UI rendering during transition
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { MentorProfileData } from '@/types';
 import { CheckCircle, Award, MessageSquareHeart } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { mentorProfileService } from '@/lib/firebase-services';
 
-// This is a Server Component, so data fetching can be done directly.
-export default async function MentorProfilePage() {
-  let mentorProfile: MentorProfileData | null = null;
+export default function MentorProfilePage() {
+  const [mentorProfile, setMentorProfile] = useState<MentorProfileData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // PRODUCTION TODO: Replace MENTOR_PROFILE with actual Firestore data fetching.
-  // try {
-  //   // Example: Fetching from a document named 'mainMentor' in a 'siteProfiles' collection
-  //   const mentorDocRef = doc(db, 'siteProfiles', 'mainMentor'); 
-  //   const mentorDocSnap = await getDoc(mentorDocRef);
+  useEffect(() => {
+    setIsLoading(true);
+    setError(null);
+    mentorProfileService.getMentorProfile()
+      .then((profile) => {
+        setMentorProfile(profile);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        setError('Failed to load mentor profile.');
+        setIsLoading(false);
+      });
+  }, []);
 
-  //   if (mentorDocSnap.exists()) {
-  //     mentorProfile = mentorDocSnap.data() as MentorProfileData;
-  //     // Ensure timestamp fields are handled correctly if they exist (e.g., toDate().toISOString())
-  //   } else {
-  //     console.warn("Mentor profile document not found in Firestore.");
-  //     // Fallback to mock data if not found, or handle error appropriately
-  //   }
-  // } catch (error) {
-  //   console.error("Error fetching mentor profile:", error);
-  //   // Optionally, render an error message or fallback UI
-  //   // For now, it will fall back to MOCK_SERVICES if fetching fails or is commented out.
-  // }
-
-  // Fallback to mock data if mentorProfile is null (e.g., Firestore fetch failed or is commented out)
-  if (!mentorProfile) {
-    mentorProfile = MENTOR_PROFILE; // Using mock data for UI consistency during refactor
-  }
-  
-  if (!mentorProfile) {
+  if (isLoading) {
     return (
       <div className="container py-12">
-        <PageHeader title="Meet Your Mentor" description="Mentor profile loading or not available." />
-        <p className="text-center text-muted-foreground">Could not load mentor profile. Please try again later.</p>
+        <PageHeader title="Meet Your Mentor" description="Mentor profile loading..." />
+        <p className="text-center text-muted-foreground">Loading...</p>
       </div>
     );
   }
 
+  if (error || !mentorProfile) {
+    return (
+      <div className="container py-12">
+        <PageHeader title="Meet Your Mentor" description="Mentor profile loading or not available." />
+        <p className="text-center text-muted-foreground">{error || 'Could not load mentor profile. Please try again later.'}</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -84,7 +82,7 @@ export default async function MentorProfilePage() {
                     Key Experience & Achievements
                   </h3>
                   <ul className="space-y-1 text-sm text-muted-foreground list-inside">
-                    {mentorProfile.experience.map((item, index) => (
+                    {mentorProfile.experience.map((item: string, index: number) => (
                       <li key={index} className="flex">
                         <CheckCircle className="h-4 w-4 mr-2 mt-0.5 text-accent flex-shrink-0" />
                         <span>{item}</span>

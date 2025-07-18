@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -13,10 +13,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { MENTOR_PROFILE } from '@/constants';
 import type { MentorProfileData } from '@/types';
 import Image from 'next/image';
 import { UserCog } from 'lucide-react';
+import { mentorProfileService } from '@/lib/firebase-services';
 
 const mentorProfileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -31,36 +31,65 @@ type MentorProfileFormValues = z.infer<typeof mentorProfileSchema>;
 
 export default function AdminMentorProfilePage() {
   const { toast } = useToast();
-  // For this admin page, we'll "load" the current mentor profile for editing
-  // In a real app, this would be fetched and updated in a database
-  const [editableProfile, setEditableProfile] = useState<MentorProfileData>(MENTOR_PROFILE);
+  const [editableProfile, setEditableProfile] = useState<MentorProfileData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsLoading(true);
+    setError(null);
+    mentorProfileService.getMentorProfile()
+      .then((profile: MentorProfileData | null) => {
+        setEditableProfile(profile);
+        setIsLoading(false);
+      })
+      .catch((err: unknown) => {
+        setError('Failed to load mentor profile.');
+        setIsLoading(false);
+      });
+  }, []);
 
   const form = useForm<MentorProfileFormValues>({
     resolver: zodResolver(mentorProfileSchema),
-    defaultValues: {
+    defaultValues: editableProfile ? {
       name: editableProfile.name,
       title: editableProfile.title,
       contactEmail: editableProfile.contactEmail,
       contactPhone: editableProfile.contactPhone,
       bio: editableProfile.bio,
-    },
+    } : {},
+    values: editableProfile ? {
+      name: editableProfile.name,
+      title: editableProfile.title,
+      contactEmail: editableProfile.contactEmail,
+      contactPhone: editableProfile.contactPhone,
+      bio: editableProfile.bio,
+    } : undefined,
   });
 
-  function onSubmit(data: MentorProfileFormValues) {
-    // Simulate updating the mentor profile
-    const updatedProfile: MentorProfileData = {
-      ...editableProfile, // Keep non-editable fields like imageUrl, experience, etc.
-      ...data, // Update editable fields
-    };
-    setEditableProfile(updatedProfile); // Update local state for demo
-    console.log("Mentor Profile Updated (Simulated):", updatedProfile);
-    
-    toast({
-      title: "Mentor Profile Updated",
-      description: "The public mentor profile has been successfully updated.",
-    });
-    // In a real app, you would likely re-fetch or confirm MENTOR_PROFILE constant source is updated
-    // For this demo, changes are only in local state `editableProfile`
+  async function onSubmit(data: MentorProfileFormValues) {
+    if (!editableProfile) return;
+    try {
+      const updatedProfile: MentorProfileData = {
+        ...editableProfile,
+        ...data,
+      };
+      await mentorProfileService.updateMentorProfile(updatedProfile);
+      setEditableProfile(updatedProfile);
+      toast({
+        title: "Mentor Profile Updated",
+        description: "The public mentor profile has been successfully updated.",
+      });
+    } catch (err) {
+      toast({ title: "Update Failed", description: "Could not update mentor profile.", variant: "destructive" });
+    }
+  }
+
+  if (isLoading) {
+    return <div className="container py-12 flex justify-center items-center min-h-[300px]"><span>Loading...</span></div>;
+  }
+  if (error || !editableProfile) {
+    return <div className="container py-12 flex justify-center items-center min-h-[300px]"><span>{error || 'Mentor profile not found.'}</span></div>;
   }
 
   return (

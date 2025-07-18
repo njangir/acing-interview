@@ -13,10 +13,11 @@ import type { LucideIcon } from 'lucide-react';
 import { Logo } from '@/components/icons/logo';
 import { useAuth } from '@/hooks/use-auth';
 import { usePathname } from 'next/navigation';
-import { DASHBOARD_NAV_LINKS, ADMIN_DASHBOARD_NAV_LINKS, MOCK_BOOKINGS, MOCK_USER_MESSAGES } from '@/constants';
+import { DASHBOARD_NAV_LINKS, ADMIN_DASHBOARD_NAV_LINKS } from '@/constants';
 import type { Booking, UserMessage } from '@/types';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
+import { bookingService, messageService } from '@/lib/firebase-services';
 
 // PRODUCTION TODO: For a production notification system:
 // - Notifications should ideally be fetched from a dedicated Firestore collection (e.g., "userNotifications/{userId}/notifications").
@@ -45,130 +46,122 @@ const getNotificationEventId = (itemId: string, type: string, subType?: string):
 
 
 export function Header() {
-  const { currentUser, logout, isAdmin } = useAuth();
-  const isLoggedIn = !!currentUser;
+  const { user, userProfile, logout } = useAuth();
+  const isAdmin = userProfile?.roles?.includes('admin');
+  const isLoggedIn = !!user;
   const pathname = usePathname();
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [isMounted, setIsMounted] = useState(false);
-
   const [notificationCount, setNotificationCount] = useState(0);
   const [notificationsToShow, setNotificationsToShow] = useState<NotificationItem[]>([]);
   const [isNotificationPopoverOpen, setIsNotificationPopoverOpen] = useState(false);
+  const [userBookings, setUserBookings] = useState<Booking[]>([]);
+  const [userMessages, setUserMessages] = useState<UserMessage[]>([]);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    bookingService.getUserBookings(user.uid).then(setUserBookings);
+    messageService.getUserMessages(user.uid).then(setUserMessages);
+  }, [user]);
+
   const getSeenNotifications = useCallback((): string[] => {
-    if (typeof window === 'undefined' || !currentUser) return [];
+    if (typeof window === 'undefined' || !user) return [];
     // For mock, using email. In production, use currentUser.uid for localStorage key or fetch from Firestore.
-    const seen = localStorage.getItem(`seenNotifications_${currentUser.email}`);
+    const seen = localStorage.getItem(`seenNotifications_${user.email}`);
     return seen ? JSON.parse(seen) : [];
-  }, [currentUser]);
+  }, [user]);
 
   const calculateNotifications = useCallback(() => {
-    if (typeof window === 'undefined' || !isLoggedIn || isAdmin || !currentUser) {
+    if (typeof window === 'undefined' || !isLoggedIn || isAdmin || !user) {
       setNotificationCount(0);
       setNotificationsToShow([]);
       return;
     }
-
     const seenNotifications = getSeenNotifications();
     const currentActiveNotifications: NotificationItem[] = [];
-
-    // PRODUCTION TODO: Fetch actual bookings and messages for the current user (currentUser.uid)
-    // from Firestore instead of using MOCK_BOOKINGS and MOCK_USER_MESSAGES.
-    // This logic would then process these fetched items to generate notifications.
-
-    // Mock processing of MOCK_BOOKINGS
-    MOCK_BOOKINGS.forEach(booking => {
-      if (booking.userEmail === currentUser.email) { // Filter for current user
+    // Process userBookings
+    userBookings.forEach(booking => {
+      if (booking.userEmail === user.email) {
         let eventId: string | null = null;
         let message: string | null = null;
         let eventTimestamp = new Date(booking.date);
         const href = '/dashboard/bookings';
         const serviceName = booking.serviceName.length > 20 ? booking.serviceName.substring(0, 17) + '...' : booking.serviceName;
-
-        // Mock check for initial payment status (simplified)
         const bookingWasOriginallyPaid = booking.transactionId !== null && booking.paymentStatus !== 'pay_later_pending' && booking.paymentStatus !== 'pay_later_unpaid';
-
         if ((booking.status === 'accepted' || booking.status === 'scheduled')) {
           eventId = getNotificationEventId(booking.id, 'booking', booking.status);
           message = `Booking for '${serviceName}' is ${booking.status}.`;
-           const linkAddedEventId = getNotificationEventId(booking.id, 'booking', 'link_added');
-           if (booking.meetingLink && !seenNotifications.includes(linkAddedEventId) && booking.paymentStatus === 'paid') {
-               eventId = linkAddedEventId;
-               message = `Meeting link for '${serviceName}' on ${booking.date} is available.`;
-               eventTimestamp = new Date();
-           }
+          const linkAddedEventId = getNotificationEventId(booking.id, 'booking', 'link_added');
+          if (booking.meetingLink && !seenNotifications.includes(linkAddedEventId) && booking.paymentStatus === 'paid') {
+            eventId = linkAddedEventId;
+            message = `Meeting link for '${serviceName}' on ${booking.date} is available.`;
+            eventTimestamp = new Date();
+          }
         } else if (booking.status === 'cancelled') {
           eventId = getNotificationEventId(booking.id, 'booking', 'cancelled');
           message = `Booking for '${serviceName}' on ${booking.date} was cancelled.`;
           eventTimestamp = new Date();
         } else if (booking.status === 'completed' && (booking.reportUrl || (booking.detailedFeedback && booking.detailedFeedback.length > 0))) {
           const feedbackReadyEventId = getNotificationEventId(booking.id, 'booking', 'feedback_ready');
-          if (!seenNotifications.includes(feedbackReadyEventId)){
+          if (!seenNotifications.includes(feedbackReadyEventId)) {
             eventId = feedbackReadyEventId;
             message = `Feedback/Report for '${serviceName}' is ready.`;
             eventTimestamp = new Date();
           }
         }
-        
-        // Notification for refund processing (mock)
-        if (bookingWasOriginallyPaid && booking.requestedRefund === false && booking.status === 'cancelled' && (booking.paymentStatus === 'pay_later_unpaid' /* or a specific 'refunded' status */)) {
-            const refundEventId = getNotificationEventId(booking.id, 'booking', 'refund_processed');
-            const alreadyNotifiedRefund = currentActiveNotifications.some(n => n.id === refundEventId) || seenNotifications.includes(refundEventId);
-            if (!alreadyNotifiedRefund) {
-                 currentActiveNotifications.push({
-                    id: refundEventId,
-                    message: `Your refund for '${serviceName}' has been processed.`,
-                    timestamp: new Date(),
-                    href,
-                    type: 'booking',
-                 });
-            }
+        if (bookingWasOriginallyPaid && booking.requestedRefund === false && booking.status === 'cancelled' && (booking.paymentStatus === 'pay_later_unpaid')) {
+          const refundEventId = getNotificationEventId(booking.id, 'booking', 'refund_processed');
+          const alreadyNotifiedRefund = currentActiveNotifications.some(n => n.id === refundEventId) || seenNotifications.includes(refundEventId);
+          if (!alreadyNotifiedRefund) {
+            currentActiveNotifications.push({
+              id: refundEventId,
+              message: `Your refund for '${serviceName}' has been processed.`,
+              timestamp: new Date(),
+              href,
+              type: 'booking',
+            });
+          }
         }
-
         if (eventId && message && !seenNotifications.includes(eventId) && !currentActiveNotifications.some(n=>n.id === eventId)) {
           currentActiveNotifications.push({ id: eventId, message, timestamp: eventTimestamp, href, type: 'booking' });
         }
       }
     });
-
-    // Mock processing of MOCK_USER_MESSAGES
+    // Process userMessages
     const userMessageThreads: { [key: string]: UserMessage[] } = {};
-     MOCK_USER_MESSAGES.forEach(msg => {
-        if (msg.userEmail === currentUser.email) { // Filter for current user
-            const threadKey = msg.userEmail + (msg.subject.startsWith("Re:") ? msg.subject.substring(3).trim() : msg.subject.trim());
-            if (!userMessageThreads[threadKey]) {
-                 userMessageThreads[threadKey] = [];
-            }
-            userMessageThreads[threadKey].push(msg);
+    userMessages.forEach(msg => {
+      if (msg.userEmail === user.email) {
+        const threadKey = msg.userEmail + (msg.subject.startsWith("Re:") ? msg.subject.substring(3).trim() : msg.subject.trim());
+        if (!userMessageThreads[threadKey]) {
+          userMessageThreads[threadKey] = [];
         }
+        userMessageThreads[threadKey].push(msg);
+      }
     });
-
     Object.values(userMessageThreads).forEach(thread => {
-        const lastMessage = thread.sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).pop();
-        if (lastMessage && lastMessage.senderType === 'admin') { // Admin reply notification
-            const eventId = getNotificationEventId(lastMessage.id, 'message', 'admin_reply');
-            const subjectSnippet = lastMessage.subject.replace('Re: ','').substring(0,25);
-            if (!seenNotifications.includes(eventId)  && !currentActiveNotifications.some(n=>n.id === eventId)) {
-                currentActiveNotifications.push({
-                    id: eventId,
-                    message: `Admin replied in: "${subjectSnippet}${subjectSnippet.length === 25 ? '...' : ''}"`,
-                    timestamp: new Date(lastMessage.timestamp),
-                    href: '/dashboard/contact',
-                    type: 'message',
-                });
-            }
+      const lastMessage = thread.sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).pop();
+      if (lastMessage && lastMessage.senderType === 'admin') {
+        const eventId = getNotificationEventId(lastMessage.id, 'message', 'admin_reply');
+        const subjectSnippet = lastMessage.subject.replace('Re: ','').substring(0,25);
+        if (!seenNotifications.includes(eventId)  && !currentActiveNotifications.some(n=>n.id === eventId)) {
+          currentActiveNotifications.push({
+            id: eventId,
+            message: `Admin replied in: "${subjectSnippet}${subjectSnippet.length === 25 ? '...' : ''}"`,
+            timestamp: new Date(lastMessage.timestamp),
+            href: '/dashboard/contact',
+            type: 'message',
+          });
         }
+      }
     });
-
     currentActiveNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
     setNotificationsToShow(currentActiveNotifications);
     setNotificationCount(currentActiveNotifications.length);
-
-  }, [isLoggedIn, isAdmin, currentUser, getSeenNotifications]);
+  }, [isLoggedIn, isAdmin, user, userBookings, userMessages, getSeenNotifications]);
 
 
   useEffect(() => {
@@ -176,12 +169,12 @@ export function Header() {
   }, [calculateNotifications, pathname]); // Recalculate on path change too, e.g. if a notification leads to a page that resolves it
 
   const handleNotificationClick = (notificationId: string) => {
-    if (typeof window === 'undefined' || !currentUser) return;
+    if (typeof window === 'undefined' || !user) return;
     
     // For mock, using email. In production, use currentUser.uid.
     const seenNotifications = getSeenNotifications();
     const updatedSeenNotifications = Array.from(new Set([...seenNotifications, notificationId]));
-    localStorage.setItem(`seenNotifications_${currentUser.email}`, JSON.stringify(updatedSeenNotifications));
+    localStorage.setItem(`seenNotifications_${user.email}`, JSON.stringify(updatedSeenNotifications));
     
     calculateNotifications();
   };
@@ -290,7 +283,7 @@ export function Header() {
         <div className="flex flex-1 items-center justify-end space-x-2">
           {isLoggedIn ? (
             <>
-              {currentUser && !isAdmin && ( // Notification bell for regular users
+              {user && !isAdmin && ( // Notification bell for regular users
                 <Popover open={isNotificationPopoverOpen} onOpenChange={handlePopoverOpenChange}>
                   <PopoverTrigger asChild>
                     <Button variant="ghost" size="icon" className="relative mr-1">
@@ -357,7 +350,7 @@ export function Header() {
                   </PopoverContent>
                 </Popover>
               )}
-              {currentUser && <span className="text-sm text-muted-foreground hidden sm:inline">{isAdmin ? 'Admin' : 'OC'} {currentUser.name.split(' ')[0]}</span>}
+              {user && <span className="text-sm text-muted-foreground hidden sm:inline">{isAdmin ? 'Admin' : 'OC'} {userProfile?.name?.split(' ')[0]}</span>}
               <Button variant="outline" size="sm" onClick={logout}>
                 <LogOut className="mr-0 sm:mr-2 h-4 w-4" />
                 <span className="hidden sm:inline">Log Out</span>

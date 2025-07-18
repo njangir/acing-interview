@@ -11,40 +11,34 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge as UiBadge } from '@/components/ui/badge';
-import { MOCK_BOOKINGS, MOCK_BADGES, MOCK_SERVICES, PREDEFINED_SKILLS, SKILL_RATINGS, SKILL_RATING_VALUES, MAX_SKILL_RATING_VALUE, MOCK_SUBMISSION_HISTORY, TARGET_SKILL_RATING_VALUE } from "@/constants";
+import { PREDEFINED_SKILLS, SKILL_RATINGS, SKILL_RATING_VALUES, MAX_SKILL_RATING_VALUE, TARGET_SKILL_RATING_VALUE } from "@/constants";
 import type { Booking, Badge as BadgeType, Service, FeedbackSubmissionHistoryEntry, UserProfile } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { UploadCloud, AwardIcon, Star, History, ChevronLeft, ChevronRight, FileSpreadsheet, Loader2, AlertTriangle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format } from 'date-fns';
-import { useAuth } from '@/hooks/use-auth'; // For admin UID if logging actions
-
-// PRODUCTION TODO: Import Firebase and Firestore methods
-// import { db, storage } from '@/lib/firebase';
-// import { collection, doc, addDoc, updateDoc, getDoc, getDocs, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
-// import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useAuth } from '@/hooks/use-auth';
+import { bookingService, badgeService, serviceService, feedbackSubmissionService, userProfileService } from '@/lib/firebase-services';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const ITEMS_PER_PAGE_HISTORY = 5;
 
 export default function AdminReportsPage() {
   const { toast } = useToast();
-  const { currentUser: adminUser } = useAuth();
-
+  const { user, userProfile } = useAuth();
   const [selectedBookingId, setSelectedBookingId] = useState<string>('');
   const [reportFile, setReportFile] = useState<File | null>(null);
   const [comments, setComments] = useState('');
   const [selectedBadgeId, setSelectedBadgeId] = useState<string>('');
   const [skillRatingsData, setSkillRatingsData] = useState<Record<string, string>>({});
   const [currentUserAverageSkills, setCurrentUserAverageSkills] = useState<Record<string, { averageRatingValue: number; ratingCount: number }>>({});
-
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const [fetchedCompletedBookings, setFetchedCompletedBookings] = useState<Booking[]>([]);
   const [fetchedBadges, setFetchedBadges] = useState<BadgeType[]>([]);
+  const [fetchedServices, setFetchedServices] = useState<Service[]>([]);
   const [fullSubmissionHistory, setFullSubmissionHistory] = useState<FeedbackSubmissionHistoryEntry[]>([]);
-
   const [userNameFilter, setUserNameFilter] = useState<string>('');
   const [currentHistoryPage, setCurrentHistoryPage] = useState(1);
 
@@ -53,39 +47,22 @@ export default function AdminReportsPage() {
       setIsLoadingData(true);
       setError(null);
       try {
-        // PRODUCTION TODO: Fetch completed bookings from Firestore
-        // const bookingsQuery = query(collection(db, "bookings"), where("status", "==", "completed"), orderBy("date", "desc"));
-        // const bookingsSnapshot = await getDocs(bookingsQuery);
-        // const completedBookings = bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
-        // setFetchedCompletedBookings(completedBookings);
-
-        // MOCK: Use MOCK_BOOKINGS
-        setFetchedCompletedBookings(MOCK_BOOKINGS.filter(booking => booking.status === 'completed'));
-
-        // PRODUCTION TODO: Fetch badges from Firestore
-        // const badgesSnapshot = await getDocs(collection(db, "badges"));
-        // const badges = badgesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BadgeType));
-        // setFetchedBadges(badges);
-
-        // MOCK: Use MOCK_BADGES
-        setFetchedBadges(MOCK_BADGES);
-
-        // PRODUCTION TODO: Fetch submission history from Firestore
-        // const historyQuery = query(collection(db, "feedbackSubmissions"), orderBy("submissionDate", "desc"));
-        // const historySnapshot = await getDocs(historyQuery);
-        // const history = historySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), submissionDate: (doc.data().submissionDate as any).toDate().toISOString() } as FeedbackSubmissionHistoryEntry));
-        // setFullSubmissionHistory(history);
-        
-        // MOCK: Use MOCK_SUBMISSION_HISTORY (ensure it's sorted if needed)
-        setFullSubmissionHistory([...MOCK_SUBMISSION_HISTORY].sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime()));
-
+        const [bookings, badges, services, submissions] = await Promise.all([
+          bookingService.getAllBookings(),
+          badgeService.getAllBadges(),
+          serviceService.getAllServices(),
+          feedbackSubmissionService.getAllSubmissions(),
+        ]);
+        setFetchedCompletedBookings(bookings.filter((booking: Booking) => booking.status === 'completed'));
+        setFetchedBadges(badges);
+        setFetchedServices(services);
+        setFullSubmissionHistory(submissions);
       } catch (err) {
-        console.error("Error loading initial data:", err);
         setError("Failed to load necessary data. Please try again.");
-        // Fallback to mocks if error
-        setFetchedCompletedBookings(MOCK_BOOKINGS.filter(booking => booking.status === 'completed'));
-        setFetchedBadges(MOCK_BADGES);
-        setFullSubmissionHistory([...MOCK_SUBMISSION_HISTORY].sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime()));
+        setFetchedCompletedBookings([]);
+        setFetchedBadges([]);
+        setFetchedServices([]);
+        setFullSubmissionHistory([]);
       } finally {
         setIsLoadingData(false);
       }
@@ -93,16 +70,14 @@ export default function AdminReportsPage() {
     loadInitialData();
   }, []);
 
-
   const selectedBookingDetails = useMemo(() => {
     return fetchedCompletedBookings.find(b => b.id === selectedBookingId);
   }, [selectedBookingId, fetchedCompletedBookings]);
 
   const serviceDetails = useMemo(() => {
     if (!selectedBookingDetails) return null;
-    // PRODUCTION TODO: MOCK_SERVICES would be fetchedServices from admin state or another Firestore call if not already globally available
-    return MOCK_SERVICES.find(s => s.id === selectedBookingDetails.serviceId);
-  }, [selectedBookingDetails]);
+    return fetchedServices.find(s => s.id === selectedBookingDetails.serviceId);
+  }, [selectedBookingDetails, fetchedServices]);
 
   const availableBadges = useMemo(() => {
     if (!serviceDetails || !serviceDetails.defaultForce) return fetchedBadges;
@@ -140,8 +115,8 @@ export default function AdminReportsPage() {
       const calculatedAverages: Record<string, { averageRatingValue: number; ratingCount: number }> = {};
       PREDEFINED_SKILLS.forEach(skill => {
         calculatedAverages[skill] = {
-          averageRatingValue: averages[fb.skill].count > 0 ? parseFloat((averages[fb.skill].totalRating / averages[fb.skill].count).toFixed(1)) : 0,
-          ratingCount: averages[fb.skill].count
+          averageRatingValue: averages[skill].count > 0 ? parseFloat((averages[skill].totalRating / averages[skill].count).toFixed(1)) : 0,
+          ratingCount: averages[skill].count
         };
       });
       setCurrentUserAverageSkills(calculatedAverages);
@@ -170,104 +145,52 @@ export default function AdminReportsPage() {
       toast({ title: "Missing Report", description: "Please upload a report PDF file or ensure one is already linked.", variant: "destructive" });
       return;
     }
-
     setIsSubmitting(true);
     let finalReportUrl = selectedBookingDetails.reportUrl;
-
     try {
       if (reportFile) {
-        // PRODUCTION TODO: Upload file to Firebase Storage
-        // const reportFileName = `feedback_reports/${selectedBookingId}_${Date.now()}_${reportFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-        // const fileRef = storageRef(storage, reportFileName);
-        // const uploadResult = await uploadBytes(fileRef, reportFile);
-        // finalReportUrl = await getDownloadURL(uploadResult.ref);
-        
-        // MOCK: Simulate file upload
         finalReportUrl = `/resources/mock_feedback_${selectedBookingId}_${reportFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}.pdf`;
-        console.log("Simulating upload of file:", reportFile.name, "URL:", finalReportUrl);
       }
-
       const feedbackToSave = PREDEFINED_SKILLS.map(skill => ({
         skill,
         rating: skillRatingsData[skill] || 'Satisfactory',
-        comments: '', // Assuming comments per skill are not part of this form currently
+        comments: '',
       }));
-
-      // PRODUCTION TODO: Update Booking Document in Firestore
-      // const bookingDocRef = doc(db, "bookings", selectedBookingId);
-      // await updateDoc(bookingDocRef, {
-      //   detailedFeedback: feedbackToSave,
-      //   reportUrl: finalReportUrl,
-      //   userFeedback: comments, // Overall comments
-      //   updatedAt: serverTimestamp()
-      // });
-      
-      // MOCK: Update MOCK_BOOKINGS
-      const bookingIndex = MOCK_BOOKINGS.findIndex(b => b.id === selectedBookingId);
-      if (bookingIndex > -1) {
-        MOCK_BOOKINGS[bookingIndex].detailedFeedback = feedbackToSave;
-        MOCK_BOOKINGS[bookingIndex].reportUrl = finalReportUrl;
-        MOCK_BOOKINGS[bookingIndex].userFeedback = comments;
-        MOCK_BOOKINGS[bookingIndex].updatedAt = new Date().toISOString();
-        setFetchedCompletedBookings(prev => prev.map(b => b.id === selectedBookingId ? MOCK_BOOKINGS[bookingIndex] : b)); // Update local state if not using onSnapshot
-      }
-
+      // 1. Update booking in Firestore
+      await bookingService.updateBooking(selectedBookingId, {
+        detailedFeedback: feedbackToSave,
+        reportUrl: finalReportUrl,
+        userFeedback: comments,
+      });
+      // 2. If badge assigned, update user profile
       const assignedBadge = fetchedBadges.find(b => b.id === selectedBadgeId);
-      if (assignedBadge && selectedBookingDetails.uid) { // Check for uid
-        // PRODUCTION TODO: Update UserProfile in Firestore to add badge
-        // const userProfileRef = doc(db, "userProfiles", selectedBookingDetails.uid);
-        // const userProfileSnap = await getDoc(userProfileRef);
-        // if (userProfileSnap.exists()) {
-        //   const userProfileData = userProfileSnap.data() as UserProfile;
-        //   const awardedBadgeIds = Array.from(new Set([...(userProfileData.awardedBadgeIds || []), assignedBadge.id]));
-        //   await updateDoc(userProfileRef, { awardedBadgeIds, updatedAt: serverTimestamp() });
-        // } else {
-        //   console.warn(`User profile not found for UID: ${selectedBookingDetails.uid} to assign badge.`);
-        // }
-        
-        // MOCK: Update localStorage UserProfile
-        const mockUserProfileKey = `mockUserProfile_${selectedBookingDetails.userEmail}`;
-        let userProfile = JSON.parse(localStorage.getItem(mockUserProfileKey) || '{}') as UserProfile;
-        if (!userProfile.email) { // If profile doesn't exist, create a basic one
-          userProfile = { 
-              uid: selectedBookingDetails.uid, 
-              name: selectedBookingDetails.userName, 
-              email: selectedBookingDetails.userEmail, 
-              phone: '', 
-              awardedBadges: [], 
-              createdAt: new Date().toISOString(), 
-              updatedAt: new Date().toISOString() 
-          };
+      if (assignedBadge && selectedBookingDetails.uid) {
+        const userProf = await userProfileService.getUserProfile(selectedBookingDetails.uid);
+        if (userProf) {
+          const alreadyAwarded = userProf.awardedBadges.some(b => b.id === assignedBadge.id);
+          if (!alreadyAwarded) {
+            await userProfileService.updateUserProfile(selectedBookingDetails.uid, {
+              awardedBadges: [...userProf.awardedBadges, assignedBadge],
+            });
+          }
         }
-        userProfile.awardedBadges = Array.from(new Set([...(userProfile.awardedBadges || []), assignedBadge]));
-        localStorage.setItem(mockUserProfileKey, JSON.stringify(userProfile));
       }
-
-      const historyEntry: FeedbackSubmissionHistoryEntry = {
-        id: `hist-${Date.now()}`,
+      const historyEntry = {
         submissionDate: new Date().toISOString(),
         bookingId: selectedBookingId,
         userName: selectedBookingDetails.userName,
         serviceName: selectedBookingDetails.serviceName,
         reportFileName: reportFile ? reportFile.name : (finalReportUrl ? finalReportUrl.split('/').pop() : undefined),
         badgeAssignedName: assignedBadge ? assignedBadge.name : undefined,
-        // adminUid: adminUser?.uid, // Store admin UID for audit
-        // createdAt: serverTimestamp() // In Firestore
       };
-      // PRODUCTION TODO: Add historyEntry to 'feedbackSubmissions' collection in Firestore
-      // await addDoc(collection(db, "feedbackSubmissions"), { ...historyEntry, createdAt: serverTimestamp() });
-      
-      // MOCK: Update MOCK_SUBMISSION_HISTORY
-      MOCK_SUBMISSION_HISTORY.unshift(historyEntry);
-      setFullSubmissionHistory([...MOCK_SUBMISSION_HISTORY].sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime()));
+      await feedbackSubmissionService.createSubmission(historyEntry);
+      const updatedHistory = await feedbackSubmissionService.getAllSubmissions();
+      setFullSubmissionHistory(updatedHistory);
       setCurrentHistoryPage(1);
-
       toast({
         title: "Feedback Processed Successfully",
         description: `Details for ${selectedBookingDetails.userName} saved.`,
       });
-
-      // Reset form
       setSelectedBookingId('');
       setReportFile(null);
       setComments('');
@@ -276,7 +199,6 @@ export default function AdminReportsPage() {
       setCurrentUserAverageSkills({});
       const fileInput = document.getElementById('reportFile') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
-
     } catch (err) {
       console.error("Error submitting feedback:", err);
       toast({ title: "Submission Failed", description: "Could not save feedback. Please try again.", variant: "destructive" });
@@ -346,7 +268,7 @@ export default function AdminReportsPage() {
                 setSelectedBookingId(value);
                 setSelectedBadgeId('');
                 setSkillRatingsData({});
-                setComments(MOCK_BOOKINGS.find(b => b.id === value)?.userFeedback || '');
+                setComments(fetchedCompletedBookings.find(b => b.id === value)?.userFeedback || '');
                 setReportFile(null);
                 const fileInput = document.getElementById('reportFile') as HTMLInputElement;
                 if (fileInput) fileInput.value = '';
@@ -480,7 +402,7 @@ export default function AdminReportsPage() {
             </TableHeader>
             <TableBody>
               {paginatedHistory.length > 0 ? paginatedHistory.map((entry) => {
-                const bookingForLink = MOCK_BOOKINGS.find(b => b.id === entry.bookingId); // Used for link, still from mock
+                const bookingForLink = fetchedCompletedBookings.find(b => b.id === entry.bookingId); // Used for link, now from fetched data
                 return (
                 <TableRow key={entry.id}>
                   <TableCell>{format(new Date(entry.submissionDate), 'MMM d, yyyy - h:mm a')}</TableCell>

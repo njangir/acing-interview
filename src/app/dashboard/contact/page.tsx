@@ -15,9 +15,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { MailQuestion, Loader2 } from 'lucide-react'; // Added Loader2
-import { MOCK_USER_MESSAGES } from '@/constants'; // For adding to mock messages
 import type { UserMessage } from '@/types';
 import { useAuth } from '@/hooks/use-auth'; // Import useAuth
+import { messageService } from '@/lib/firebase-services';
 
 // PRODUCTION TODO: Import Firebase and Firestore methods
 // import { db } from '@/lib/firebase';
@@ -34,7 +34,7 @@ type ContactFormValues = z.infer<typeof contactFormSchema>;
 
 export default function ContactSupportPage() {
   const { toast } = useToast();
-  const { currentUser, loadingAuth } = useAuth(); // Get the current logged-in user and loading state
+  const { user, loading } = useAuth(); // Get the current logged-in user and loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<ContactFormValues>({
@@ -48,7 +48,7 @@ export default function ContactSupportPage() {
   });
 
   async function onSubmit(data: ContactFormValues) {
-    if (!currentUser) {
+    if (!user) {
       toast({
         title: "Error",
         description: "User not found. Please log in again.",
@@ -59,37 +59,22 @@ export default function ContactSupportPage() {
 
     setIsSubmitting(true);
 
-    const newMessageData: Omit<UserMessage, 'id' | 'createdAt' | 'updatedAt'> = {
-      uid: currentUser.uid,
-      userName: currentUser.name,
-      userEmail: currentUser.email,
+    const now = new Date().toISOString();
+    const newMessageData: Omit<UserMessage, 'id'> = {
+      uid: user.uid,
+      userName: user.displayName || user.email || 'Unknown',
+      userEmail: user.email || 'Unknown',
       subject: data.subject,
       messageBody: data.message,
-      timestamp: new Date().toISOString(), // For Firestore, use serverTimestamp() for 'createdAt'
       status: 'new',
       senderType: 'user',
+      timestamp: now,
+      createdAt: now,
+      updatedAt: now,
     };
     
     try {
-      // PRODUCTION TODO: Add new message document to Firestore 'userMessages' collection
-      // const messagesColRef = collection(db, "userMessages");
-      // await addDoc(messagesColRef, {
-      //   ...newMessageData,
-      //   timestamp: serverTimestamp(), // Use server timestamp for consistent ordering
-      //   createdAt: serverTimestamp(),
-      //   updatedAt: serverTimestamp(),
-      // });
-
-      // MOCK: Add to MOCK_USER_MESSAGES array for prototype
-      MOCK_USER_MESSAGES.push({
-        ...newMessageData,
-        id: `msg-user-${Date.now()}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      } as UserMessage);
-      console.log("Message submitted (simulated backend send):", newMessageData);
-      // END MOCK
-
+      await messageService.createMessage(newMessageData);
       toast({
         title: "Message Sent!",
         description: "Your message has been sent to our support team. We'll get back to you shortly.",
@@ -103,7 +88,7 @@ export default function ContactSupportPage() {
     }
   }
 
-  if (loadingAuth) {
+  if (loading) {
     return (
         <div className="container py-12 flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -112,7 +97,7 @@ export default function ContactSupportPage() {
     );
   }
 
-  if (!currentUser) {
+  if (!user) {
      return (
         <div className="container py-12">
             <PageHeader title="Contact Support" description="Please log in to contact support."/>
@@ -133,7 +118,7 @@ export default function ContactSupportPage() {
             <MailQuestion className="h-10 w-10 text-primary"/>
             <div>
                 <CardTitle className="font-headline text-2xl text-primary">Send a Message</CardTitle>
-                <CardDescription>Fill out the form below. Replies will be sent to: <strong>{currentUser.email}</strong></CardDescription>
+                <CardDescription>Fill out the form below. Replies will be sent to: <strong>{user.email}</strong></CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -182,7 +167,7 @@ export default function ContactSupportPage() {
                         Confirm Contact Information
                       </FormLabel>
                       <FormDescription>
-                        My email (<strong className="text-foreground">{currentUser.email}</strong>) is correct, and I understand replies will be sent here.
+                        My email (<strong className="text-foreground">{user.email}</strong>) is correct, and I understand replies will be sent here.
                       </FormDescription>
                       <FormMessage />
                     </div>

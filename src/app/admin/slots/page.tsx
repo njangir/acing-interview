@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react'; // Added useEffect and useMemo
+import { useState, useEffect, useMemo } from 'react';
 import { addDays, format, startOfWeek, endOfWeek, nextSaturday, nextSunday, isBefore, startOfToday } from 'date-fns';
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
@@ -10,13 +10,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { AVAILABLE_SLOTS } from '@/constants'; // For simulation & temporary dual update
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Info, CalendarCheck, CalendarX, Loader2, AlertTriangle } from 'lucide-react'; // Added Loader2, AlertTriangle
-
-// PRODUCTION TODO: Import Firebase and Firestore methods
-// import { db } from '@/lib/firebase';
-// import { collection, doc, getDoc, setDoc, getDocs } from 'firebase/firestore';
+import { Info, CalendarCheck, CalendarX, Loader2, AlertTriangle } from 'lucide-react';
+import { availabilityService } from '@/lib/firebase-services';
 
 // Structure for slots data fetched from/sent to Firestore
 type FirestoreSlotsData = Record<string, string[]>;
@@ -27,7 +23,6 @@ export default function AdminSlotsPage() {
   const [startTime, setStartTime] = useState<string>("09:00");
   const [endTime, setEndTime] = useState<string>("17:00");
   const [interval, setIntervalMinutes] = useState<number>(60);
-
   const [firestoreSlotsData, setFirestoreSlotsData] = useState<FirestoreSlotsData>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,25 +32,20 @@ export default function AdminSlotsPage() {
       setIsLoading(true);
       setError(null);
       try {
-        // PRODUCTION TODO: Fetch all (or a relevant range of) slot data from Firestore
-        // Example: Assuming a collection 'globalAvailability' where doc ID is 'YYYY-MM-DD'
-        // const availabilityColRef = collection(db, 'globalAvailability');
-        // const snapshot = await getDocs(availabilityColRef);
-        // const fetchedData: FirestoreSlotsData = {};
-        // snapshot.forEach(doc => {
-        //   fetchedData[doc.id] = doc.data().timeSlots || [];
-        // });
-        // setFirestoreSlotsData(fetchedData);
-
-        // MOCK: Simulate fetch by using a copy of AVAILABLE_SLOTS
-        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
-        setFirestoreSlotsData({ ...AVAILABLE_SLOTS }); // Initialize with current mock state for demo
-
+        // Fetch all slot data for the next 60 days
+        const today = new Date();
+        const slots: FirestoreSlotsData = {};
+        for (let i = 0; i < 60; i++) {
+          const date = addDays(today, i);
+          const dateString = format(date, 'yyyy-MM-dd');
+          const timeSlots = await availabilityService.getAvailability(dateString);
+          slots[dateString] = timeSlots;
+        }
+        setFirestoreSlotsData(slots);
       } catch (err) {
         console.error("Error fetching availability data:", err);
         setError("Failed to load availability data. Please try again.");
-        // Fallback to mock if fetch fails, to keep UI somewhat functional
-        setFirestoreSlotsData({ ...AVAILABLE_SLOTS });
+        setFirestoreSlotsData({});
       } finally {
         setIsLoading(false);
       }
@@ -63,16 +53,13 @@ export default function AdminSlotsPage() {
     fetchAvailability();
   }, []);
 
-
   const generateTimeSlots = (start: string, end: string, intervalMin: number): string[] => {
     const slots: string[] = [];
     let currentTime = new Date(`1970-01-01T${start}:00`);
     const const_endTime = new Date(`1970-01-01T${end}:00`);
-
     if (currentTime >= const_endTime || intervalMin <= 0) {
       return [];
     }
-
     while (currentTime < const_endTime) {
       slots.push(currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }));
       currentTime = new Date(currentTime.getTime() + intervalMin * 60000);
@@ -85,7 +72,6 @@ export default function AdminSlotsPage() {
       toast({ title: "No Dates Selected", description: "Please select at least one date.", variant: "destructive" });
       return;
     }
-
     let slotsToApply: string[] = [];
     if (actionType === 'set') {
       slotsToApply = customSlots || generateTimeSlots(startTime, endTime, interval);
@@ -94,38 +80,27 @@ export default function AdminSlotsPage() {
         return;
       }
     }
-
-    // To reflect changes immediately in UI
     const updatedFirestoreSlots: FirestoreSlotsData = { ...firestoreSlotsData };
-
     try {
-      // PRODUCTION TODO: Batch write to Firestore
-      // const batch = writeBatch(db);
       for (const date of dates) {
         const dateString = format(date, 'yyyy-MM-dd');
-        // PRODUCTION TODO: Update Firestore document for this dateString
-        // Example: const docRef = doc(db, 'globalAvailability', dateString);
-        // batch.set(docRef, { timeSlots: slotsToApply });
-
-        // MOCK: Update local state for Firestore simulation
-        updatedFirestoreSlots[dateString] = slotsToApply;
-        // MOCK: Also update the global AVAILABLE_SLOTS for other parts of the prototype
-        AVAILABLE_SLOTS[dateString] = slotsToApply;
+        if (actionType === 'set') {
+          await availabilityService.setAvailability(dateString, slotsToApply);
+          updatedFirestoreSlots[dateString] = slotsToApply;
+        } else {
+          await availabilityService.setAvailability(dateString, []);
+          updatedFirestoreSlots[dateString] = [];
+        }
       }
-      // PRODUCTION TODO: await batch.commit();
-
-      setFirestoreSlotsData(updatedFirestoreSlots); // Update local state to re-render calendar
-
+      setFirestoreSlotsData(updatedFirestoreSlots);
       toast({
-        title: `Availability ${actionType === 'set' ? 'Updated' : 'Cleared'} (Simulated Firestore & Mock)`,
+        title: `Availability ${actionType === 'set' ? 'Updated' : 'Cleared'}`,
         description: `Slots for ${dates.length} date(s) have been ${actionType === 'set' ? 'set' : 'cleared'}.`,
       });
-      // Force re-render of calendar by changing selectedDate slightly if needed or use a dedicated state
       setSelectedDate(new Date(selectedDate || Date.now()));
-
     } catch (err) {
-        console.error("Error updating availability in Firestore:", err);
-        toast({ title: "Update Failed", description: "Could not save availability changes.", variant: "destructive"});
+      console.error("Error updating availability in Firestore:", err);
+      toast({ title: "Update Failed", description: "Could not save availability changes.", variant: "destructive"});
     }
   };
 

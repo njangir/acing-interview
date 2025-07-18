@@ -17,7 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MOCK_BADGES } from "@/constants"; // Keep for fallback
+import { badgeService } from '@/lib/firebase-services';
 import type { Badge } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Edit, Trash2, Award as AwardIcon, ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
@@ -67,60 +67,16 @@ export default function AdminBadgesPage() {
   useEffect(() => {
     setIsLoading(true);
     setError(null);
-    // PRODUCTION TODO: Fetch badges from Firestore
-    // Option 1: Fetch once
-    /*
-    const fetchBadges = async () => {
-      try {
-        const badgesColRef = collection(db, 'badges');
-        // const q = query(badgesColRef, orderBy('name', 'asc')); // Example ordering
-        const badgesSnap = await getDocs(badgesColRef); // or await getDocs(q);
-        const fetchedBadges = badgesSnap.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            // Ensure timestamp fields are handled (e.g., toDate().toISOString())
-            // createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
-            // updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : new Date().toISOString(),
-          } as Badge;
-        });
-        setAllBadgesData(fetchedBadges);
-      } catch (err) {
-        console.error("Error fetching badges:", err);
-        setError("Failed to load badges. Displaying mock data as fallback.");
-        setAllBadgesData([...MOCK_BADGES]); // Fallback to mock
-      } finally {
+    badgeService.getAllBadges()
+      .then(badges => {
+        setAllBadgesData(badges);
         setIsLoading(false);
-      }
-    };
-    fetchBadges();
-    */
-
-    // Option 2: Real-time updates with onSnapshot (preferred for admin dashboards)
-    /*
-    const badgesColRef = collection(db, 'badges');
-    // const q = query(badgesColRef, orderBy('name', 'asc'));
-    const unsubscribe = onSnapshot(badgesColRef, (querySnapshot) => { // Use q for ordering
-      const fetchedBadges = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Badge));
-      setAllBadgesData(fetchedBadges);
-      setIsLoading(false);
-      setError(null);
-    }, (err) => {
-      console.error("Error with real-time badges listener:", err);
-      setError("Failed to load badges in real-time. Displaying mock data.");
-      setAllBadgesData([...MOCK_BADGES]); // Fallback
-      setIsLoading(false);
-    });
-    return () => unsubscribe(); // Cleanup listener
-    */
-
-    // MOCK IMPLEMENTATION:
-    setTimeout(() => {
-      setAllBadgesData([...MOCK_BADGES]); // Use a copy for local state
-      setIsLoading(false);
-    }, 500);
-
+      })
+      .catch(err => {
+        console.error('Error fetching badges:', err);
+        setError('Failed to load badges.');
+        setIsLoading(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -168,27 +124,17 @@ export default function AdminBadgesPage() {
 
   const handleDelete = async (badgeId: string, badgeName: string) => {
     try {
-      // PRODUCTION TODO: Delete badge document from Firestore
-      // const badgeDocRef = doc(db, "badges", badgeId);
-      // await deleteDoc(badgeDocRef);
-
-      // MOCK:
-      const badgeIndexInMock = MOCK_BADGES.findIndex(b => b.id === badgeId);
-      if (badgeIndexInMock > -1) {
-        MOCK_BADGES.splice(badgeIndexInMock, 1);
-      }
-      setAllBadgesData(prev => prev.filter(b => b.id !== badgeId)); // Update local state
-
-      toast({ title: "Badge Deleted", description: `Badge "${badgeName}" has been removed.` });
-      // Adjust pagination if necessary
-      if (currentPage > Math.ceil(allBadgesData.length / ITEMS_PER_PAGE) && allBadgesData.length > 0) {
-        setCurrentPage(Math.ceil(allBadgesData.length / ITEMS_PER_PAGE));
-      } else if (allBadgesData.length === 0) {
+      await badgeService.deleteBadge(badgeId);
+      setAllBadgesData(prev => prev.filter(b => b.id !== badgeId));
+      toast({ title: 'Badge Deleted', description: `Badge "${badgeName}" has been removed.` });
+      if (currentPage > Math.ceil((allBadgesData.length - 1) / ITEMS_PER_PAGE) && allBadgesData.length > 1) {
+        setCurrentPage(Math.ceil((allBadgesData.length - 1) / ITEMS_PER_PAGE));
+      } else if (allBadgesData.length <= 1) {
         setCurrentPage(1);
       }
     } catch (err) {
-      console.error("Error deleting badge:", err);
-      toast({ title: "Delete Failed", description: `Could not delete badge "${badgeName}".`, variant: "destructive"});
+      console.error('Error deleting badge:', err);
+      toast({ title: 'Delete Failed', description: `Could not delete badge "${badgeName}".`, variant: 'destructive' });
     }
   };
 
@@ -199,36 +145,21 @@ export default function AdminBadgesPage() {
       imageUrl: data.imageUrl || defaultPlaceholderImage,
       dataAiHint: data.dataAiHint || 'badge icon',
     };
-
     try {
       if (currentBadge) {
-        // PRODUCTION TODO: Update existing badge document in Firestore
-        // const badgeDocRef = doc(db, "badges", currentBadge.id);
-        // await updateDoc(badgeDocRef, { ...badgeDataToSave, updatedAt: serverTimestamp() });
-        
-        // MOCK:
-        const updatedBadgeWithId = { ...badgeDataToSave, id: currentBadge.id, createdAt: currentBadge.createdAt, updatedAt: new Date().toISOString() } as Badge;
-        const mockIndex = MOCK_BADGES.findIndex(b => b.id === currentBadge.id);
-        if (mockIndex > -1) MOCK_BADGES[mockIndex] = updatedBadgeWithId;
-        setAllBadgesData(prev => prev.map(b => b.id === currentBadge.id ? updatedBadgeWithId : b));
-
-        toast({ title: "Badge Updated", description: `${data.name} has been updated.` });
+        await badgeService.updateBadge(currentBadge.id, badgeDataToSave);
+        setAllBadgesData(prev => prev.map(b => b.id === currentBadge.id ? { ...b, ...badgeDataToSave, updatedAt: new Date().toISOString() } : b));
+        toast({ title: 'Badge Updated', description: `${data.name} has been updated.` });
       } else {
-        // PRODUCTION TODO: Add new badge document to Firestore
-        // const docRef = await addDoc(collection(db, "badges"), { ...badgeDataToSave, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-        // const newBadgeWithId = { ...badgeDataToSave, id: docRef.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Badge;
-
-        // MOCK:
-        const newBadgeWithId = { ...badgeDataToSave, id: `badge-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Badge;
-        MOCK_BADGES.push(newBadgeWithId);
+        const newId = await badgeService.createBadge(badgeDataToSave);
+        const newBadgeWithId = { ...badgeDataToSave, id: newId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Badge;
         setAllBadgesData(prev => [...prev, newBadgeWithId]);
-
-        toast({ title: "Badge Added", description: `${data.name} has been created.` });
+        toast({ title: 'Badge Added', description: `${data.name} has been created.` });
       }
       setIsModalOpen(false);
     } catch (err) {
-      console.error("Error saving badge:", err);
-      toast({ title: "Save Failed", description: "Could not save badge details.", variant: "destructive" });
+      console.error('Error saving badge:', err);
+      toast({ title: 'Save Failed', description: 'Could not save badge details.', variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
     }

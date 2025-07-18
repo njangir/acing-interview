@@ -20,11 +20,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { MOCK_TESTIMONIALS, MOCK_BADGES, MOCK_SERVICES, PREDEFINED_AVATARS, MOCK_BOOKINGS } from "@/constants"; // Keep for fallback/initial display
+import { PREDEFINED_AVATARS } from "@/constants";
 import type { Testimonial, Badge as BadgeType, UserProfile, Service } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { X, Eye, EyeOff, Filter, ShieldAlert, CheckCircle2, PlusCircle, Briefcase, Upload, Users, ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { testimonialService, badgeService, serviceService, userProfileService } from '@/lib/firebase-services';
 
 
 // PRODUCTION TODO: Import Firebase and Firestore methods
@@ -75,13 +76,12 @@ interface SelectableUser {
 
 export default function AdminTestimonialsPage() {
   const { toast } = useToast();
-  const [allTestimonialsData, setAllTestimonialsData] = useState<Testimonial[]>(MOCK_TESTIMONIALS);
-  const [allBadgesData, setAllBadgesData] = useState<BadgeType[]>(MOCK_BADGES);
-  const [allServicesData, setAllServicesData] = useState<Service[]>(MOCK_SERVICES);
-
+  const [allTestimonialsData, setAllTestimonialsData] = useState<Testimonial[]>([]);
+  const [allBadgesData, setAllBadgesData] = useState<BadgeType[]>([]);
+  const [allServicesData, setAllServicesData] = useState<Service[]>([]);
+  const [allUserProfiles, setAllUserProfiles] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const [filterBadgeId, setFilterBadgeId] = useState<string>('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isNameEmailEditable, setIsNameEmailEditable] = useState(true);
@@ -92,87 +92,42 @@ export default function AdminTestimonialsPage() {
   useEffect(() => {
     setIsLoading(true);
     setError(null);
-
     const fetchData = async () => {
       try {
-        // PRODUCTION TODO: Fetch testimonials from Firestore
-        // const testimonialsQuery = query(collection(db, 'testimonials'), orderBy('status'), orderBy('createdAt', 'desc'));
-        // const testimonialsSnap = await getDocs(testimonialsQuery);
-        // const fetchedTestimonials = testimonialsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Testimonial));
-        // setAllTestimonialsData(fetchedTestimonials);
-        setAllTestimonialsData(MOCK_TESTIMONIALS); // Mock
-
-        // PRODUCTION TODO: Fetch badges from Firestore
-        // const badgesSnap = await getDocs(collection(db, 'badges'));
-        // const fetchedBadges = badgesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BadgeType));
-        // setAllBadgesData(fetchedBadges);
-        setAllBadgesData(MOCK_BADGES); // Mock
-
-        // PRODUCTION TODO: Fetch services from Firestore
-        // const servicesSnap = await getDocs(collection(db, 'services'));
-        // const fetchedServices = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
-        // setAllServicesData(fetchedServices);
-        setAllServicesData(MOCK_SERVICES); // Mock
-
+        const [testimonials, badges, services] = await Promise.all([
+          testimonialService.getAllTestimonials(),
+          badgeService.getAllBadges(),
+          serviceService.getAllServices(),
+        ]);
+        setAllTestimonialsData(testimonials);
+        setAllBadgesData(badges);
+        setAllServicesData(services);
+        setAllUserProfiles([]); // No getAllUserProfiles method, fallback to empty array
       } catch (err) {
         console.error("Error fetching admin testimonials data:", err);
         setError("Failed to load data. Please try again.");
-        // Fallback to mocks
-        setAllTestimonialsData(MOCK_TESTIMONIALS);
-        setAllBadgesData(MOCK_BADGES);
-        setAllServicesData(MOCK_SERVICES);
       } finally {
         setIsLoading(false);
       }
     };
-
     fetchData();
-    // For real-time updates, use onSnapshot:
-    /*
-    const testimonialsColRef = collection(db, 'testimonials');
-    const q = query(testimonialsColRef, orderBy('status'), orderBy('createdAt', 'desc')); // Example ordering
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const fetchedTestimonials = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Testimonial));
-      setAllTestimonialsData(fetchedTestimonials);
-      setIsLoading(false);
-    }, (err) => {
-      console.error("Error with real-time testimonials listener:", err);
-      setError("Failed to load testimonials in real-time.");
-      setAllTestimonialsData(MOCK_TESTIMONIALS); // Fallback
-      setIsLoading(false);
-    });
-    return () => unsubscribe(); // Cleanup listener
-    */
   }, []);
 
 
   const selectableUsers = useMemo((): SelectableUser[] => {
-    // PRODUCTION TODO: This should ideally fetch from a "userProfiles" collection or be based on a more robust user list.
-    // Using MOCK_BOOKINGS to derive users is a temporary mock strategy.
     const usersMap = new Map<string, SelectableUser>();
-    MOCK_BOOKINGS.forEach(booking => { // MOCK_BOOKINGS is still used here for user list derivation
-      if (booking.userEmail && !usersMap.has(booking.userEmail)) {
-        let avatarUrl = PREDEFINED_AVATARS[0].url; 
-        try {
-          const userProfileString = localStorage.getItem(`mockUserProfile_${booking.userEmail}`);
-          if (userProfileString) {
-            const userProfile: UserProfile = JSON.parse(userProfileString);
-            if (userProfile.imageUrl) {
-              avatarUrl = userProfile.imageUrl;
-            }
-          }
-        } catch (e) { console.error("Error parsing profile for user list", e); }
-        
-        usersMap.set(booking.userEmail, {
-          id: booking.userEmail, // Using email as ID for mock
-          name: booking.userName,
-          email: booking.userEmail,
-          avatarUrl: avatarUrl,
+    allUserProfiles.forEach(profile => {
+      if (profile.email && !usersMap.has(profile.email)) {
+        usersMap.set(profile.email, {
+          id: profile.uid,
+          name: profile.name,
+          email: profile.email,
+          avatarUrl: profile.imageUrl,
         });
       }
     });
     return Array.from(usersMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, []); // This will not update if MOCK_BOOKINGS changes unless the component re-renders
+  }, [allUserProfiles]);
 
 
   const adminForm = useForm<AdminTestimonialFormValues>({
@@ -235,10 +190,10 @@ export default function AdminTestimonialsPage() {
       // await updateDoc(testimonialDocRef, { status: newStatus, updatedAt: serverTimestamp() });
       
       // MOCK:
-      const testimonialIndex = MOCK_TESTIMONIALS.findIndex(t => t.id === testimonialId);
+      const testimonialIndex = allTestimonialsData.findIndex(t => t.id === testimonialId);
       if (testimonialIndex !== -1) {
-        MOCK_TESTIMONIALS[testimonialIndex].status = newStatus;
-        setAllTestimonialsData([...MOCK_TESTIMONIALS]);
+        allTestimonialsData[testimonialIndex].status = newStatus;
+        setAllTestimonialsData([...allTestimonialsData]);
       }
       
       toast({
@@ -258,10 +213,10 @@ export default function AdminTestimonialsPage() {
       // await updateDoc(testimonialDocRef, { status: 'rejected', updatedAt: serverTimestamp() });
 
       // MOCK:
-      const testimonialIndex = MOCK_TESTIMONIALS.findIndex(t => t.id === testimonialId);
+      const testimonialIndex = allTestimonialsData.findIndex(t => t.id === testimonialId);
       if (testimonialIndex !== -1) {
-        MOCK_TESTIMONIALS[testimonialIndex].status = 'rejected';
-        setAllTestimonialsData([...MOCK_TESTIMONIALS]);
+        allTestimonialsData[testimonialIndex].status = 'rejected';
+        setAllTestimonialsData([...allTestimonialsData]);
       }
       
       toast({
@@ -287,21 +242,15 @@ export default function AdminTestimonialsPage() {
       console.warn("Filtering by badge is using mock localStorage data and is not production-ready.");
       filtered = filtered.filter(testimonial => {
         if (!testimonial.userEmail) return false;
-        const mockUserProfileKey = `mockUserProfile_${testimonial.userEmail}`;
-        const storedProfileData = localStorage.getItem(mockUserProfileKey);
-
-        if (storedProfileData) {
-          const userProfile: UserProfile = JSON.parse(storedProfileData);
-          return userProfile.awardedBadges?.some(badge => badge.id === filterBadgeId);
-        }
-        return false;
+        const userProfile = allUserProfiles.find(profile => profile.email === testimonial.userEmail);
+        return userProfile?.awardedBadges?.some(badge => badge.id === filterBadgeId);
       });
     }
     return filtered.sort((a,b) => {
         const statusOrder = { pending: 0, approved: 1, rejected: 2 };
         return statusOrder[a.status] - statusOrder[b.status];
     });
-  }, [allTestimonialsData, filterBadgeId]); 
+  }, [allTestimonialsData, filterBadgeId, allUserProfiles]); 
 
   const totalPages = Math.ceil(allFilteredTestimonials.length / ITEMS_PER_PAGE);
 
@@ -374,8 +323,8 @@ export default function AdminTestimonialsPage() {
             createdAt: new Date().toISOString(), 
             updatedAt: new Date().toISOString() 
         } as Testimonial;
-        MOCK_TESTIMONIALS.push(newTestimonialWithId); 
-        setAllTestimonialsData([...MOCK_TESTIMONIALS]); // If not using onSnapshot
+        allTestimonialsData.push(newTestimonialWithId); 
+        setAllTestimonialsData([...allTestimonialsData]); // If not using onSnapshot
 
         toast({
           title: "Testimonial Added!",

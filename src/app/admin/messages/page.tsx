@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Dialog, DialogContent, DialogDescription as DialogDesc, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { MOCK_USER_MESSAGES, MOCK_USER_PROFILE_FOR_CONTACT } from "@/constants"; // MOCK_USER_MESSAGES for fallback
+import { messageService } from '@/lib/firebase-services';
 import type { UserMessage } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Mail, Send, CornerDownRight, User, Shield, ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
@@ -39,9 +39,9 @@ interface Conversation {
 
 export default function AdminMessagesPage() {
   const { toast } = useToast();
-  const { currentUser: adminUser } = useAuth();
+  const { user, userProfile } = useAuth();
   
-  const [allMessagesData, setAllMessagesData] = useState<UserMessage[]>(MOCK_USER_MESSAGES); // Holds fetched or mock messages
+  const [allMessagesData, setAllMessagesData] = useState<UserMessage[]>([]); // Holds fetched messages
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,44 +53,18 @@ export default function AdminMessagesPage() {
   useEffect(() => {
     setIsLoading(true);
     setError(null);
-
-    // PRODUCTION TODO: Fetch messages from Firestore using onSnapshot for real-time updates.
-    // This replaces the polling mechanism.
-    /*
-    const messagesColRef = collection(db, 'userMessages');
-    const q = query(messagesColRef, orderBy('timestamp', 'desc')); // Adjust orderBy as needed
-
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const fetchedMessages = querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp), // Ensure timestamp is a Date object
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
-          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : new Date().toISOString(),
-        } as UserMessage;
-      });
+    // Enable real-time updates using onSnapshot
+    const unsubscribe = messageService.onMessagesChange((fetchedMessages: UserMessage[]) => {
       setAllMessagesData(fetchedMessages);
       setIsLoading(false);
       setError(null);
-    }, (err) => {
-      console.error("Error with real-time messages listener:", err);
-      setError("Failed to load messages in real-time. Displaying potentially stale data.");
-      setAllMessagesData(MOCK_USER_MESSAGES); // Fallback to mock for UI
+    }, (err: any) => {
+      setError("Failed to load messages in real-time.");
+      setAllMessagesData([]);
       setIsLoading(false);
     });
-
-    return () => unsubscribe(); // Cleanup listener on component unmount
-    */
-
-    // MOCK: Simulate initial fetch
-    setTimeout(() => {
-        setAllMessagesData([...MOCK_USER_MESSAGES]); // Use a copy for local state
-        setIsLoading(false);
-    }, 500);
-
-  }, []); // Empty dependency array for initial fetch / listener setup
+    return () => unsubscribe && unsubscribe();
+  }, []);
 
   const groupedMessages = useMemo(() => {
     const groups: Record<string, UserMessage[]> = {};
@@ -167,53 +141,28 @@ export default function AdminMessagesPage() {
     setSelectedConversation(conversation);
     setReplyText('');
     setIsModalOpen(true);
-
-    // PRODUCTION TODO: Mark user messages in this conversation as 'read' in Firestore
-    /*
-    const batch = writeBatch(db);
-    let messagesToUpdate = false;
-    conversation.messages.forEach(msg => {
+    // Mark user messages in this conversation as 'read' in Firestore
+    try {
+      const updates = await Promise.all(conversation.messages.map(async (msg: UserMessage) => {
         if (msg.senderType === 'user' && msg.status === 'new') {
-            const msgRef = doc(db, "userMessages", msg.id);
-            batch.update(msgRef, { status: 'read', updatedAt: serverTimestamp() });
-            messagesToUpdate = true;
+          await messageService.updateMessage(msg.id, { status: 'read' });
+          return true;
         }
-    });
-    if (messagesToUpdate) {
-        try {
-            await batch.commit();
-            // If not using onSnapshot, you might need to manually update local state or re-fetch.
-            // For MOCK, we update directly:
-             MOCK_USER_MESSAGES.forEach(mockMsg => {
-                if (conversation.messages.some(m => m.id === mockMsg.id && m.senderType === 'user' && mockMsg.status === 'new')) {
-                    mockMsg.status = 'read';
-                    mockMsg.updatedAt = new Date().toISOString();
-                }
-            });
-            setAllMessagesData([...MOCK_USER_MESSAGES]); // Trigger re-memoization
-            toast({ title: "Conversation Updated", description: "Messages marked as read."});
-        } catch (err) {
-            console.error("Error marking messages as read:", err);
-            toast({ title: "Error", description: "Could not update message statuses.", variant: "destructive" });
-        }
+        return false;
+      }));
+      if (updates.some(Boolean)) {
+        // Refetch messages to update UI
+        const refreshed = await messageService.getAllMessages();
+        setAllMessagesData(refreshed);
+        toast({ title: "Conversation Updated", description: "Messages marked as read." });
+      }
+    } catch (err) {
+      toast({ title: "Error", description: "Could not update message statuses.", variant: "destructive" });
     }
-    */
-    // MOCK Implementation:
-    let updatedInMock = false;
-    MOCK_USER_MESSAGES.forEach(msg => {
-        if (msg.userEmail === conversation.userEmail && 
-            msg.subject.replace(/^Re: /i, '').trim() === conversation.subject &&
-            msg.senderType === 'user' && msg.status === 'new') {
-            msg.status = 'read';
-            msg.updatedAt = new Date().toISOString();
-            updatedInMock = true;
-        }
-    });
-    if (updatedInMock) setAllMessagesData([...MOCK_USER_MESSAGES]);
   };
 
   const handleSendReply = async () => {
-    if (!selectedConversation || !replyText.trim() || !adminUser) {
+    if (!selectedConversation || !replyText.trim() || !userProfile || !user) {
       toast({
         title: "Cannot Send",
         description: "Reply text cannot be empty or admin user not found.",
@@ -221,104 +170,41 @@ export default function AdminMessagesPage() {
       });
       return;
     }
-
-    const newAdminMessageData: Omit<UserMessage, 'id' | 'createdAt' | 'updatedAt'> = {
-      uid: adminUser.uid, // UID of the admin sending the message
-      userName: selectedConversation.userName, // Keep track of user context
+    const newAdminMessageData: Omit<UserMessage, 'id'> = {
+      uid: user.uid,
+      userName: selectedConversation.userName,
       userEmail: selectedConversation.userEmail,
       subject: `Re: ${selectedConversation.subject}`,
       messageBody: replyText,
-      timestamp: new Date().toISOString(), // For Firestore, use serverTimestamp() for 'createdAt'
-      status: 'replied', // Admin replies are typically 'replied'
+      timestamp: new Date().toISOString(),
+      status: 'replied',
       senderType: 'admin',
-      adminName: adminUser.name || 'Admin Support',
+      adminName: userProfile.name || 'Admin Support',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
-
     try {
-        // PRODUCTION TODO: Add newAdminMessageData to 'userMessages' collection in Firestore
-        // const docRef = await addDoc(collection(db, "userMessages"), { 
-        //   ...newAdminMessageData, 
-        //   timestamp: serverTimestamp(), // Use server timestamp for sorting/consistency
-        //   createdAt: serverTimestamp(), 
-        //   updatedAt: serverTimestamp() 
-        // });
-        // const newAdminMessageWithId = { ...newAdminMessageData, id: docRef.id, timestamp: new Date() } as UserMessage;
-
-        // MOCK Implementation:
-        const newAdminMessageWithId = {
-          ...newAdminMessageData,
-          id: `msg-admin-${Date.now()}`,
-          timestamp: new Date(), // Local date for mock
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        } as unknown as UserMessage;
-        MOCK_USER_MESSAGES.push(newAdminMessageWithId);
-        
-        // PRODUCTION TODO: Update status of user messages in this conversation to 'replied'
-        // const userMessagesToUpdateQuery = query(
-        //   collection(db, "userMessages"),
-        //   where("userEmail", "==", selectedConversation.userEmail),
-        //   where("subject", "==", selectedConversation.subject), // Or match by conversationId
-        //   where("senderType", "==", "user"),
-        //   where("status", "in", ["new", "read"])
-        // );
-        // const userMessagesSnapshot = await getDocs(userMessagesToUpdateQuery);
-        // const batch = writeBatch(db);
-        // userMessagesSnapshot.forEach(doc => {
-        //   batch.update(doc.ref, { status: 'replied', updatedAt: serverTimestamp() });
-        // });
-        // await batch.commit();
-
-        // MOCK Implementation for updating user messages status:
-        MOCK_USER_MESSAGES.forEach(msg => {
-            if (msg.userEmail === selectedConversation.userEmail && 
-                msg.subject.replace(/^Re: /i, '').trim() === selectedConversation.subject &&
-                msg.senderType === 'user' && (msg.status === 'new' || msg.status === 'read')) {
-                msg.status = 'replied';
-                msg.updatedAt = new Date().toISOString();
-            }
-        });
-        setAllMessagesData([...MOCK_USER_MESSAGES]); // This will trigger re-memoization
-        
-        toast({
-          title: "Reply Sent",
-          description: `Your reply to ${selectedConversation.userName} has been sent.`,
-        });
-        
-        // Optimistically update selectedConversation for UI
-        const updatedSelectedConvMessages = [
-          ...(selectedConversation.messages || []),
-          newAdminMessageWithId
-        ].sort(
-          (a, b) =>
-            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-        );
-        setSelectedConversation((prev) =>
-          prev
-            ? {
-                ...prev,
-                messages: updatedSelectedConvMessages,
-                status: "replied", // Conversation status is now 'replied'
-                lastMessageTimestamp:
-                  typeof newAdminMessageWithId.timestamp === "string"
-                    ? new Date(newAdminMessageWithId.timestamp)
-                    : newAdminMessageWithId.timestamp,
-                lastMessageSnippet: `${
-                  newAdminMessageWithId.senderType === "admin"
-                    ? (newAdminMessageWithId.adminName || "Admin") + ": "
-                    : ""
-                }${newAdminMessageWithId.messageBody.substring(0, 40)}${
-                  newAdminMessageWithId.messageBody.length > 40 ? "..." : ""
-                }`,
-              }
-            : null
-        );
-        setReplyText("");
-        // If not using onSnapshot, call a re-fetch or rely on local state update
-        } catch (error) {
-          toast({ title: "Send Failed", description: "Could not send reply.", variant: "destructive" });
+      await messageService.createMessage(newAdminMessageData);
+      // Update status of user messages in this conversation to 'replied'
+      await Promise.all(selectedConversation.messages.map(async (msg: UserMessage) => {
+        if (msg.senderType === 'user' && (msg.status === 'new' || msg.status === 'read')) {
+          await messageService.updateMessage(msg.id, { status: 'replied' });
         }
-      };
+      }));
+      const refreshed = await messageService.getAllMessages();
+      setAllMessagesData(refreshed);
+      toast({
+        title: "Reply Sent",
+        description: `Your reply to ${selectedConversation.userName} has been sent.`,
+      });
+      setReplyText("");
+      // Optionally, update selectedConversation for UI
+      setSelectedConversation(null);
+      setIsModalOpen(false);
+    } catch (error) {
+      toast({ title: "Send Failed", description: "Could not send reply.", variant: "destructive" });
+    }
+  };
 
   
       if (isLoading) {

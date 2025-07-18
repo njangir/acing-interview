@@ -1,16 +1,16 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
-import { MOCK_SERVICES, AVAILABLE_SLOTS } from "@/constants"; // AVAILABLE_SLOTS for mock
 import type { Service } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { CheckCircle, XCircle, Loader2, Ban } from 'lucide-react';
+import { availabilityService } from '@/lib/firebase-services';
 import { useAuth } from '@/hooks/use-auth';
 
 // PRODUCTION TODO: Import Firebase and Firestore methods:
@@ -22,7 +22,7 @@ export default function SlotSelectionPage() {
   const params = useParams();
   const router = useRouter();
   const serviceId = params.serviceId as string;
-  const { currentUser, loadingAuth } = useAuth(); // Added loadingAuth
+  const { user, loading } = useAuth(); // Added loadingAuth
 
   const [service, setService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
@@ -34,11 +34,11 @@ export default function SlotSelectionPage() {
   const [isFetchingSlots, setIsFetchingSlots] = useState(false);
 
   useEffect(() => {
-    if (loadingAuth) {
+    if (loading) {
       setIsLoading(true);
       return;
     }
-    if (!currentUser) {
+    if (!user) {
       router.push(`/login?redirect=/book/${serviceId}/slots`);
       return;
     }
@@ -78,16 +78,16 @@ export default function SlotSelectionPage() {
     };
 
     fetchServiceDetails();
-  }, [serviceId, currentUser, router, loadingAuth]);
+  }, [serviceId, user, router, loading]);
 
   // Memoize the stringified version of slots for the selected date to use as a dependency
   // For production, this logic will depend on how slots are fetched and stored in state.
-  const stringifiedSlotsForSelectedDate = useMemo(() => {
+  const stringifiedSlotsForSelectedDate = useState(() => {
     if (!selectedDate) return '[]';
     const dateString = selectedDate.toISOString().split('T')[0];
     // MOCK: Directly access AVAILABLE_SLOTS
     return JSON.stringify(AVAILABLE_SLOTS[dateString] || []);
-  }, [selectedDate]);
+  });
 
 
   useEffect(() => {
@@ -140,7 +140,7 @@ export default function SlotSelectionPage() {
       setError("Please select a date and time slot.");
       return;
     }
-    if (!currentUser) {
+    if (!user) {
         router.push(`/login?redirect=/book/${serviceId}/slots`);
         return;
     }
@@ -168,16 +168,16 @@ export default function SlotSelectionPage() {
     }));
 
     const userDetailsToStore = {
-      name: currentUser.name,
-      email: currentUser.email,
-      // phone: currentUser.phone || "", // If phone is part of AuthUser/UserProfile
+      name: user.name,
+      email: user.email,
+      // phone: user.phone || "", // If phone is part of AuthUser/UserProfile
     };
     localStorage.setItem('userDetails', JSON.stringify(userDetailsToStore));
 
     router.push(`/book/${serviceId}/payment`);
   };
 
-  if (isLoading || loadingAuth) {
+  if (isLoading || loading) {
     return (
       <div className="container py-12 flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />

@@ -19,6 +19,7 @@ import type { UserProfile, Badge } from '@/types';
 import { useAuth } from '@/hooks/use-auth';
 import { PREDEFINED_AVATARS } from '@/constants';
 import { cn } from '@/lib/utils';
+import { userProfileService } from '@/lib/firebase-services';
 
 // PRODUCTION TODO: Import Firebase and Firestore methods
 // import { db } from '@/lib/firebase';
@@ -38,10 +39,8 @@ type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
 export default function ProfilePage() {
   const { toast } = useToast();
-  const { currentUser, login: updateAuthContextUser, loadingAuth } = useAuth(); // updateAuthContextUser can be used if login function in useAuth handles updates
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const { user, userProfile, loading } = useAuth();
   const [selectedAvatarForForm, setSelectedAvatarForForm] = useState<string | undefined>(undefined);
-  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   const form = useForm<ProfileFormValues>({
@@ -57,140 +56,36 @@ export default function ProfilePage() {
   });
 
   useEffect(() => {
-    if (loadingAuth) {
-      setIsLoadingProfile(true);
-      return;
-    }
-    if (!currentUser) {
-      setIsLoadingProfile(false);
-      // Optionally redirect to login if no user
-      // router.push('/login?redirect=/dashboard/profile');
-      return;
-    }
-
-    const fetchUserProfile = async () => {
-      setIsLoadingProfile(true);
-      try {
-        // PRODUCTION TODO: Fetch UserProfile from Firestore
-        // const userDocRef = doc(db, "userProfiles", currentUser.uid);
-        // const userDocSnap = await getDoc(userDocRef);
-        // let loadedProfileData: UserProfile;
-
-        // if (userDocSnap.exists()) {
-        //   loadedProfileData = userDocSnap.data() as UserProfile;
-        //   // Ensure awardedBadges is an array (Firestore might return undefined if field doesn't exist)
-        //   loadedProfileData.awardedBadges = loadedProfileData.awardedBadges || [];
-        // } else {
-        //   // Profile doesn't exist, create a default one (or redirect to a setup page)
-        //   console.warn(`Profile not found for user ${currentUser.uid}, creating default.`);
-        //   loadedProfileData = {
-        //     uid: currentUser.uid,
-        //     name: currentUser.name,
-        //     email: currentUser.email,
-        //     phone: '',
-        //     imageUrl: currentUser.imageUrl || PREDEFINED_AVATARS[0].url,
-        //     awardedBadges: [], // Or assign default badges
-        //     gender: undefined,
-        //     targetOrganization: undefined,
-        //     createdAt: new Date().toISOString(), // For Firestore, use serverTimestamp() on creation
-        //     updatedAt: new Date().toISOString(), // For Firestore, use serverTimestamp() on creation
-        //   };
-        //   // Optionally save this new default profile to Firestore
-        //   // await setDoc(userDocRef, { ...loadedProfileData, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-        // }
-
-        // MOCK: Using localStorage as a stand-in for Firestore
-        const mockUserProfileKey = `mockUserProfile_${currentUser.email}`;
-        const storedProfile = localStorage.getItem(mockUserProfileKey);
-        let loadedProfileData: UserProfile;
-
-        if (storedProfile) {
-          loadedProfileData = JSON.parse(storedProfile);
-          // Ensure awardedBadges is an array
-          loadedProfileData.awardedBadges = loadedProfileData.awardedBadges || [];
-        } else {
-          // Fallback if no profile in localStorage, create a basic one from auth context
-          loadedProfileData = {
-            uid: currentUser.uid,
-            name: currentUser.name,
-            email: currentUser.email,
-            phone: '',
-            imageUrl: currentUser.imageUrl || PREDEFINED_AVATARS[0].url,
-            awardedBadges: [], // PRODUCTION: Could assign a default "Welcome" badge here
-            gender: undefined,
-            targetOrganization: undefined,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          localStorage.setItem(mockUserProfileKey, JSON.stringify(loadedProfileData));
-        }
-        // END MOCK
-
-        setUserProfile(loadedProfileData);
-        form.reset({
-          name: loadedProfileData.name,
-          email: loadedProfileData.email,
-          phone: loadedProfileData.phone || '',
-          imageUrl: loadedProfileData.imageUrl || PREDEFINED_AVATARS[0].url,
-          gender: loadedProfileData.gender,
-          targetOrganization: loadedProfileData.targetOrganization,
-        });
-        setSelectedAvatarForForm(loadedProfileData.imageUrl || PREDEFINED_AVATARS[0].url);
-
-      } catch (error) {
-        console.error("Error fetching user profile:", error);
-        toast({ title: "Error", description: "Could not load your profile. Please try again.", variant: "destructive" });
-      } finally {
-        setIsLoadingProfile(false);
-      }
-    };
-
-    fetchUserProfile();
-  }, [currentUser, form, toast, loadingAuth]);
+    if (loading) return;
+    if (!userProfile) return;
+    form.reset({
+      name: userProfile.name,
+      email: userProfile.email,
+      phone: userProfile.phone || '',
+      imageUrl: userProfile.imageUrl || PREDEFINED_AVATARS[0].url,
+      gender: userProfile.gender,
+      targetOrganization: userProfile.targetOrganization,
+    });
+    setSelectedAvatarForForm(userProfile.imageUrl || PREDEFINED_AVATARS[0].url);
+  }, [userProfile, form, loading]);
 
   async function onSubmit(data: ProfileFormValues) {
-    if (!userProfile || !currentUser) {
+    if (!userProfile || !user) {
         toast({ title: "Error", description: "User session not found. Please re-login.", variant: "destructive" });
         return;
     }
-
     setIsSaving(true);
-
     const updatedProfileData: UserProfile = {
-      ...userProfile, // Preserve awardedBadges, uid, createdAt and other non-form fields
+      ...userProfile,
       name: data.name,
-      // email: data.email, // Email generally shouldn't be changed by user directly this way, handle separately if needed
       phone: data.phone,
       imageUrl: selectedAvatarForForm,
       gender: data.gender,
       targetOrganization: data.targetOrganization,
-      updatedAt: new Date().toISOString(), // For Firestore, use serverTimestamp()
+      updatedAt: new Date().toISOString(),
     };
-
     try {
-      // PRODUCTION TODO: Save updatedProfileData to Firestore
-      // const userDocRef = doc(db, "userProfiles", currentUser.uid);
-      // await setDoc(userDocRef, { ...updatedProfileData, updatedAt: serverTimestamp() }, { merge: true }); // Use merge:true to avoid overwriting fields not in form
-
-      // MOCK: Save to localStorage
-      localStorage.setItem(`mockUserProfile_${currentUser.email}`, JSON.stringify(updatedProfileData));
-      // END MOCK
-
-      setUserProfile(updatedProfileData); // Update local state
-
-      // Update AuthContext if core identifiable info changed
-      if (currentUser.name !== updatedProfileData.name || currentUser.imageUrl !== updatedProfileData.imageUrl) {
-          // The login function in useAuth needs to be able to handle partial updates or fetch fresh profile for context
-          // For this mock, we assume `updateAuthContextUser` (which is `login` from context) can take the new minimal data.
-          // In a real app, after updating Firestore, you might re-fetch the minimal user data for the auth context
-          // or rely on an onSnapshot listener if you have one for the user profile.
-          await updateAuthContextUser({
-            ...currentUser, // Pass existing UID, email, isAdmin
-            displayName: updatedProfileData.name,
-            photoURL: updatedProfileData.imageUrl,
-          });
-      }
-
+      await userProfileService.updateUserProfile(user.uid, updatedProfileData);
       toast({
         title: "Profile Updated",
         description: "Your profile information has been successfully updated.",
@@ -203,7 +98,7 @@ export default function ProfilePage() {
     }
   }
 
-  if (isLoadingProfile || loadingAuth) {
+  if (loading) {
     return (
         <div className="container py-12 flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -211,7 +106,6 @@ export default function ProfilePage() {
         </div>
     );
   }
-
   if (!userProfile) {
     return <div className="container py-12">User profile could not be loaded. Please ensure you are logged in.</div>;
   }
