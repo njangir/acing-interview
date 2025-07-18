@@ -15,20 +15,20 @@ export default function HomePage() {
       <section className="py-16 md:py-24 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
         <div className="container grid md:grid-cols-2 gap-8 items-center">
           <div className="space-y-6">
-            <h1 className="text-4xl md:text-5xl font-bold font-headline animate-subtle-appear" style={{ animationDelay: '0.1s' }}>
+            <h1 className="text-4xl md:text-5xl font-bold font-headline animate-subtle-appear delay-100">
               Crack Your SSB Interview with Expert Guidance
             </h1>
-            <p className="text-lg md:text-xl text-primary-foreground/80 animate-subtle-appear" style={{ animationDelay: '0.3s' }}>
+            <p className="text-lg md:text-xl text-primary-foreground/80 animate-subtle-appear animate-subtle-appear delay-300">
               Led by a 4-time SSB recommended professional. Get personalized mock interviews,
               in-depth feedback, and proven strategies to achieve your armed forces dream.
             </p>
-            <div className="animate-subtle-appear" style={{ animationDelay: '0.5s' }}>
+            <div className="animate-subtle-appear animate-subtle-appear delay-500">
               <Button size="lg" asChild className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg transform hover:scale-105 transition-transform duration-300">
                 <Link href="/services">Book Your Interview Now</Link>
               </Button>
             </div>
           </div>
-          <div className="hidden md:block relative animate-subtle-appear group overflow-hidden rounded-lg shadow-2xl" style={{ animationDelay: '0.2s' }}>
+          <div className="hidden md:block relative animate-subtle-appear group overflow-hidden rounded-lg shadow-2xl animate-subtle-appear delay-200">
             <Image
               src="https://placehold.co/600x450.png"
               alt="SSB Interview Preparation"

@@ -1,5 +1,11 @@
 {
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noImplicitReturns": false,
+    "noUnusedLocals": false
+  },
   "include": [
-    ".eslintrc.js"
+    "src",
+    "test"
   ]
 }

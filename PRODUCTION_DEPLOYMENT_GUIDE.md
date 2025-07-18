@@ -60,7 +60,7 @@
    - Storage
    - Hosting (if you want to use Firebase Hosting)
 
-4. **Deploy Firebase resources** (inprogress)
+4. **Deploy Firebase resources** (complete)
    ```bash
    firebase deploy
    ```

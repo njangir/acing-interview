@@ -28,7 +28,7 @@ export const MOCK_SERVICES: Service[] = [
     features: ['One-on-One Interview', 'Psychological Test Analysis (TAT, WAT, SRT)', 'GTO Task Briefing', 'Personalized Feedback Report', 'Doubt Clearing Session'],
     image: 'https://placehold.co/600x400.png',
     dataAiHint: 'interview meeting',
-    defaultForce: 'General',
+    defaultForce: 'Army',
     isBookable: true,
     // TODO: PRODUCTION - Add createdAt, updatedAt (Firestore Timestamps)
   },
@@ -41,7 +41,7 @@ export const MOCK_SERVICES: Service[] = [
     features: ['Career Path Guidance', 'Strengths & Weaknesses Analysis', 'Confidence Building Techniques', 'SSB Procedure Walkthrough'],
     image: 'https://placehold.co/600x400.png',
     dataAiHint: 'counseling support',
-    defaultForce: 'General',
+    defaultForce: 'Army',
     isBookable: true,
     // TODO: PRODUCTION - Add createdAt, updatedAt (Firestore Timestamps)
   },

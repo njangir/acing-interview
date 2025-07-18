@@ -137,3 +137,7 @@ body {
 .rdp-button.rdp-day_today:not(:is(.rdp-day_selected, [aria-selected="true"])):is(.day-available, .day-unavailable) {
   @apply !bg-accent !text-accent-foreground !opacity-100;
 }
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-500 { animation-delay: 0.5s; }
