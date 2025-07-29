@@ -1,89 +1,82 @@
 
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Default deny all reads and writes
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Function to check if a user is an admin
-    function isAdmin() {
-      return request.auth != null && get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.roles.hasAny(['admin']);
-    }
-
-    // User can read/write their own profile. Admins can read all.
+    // USERS can only read/write their own profile.
+    // ADMINS can read any profile.
     match /userProfiles/{userId} {
       allow read, update: if request.auth != null && request.auth.uid == userId;
-      allow list: if isAdmin(); // Admins can list users
-    }
-    
-    // Services are publicly readable, writable only by admins.
-    match /services/{serviceId} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow create: if request.auth != null;
+      allow read: if request.auth != null && request.auth.token.isAdmin == true;
     }
 
-    // Bookings can be created by logged-in users for themselves.
-    // They can read their own bookings.
-    // Admins can read all and update any booking.
-    match /bookings/{bookingId} {
-      allow read: if request.auth != null && (resource.data.uid == request.auth.uid || isAdmin());
-      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
-      allow update: if (request.auth != null && resource.data.uid == request.auth.uid && request.resource.data.requestedRefund == true) || isAdmin();
-      // Users can only update to request a refund. Admins can do any update.
+    // SERVICES are publicly readable. Only admins can write.
+    match /services/{serviceId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.isAdmin == true;
     }
-    
-    // Badges are publicly readable, writable only by admins.
-    match /badges/{badgeId} {
-        allow read: if true;
-        allow write: if isAdmin();
+
+    // MENTOR PROFILE is publicly readable. Only admins can write.
+     match /siteProfiles/{profileId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.isAdmin == true;
     }
-    
-    // Testimonials can be created by any authenticated user.
-    // Only approved testimonials are publicly readable.
+
+    // TESTIMONIALS can be created by logged-in users.
+    // Public can only read approved testimonials.
     // Admins can manage all testimonials.
     match /testimonials/{testimonialId} {
       allow read: if resource.data.status == 'approved';
       allow create: if request.auth != null;
-      allow update, delete: if isAdmin();
+      allow update, delete: if request.auth != null && request.auth.token.isAdmin == true;
     }
     
-    // Availability slots are publicly readable, writable only by admins.
+    // BOOKINGS can be created, read, and updated (for refunds) by the user who owns them.
+    // Admins have full read/write access to all bookings.
+    match /bookings/{bookingId} {
+      allow read, update: if request.auth != null && request.auth.uid == resource.data.uid;
+      allow create: if request.auth != null;
+      // Admin Access
+      allow read, write: if request.auth != null && request.auth.token.isAdmin == true;
+    }
+
+    // AVAILABILITY is publicly readable. Only admins can write.
     match /globalAvailability/{date} {
         allow read: if true;
-        allow write: if isAdmin();
+        allow write: if request.auth != null && request.auth.token.isAdmin == true;
+    }
+
+    // BADGES are publicly readable. Only admins can write.
+    match /badges/{badgeId} {
+        allow read: if true;
+        allow write: if request.auth != null && request.auth.token.isAdmin == true;
     }
     
-    // Resources are readable by authenticated users (logic for specific entitlements can be added).
-    // Writable only by admins.
+    // RESOURCES rules would go here. For now, deny all.
     match /resources/{resourceId} {
-      allow read: if request.auth != null; // Simplistic rule, can be refined based on user purchases
-      allow write: if isAdmin();
+      allow read, write: if false; // Define rules later
     }
 
-    // Users can create messages for themselves. Admins can read all and reply.
+    // MESSAGES can be created by the user. Admins can read all and write replies.
     match /userMessages/{messageId} {
-      allow read: if request.auth != null && (resource.data.uid == request.auth.uid || isAdmin());
-      allow create: if request.auth != null && (request.resource.data.uid == request.auth.uid || isAdmin());
-      allow update: if isAdmin(); // Only admins can change status (e.g., to 'read' or 'closed')
+        // User can create a message for themselves.
+        allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
+        // User can only read messages in their own "thread" (based on their UID).
+        allow read: if request.auth != null && request.auth.uid == resource.data.uid;
+        // Admin can read/write all messages.
+        allow read, write: if request.auth != null && request.auth.token.isAdmin == true;
     }
 
-    // Feedback submissions are write-only for admins. No public read access.
+    // FEEDBACK SUBMISSIONS are write-only for admins.
     match /feedbackSubmissions/{submissionId} {
-      allow read: if isAdmin();
-      allow write: if isAdmin();
+        allow read: if request.auth != null && request.auth.token.isAdmin == true;
+        allow write: if request.auth != null && request.auth.token.isAdmin == true;
     }
-    
-    // Mentor profile is publicly readable, writable only by admins.
-     match /siteProfiles/mainMentor {
-      allow read: if true;
-      allow write: if isAdmin();
+
+    // Fallback rule to deny access to any other collections
+    match /{document=**} {
+      allow read, write: if false;
     }
-    
   }
 }
-
-    

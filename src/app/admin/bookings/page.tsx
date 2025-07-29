@@ -15,26 +15,26 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription as DialogDesc, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label'; // Not explicitly used in forms but could be for direct info display
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { MOCK_BOOKINGS, MOCK_SERVICES } from "@/constants"; // Keep for fallback/initial display
 import type { Booking, Service } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck, PlusCircle, CalendarIcon, Edit, Filter, InfoIcon, Video, ChevronLeft, ChevronRight, Eye, Loader2 } from 'lucide-react';
+import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck, PlusCircle, CalendarIcon, Edit, Filter, InfoIcon, Video, ChevronLeft, ChevronRight, Eye, Loader2, AlertTriangle } from 'lucide-react';
 import { Badge as UiBadge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { format, parse } from 'date-fns';
 import Link from 'next/link';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useAuth } from '@/hooks/use-auth'; // For getting admin UID if needed for logging actions
+import { useAuth } from '@/hooks/use-auth';
 
 // PRODUCTION TODO: Import Firebase and Firestore methods
-// import { db } from '@/lib/firebase';
-// import { collection, doc, addDoc, setDoc, updateDoc, deleteDoc, getDocs, query, orderBy, serverTimestamp, onSnapshot, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { collection, doc, addDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, onSnapshot, where, writeBatch, getDocs } from 'firebase/firestore';
+
 
 const ITEMS_PER_PAGE = 7;
 
@@ -63,8 +63,8 @@ export default function AdminBookingsPage() {
   const { toast } = useToast();
   const { currentUser: adminUser } = useAuth(); // Admin user context
 
-  const [allBookingsData, setAllBookingsData] = useState<Booking[]>(MOCK_BOOKINGS); // Holds fetched or mock bookings
-  const [allServicesData, setAllServicesData] = useState<Service[]>(MOCK_SERVICES); // Holds fetched or mock services
+  const [allBookingsData, setAllBookingsData] = useState<Booking[]>([]); // Holds fetched or mock bookings
+  const [allServicesData, setAllServicesData] = useState<Service[]>([]); // Holds fetched or mock services
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,70 +80,25 @@ export default function AdminBookingsPage() {
   const [isViewFeedbackModalOpen, setIsViewFeedbackModalOpen] = useState(false);
   const [selectedBookingForFeedback, setSelectedBookingForFeedback] = useState<Booking | null>(null);
 
-  // Used to trigger re-renders or re-fetches if not using onSnapshot
-  const [forceDataRefresh, setForceDataRefresh] = useState(0);
-
 
   useEffect(() => {
     setIsLoading(true);
     setError(null);
-
-    // PRODUCTION TODO: Fetch services from Firestore for filters and forms
-    /*
-    const fetchServices = async () => {
-      try {
-        const servicesColRef = collection(db, 'services');
-        const servicesSnap = await getDocs(query(servicesColRef, orderBy('name', 'asc')));
-        const fetchedServices = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
+    
+    const servicesColRef = collection(db, 'services');
+    const servicesQuery = query(servicesColRef, orderBy('name', 'asc'));
+    const unsubscribeServices = onSnapshot(servicesQuery, (snapshot) => {
+        const fetchedServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
         setAllServicesData(fetchedServices);
-      } catch (err) {
+    }, (err) => {
         console.error("Error fetching services:", err);
         setError(prev => prev ? `${prev} Failed to load services.` : "Failed to load services.");
-        setAllServicesData(MOCK_SERVICES); // Fallback to mock
-      }
-    };
-    fetchServices();
-    */
-    // Using mock services for now
-    setAllServicesData(MOCK_SERVICES);
-
-
-    // PRODUCTION TODO: Fetch bookings from Firestore
-    // Option 1: Fetch once (requires manual refresh or using forceDataRefresh)
-    /*
-    const fetchBookings = async () => {
-      try {
-        const bookingsColRef = collection(db, 'bookings');
-        // Potentially add orderBy('createdAt', 'desc') or similar
-        const bookingsSnap = await getDocs(query(bookingsColRef, orderBy('date', 'desc'))); 
-        const fetchedBookings = bookingsSnap.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            // Ensure timestamp fields from Firestore are converted if needed for date operations
-            createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
-            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : new Date().toISOString(),
-          } as Booking;
-        });
-        setAllBookingsData(fetchedBookings);
-      } catch (err) {
-        console.error("Error fetching bookings:", err);
-        setError(prev => prev ? `${prev} Failed to load bookings.` : "Failed to load bookings.");
-        setAllBookingsData(MOCK_BOOKINGS); // Fallback to mock
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchBookings();
-    */
-
-    // Option 2: Real-time updates with onSnapshot (preferred for admin dashboards)
-    /*
+    });
+    
     const bookingsColRef = collection(db, 'bookings');
-    const q = query(bookingsColRef, orderBy('date', 'desc')); // Example: order by date
+    const bookingsQuery = query(bookingsColRef, orderBy('date', 'desc'));
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const unsubscribeBookings = onSnapshot(bookingsQuery, (querySnapshot) => {
       const fetchedBookings = querySnapshot.docs.map(doc => {
         const data = doc.data();
         return {
@@ -158,19 +113,15 @@ export default function AdminBookingsPage() {
       setError(null);
     }, (err) => {
       console.error("Error with real-time bookings listener:", err);
-      setError("Failed to load bookings in real-time. Displaying potentially stale data.");
-      setAllBookingsData(MOCK_BOOKINGS); // Fallback
+      setError("Failed to load bookings in real-time. Please check your connection and security rules.");
       setIsLoading(false);
     });
-    return () => unsubscribe(); // Cleanup listener on component unmount
-    */
 
-    // For this refactor, we'll stick to MOCK_BOOKINGS simulation but acknowledge Firestore fetching.
-    setAllBookingsData(MOCK_BOOKINGS);
-    setAllServicesData(MOCK_SERVICES); // Ensure services are also "loaded"
-    setIsLoading(false); // Simulate data loaded
-
-  }, [forceDataRefresh]); // forceDataRefresh can trigger re-fetch if not using onSnapshot
+    return () => {
+        unsubscribeServices();
+        unsubscribeBookings();
+    };
+  }, []); 
 
 
   const createBookingForm = useForm<CreateBookingFormValues>({
@@ -193,11 +144,6 @@ export default function AdminBookingsPage() {
   useEffect(() => {
     if (selectedBookingForEdit) {
       let currentStatus = selectedBookingForEdit.status;
-      // 'upcoming' is not a distinct status in the enum, map it
-      if (currentStatus === 'upcoming' as any) {
-        currentStatus = selectedBookingForEdit.meetingLink ? 'scheduled' : 'accepted';
-      }
-
       editBookingForm.reset({
         date: parse(selectedBookingForEdit.date, 'yyyy-MM-dd', new Date()),
         time: selectedBookingForEdit.time,
@@ -210,65 +156,42 @@ export default function AdminBookingsPage() {
 
 
   const handleAdminAction = async (bookingId: string, action: 'accept' | 'cancel' | 'complete' | 'approve_refund') => {
-    // PRODUCTION TODO: Replace MOCK_BOOKINGS manipulation with Firestore updates.
     let message = '';
-    let bookingUpdated = false;
-    
-    // Find in current state first, for optimistic UI or if not using onSnapshot
-    const bookingIndex = allBookingsData.findIndex(b => b.id === bookingId);
-    if (bookingIndex === -1) {
-        toast({ title: "Error", description: "Booking not found in local data.", variant: "destructive"});
+    const bookingDocRef = doc(db, "bookings", bookingId);
+    const bookingToUpdateSnap = await getDoc(bookingDocRef);
+    if (!bookingToUpdateSnap.exists()) {
+        toast({ title: "Error", description: "Booking not found.", variant: "destructive"});
         return;
     }
+    const bookingToUpdate = bookingToUpdateSnap.data() as Booking;
 
-    const bookingToUpdate = { ...allBookingsData[bookingIndex] };
-    const updatePayload: Partial<Booking> = { updatedAt: new Date().toISOString() /* serverTimestamp() */ };
+    const updatePayload: Partial<Booking> = {};
 
     if (action === 'accept') {
       message = `Booking ${bookingId} accepted. User will be notified. Please add meeting link to schedule.`;
       updatePayload.status = 'accepted';
-      bookingUpdated = true;
-      // PRODUCTION TODO: Backend API call to notify user
     } else if (action === 'cancel') {
       message = `Booking ${bookingId} cancelled and user notified.`;
       updatePayload.status = 'cancelled';
       if (bookingToUpdate.paymentStatus === 'pay_later_pending') {
           updatePayload.paymentStatus = 'pay_later_unpaid';
       }
-      bookingUpdated = true;
-      // PRODUCTION TODO: Backend API call to notify user
-      // PRODUCTION TODO: If paid, trigger refund process via backend API if not handled by 'approve_refund'
     } else if (action === 'complete') {
       message = `Booking ${bookingId} marked as completed.`;
       updatePayload.status = 'completed';
-      bookingUpdated = true;
     } else if (action === 'approve_refund' && bookingToUpdate.paymentStatus === 'paid' && bookingToUpdate.requestedRefund) {
       message = `Refund for booking ${bookingId} approved. Booking cancelled.`;
       updatePayload.status = 'cancelled';
-      updatePayload.paymentStatus = 'pay_later_unpaid'; // Or a specific 'refunded' status
+      updatePayload.paymentStatus = 'pay_later_unpaid';
       updatePayload.requestedRefund = false; 
-      bookingUpdated = true;
-      // PRODUCTION TODO: Backend API call to process refund via payment gateway
-      // PRODUCTION TODO: Backend API call to notify user
     }
 
-    if (bookingUpdated) {
-      try {
-        // PRODUCTION TODO: Firestore update
-        // const bookingDocRef = doc(db, "bookings", bookingId);
-        // await updateDoc(bookingDocRef, { ...updatePayload, updatedAt: serverTimestamp() });
-        
-        // MOCK: Update local state (optimistic update or if not using onSnapshot)
-        const updatedBookingInMock = { ...bookingToUpdate, ...updatePayload };
-        MOCK_BOOKINGS[MOCK_BOOKINGS.findIndex(b => b.id === bookingId)] = updatedBookingInMock; // Persist in mock if needed for other parts
-        setAllBookingsData(prev => prev.map(b => b.id === bookingId ? updatedBookingInMock : b));
-        
+    try {
+        await updateDoc(bookingDocRef, { ...updatePayload, updatedAt: serverTimestamp() });
         toast({ title: "Action Successful", description: message });
-        // If not using onSnapshot, trigger a refresh: setForceDataRefresh(prev => prev + 1);
-      } catch (err) {
+    } catch (err) {
         console.error(`Error performing action ${action} on booking ${bookingId}:`, err);
         toast({ title: "Action Failed", description: `Could not perform action: ${action}. Please try again.`, variant: "destructive" });
-      }
     }
   };
 
@@ -290,7 +213,6 @@ export default function AdminBookingsPage() {
   };
 
   async function onCreateBookingSubmit(data: CreateBookingFormValues) {
-    // PRODUCTION TODO: Replace MOCK_BOOKINGS manipulation with Firestore document creation.
     const selectedService = allServicesData.find(s => s.id === data.serviceId);
     if (!selectedService) {
       toast({ title: "Error", description: "Selected service not found.", variant: "destructive" });
@@ -303,11 +225,13 @@ export default function AdminBookingsPage() {
         return;
     }
 
+    const batch = writeBatch(db);
     let bookingsCreatedCount = 0;
-    const creationPromises = emails.map(async (email, index) => {
+
+    for (const email of emails) {
         if (!/^\S+@\S+\.\S+$/.test(email)) {
             toast({ title: "Skipped Invalid Email", description: `Skipped "${email}" as it's not a valid email format.`, variant: "destructive" });
-            return null;
+            continue;
         }
         
         let initialStatus: Booking['status'];
@@ -317,14 +241,8 @@ export default function AdminBookingsPage() {
             initialStatus = 'pending_approval';
         }
 
-        // PRODUCTION TODO: Fetch user UID based on email if not directly provided or linked.
-        // This is complex and usually implies user accounts already exist.
-        // For manual admin creation, you might assign to a generic UID or require admin to know UID.
-        // For simplicity, let's assume we need a placeholder or way to link later.
-        const mockUid = `admin-created-user-${email.split('@')[0]}`;
-
-        const newBookingData: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'> & { uid?: string } = {
-          uid: mockUid, // Placeholder, needs proper UID in production
+        const newBookingData = {
+          uid: `admin-created-${email}`,
           userName: data.userName,
           userEmail: email,
           serviceId: data.serviceId,
@@ -333,65 +251,38 @@ export default function AdminBookingsPage() {
           time: data.time,
           paymentStatus: data.paymentStatus,
           status: initialStatus,
-          meetingLink: data.meetingLink || (initialStatus === 'scheduled' ? `https://meet.google.com/mock-admin-${Math.random().toString(36).substring(2, 9)}` : ''),
-          transactionId: data.paymentStatus === 'paid' ? `admin_txn_${Date.now()}-${index}` : null,
+          meetingLink: data.meetingLink || '',
+          transactionId: data.paymentStatus === 'paid' ? `admin_txn_${Date.now()}` : null,
           requestedRefund: false,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         };
         
-        try {
-            // PRODUCTION TODO: Firestore document creation
-            // const bookingsColRef = collection(db, "bookings");
-            // const docRef = await addDoc(bookingsColRef, { ...newBookingData, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), adminCreatorUid: adminUser?.uid });
-            // const newBookingWithId = { ...newBookingData, id: docRef.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Booking;
+        const newBookingRef = doc(collection(db, "bookings"));
+        batch.set(newBookingRef, newBookingData);
+        bookingsCreatedCount++;
+    }
 
-            // MOCK:
-            const newBookingWithId = { 
-                ...newBookingData, 
-                id: `admin-booking-${Date.now()}-${index}`, 
-                createdAt: new Date().toISOString(), 
-                updatedAt: new Date().toISOString() 
-            } as Booking;
-            MOCK_BOOKINGS.unshift(newBookingWithId); // Persist in mock
-            
-            bookingsCreatedCount++;
-            return newBookingWithId; // For potential optimistic update
-        } catch (err) {
-            console.error("Error creating booking for email:", email, err);
-            toast({ title: "Creation Failed", description: `Could not create booking for ${email}.`, variant: "destructive" });
-            return null;
+    try {
+        await batch.commit();
+        if (bookingsCreatedCount > 0) {
+            toast({
+              title: `${bookingsCreatedCount > 1 ? 'Group Booking' : 'Booking'} Created`,
+              description: `${bookingsCreatedCount} booking(s) for ${data.userName} for ${selectedService.name} has been created.`,
+            });
+            setIsCreateBookingModalOpen(false);
+            createBookingForm.reset();
         }
-    });
-
-    const results = await Promise.all(creationPromises);
-    const successfulCreations = results.filter(r => r !== null) as Booking[];
-
-    if (successfulCreations.length > 0) {
-        // If not using onSnapshot, trigger a refresh or optimistically update local state
-        // setAllBookingsData(prev => [...successfulCreations, ...prev].sort(...)); // Example optimistic update
-        setForceDataRefresh(prev => prev + 1); 
-
-        toast({
-          title: `${successfulCreations.length > 1 ? 'Group Booking' : 'Booking'} Created`,
-          description: `${successfulCreations.length} booking(s) for ${data.userName} for ${selectedService.name} has been created.`,
-        });
-        setIsCreateBookingModalOpen(false);
-        createBookingForm.reset();
-        // PRODUCTION TODO: Backend API call to notify user(s)
+    } catch (err) {
+        console.error("Error creating booking(s):", err);
+        toast({ title: "Creation Failed", description: `Could not create bookings.`, variant: "destructive" });
     }
   }
 
   async function onEditBookingSubmit(data: EditBookingFormValues) {
-    // PRODUCTION TODO: Replace MOCK_BOOKINGS manipulation with Firestore document update.
     if (!selectedBookingForEdit) return;
 
-    const bookingIndex = allBookingsData.findIndex(b => b.id === selectedBookingForEdit.id);
-    if (bookingIndex === -1) {
-      toast({ title: "Error", description: "Booking not found for update.", variant: "destructive" });
-      return;
-    }
-
     let newStatus = data.status;
-    // Auto-adjust status based on meeting link presence
     if (data.meetingLink) {
       if (newStatus === 'accepted' || newStatus === 'pending_approval') {
         newStatus = 'scheduled';
@@ -401,37 +292,26 @@ export default function AdminBookingsPage() {
         newStatus = 'accepted';
       }
     }
-    if (data.status === 'upcoming' as any) { // 'upcoming' is not a valid status
-        newStatus = data.meetingLink ? 'scheduled' : 'accepted';
-    }
 
-    const updatePayload: Partial<Booking> = {
+    const updatePayload = {
       date: format(data.date, 'yyyy-MM-dd'),
       time: data.time,
       meetingLink: data.meetingLink || '',
       status: newStatus,
       paymentStatus: data.paymentStatus,
-      updatedAt: new Date().toISOString(), // serverTimestamp() in production
+      updatedAt: serverTimestamp(),
     };
 
     try {
-        // PRODUCTION TODO: Firestore document update
-        // const bookingDocRef = doc(db, "bookings", selectedBookingForEdit.id);
-        // await updateDoc(bookingDocRef, { ...updatePayload, updatedAt: serverTimestamp() });
+        const bookingDocRef = doc(db, "bookings", selectedBookingForEdit.id);
+        await updateDoc(bookingDocRef, updatePayload);
         
-        // MOCK:
-        const updatedBookingInMock = { ...selectedBookingForEdit, ...updatePayload } as Booking;
-        MOCK_BOOKINGS[MOCK_BOOKINGS.findIndex(b => b.id === selectedBookingForEdit.id)] = updatedBookingInMock;
-        setAllBookingsData(prev => prev.map(b => b.id === selectedBookingForEdit.id ? updatedBookingInMock : b));
-
         toast({
           title: "Booking Updated",
-          description: `Booking for ${updatedBookingInMock.userName} has been successfully updated. Status: ${updatedBookingInMock.status}.`,
+          description: `Booking for ${selectedBookingForEdit.userName} has been successfully updated. Status: ${newStatus}.`,
         });
         setIsEditBookingModalOpen(false);
         setSelectedBookingForEdit(null);
-        // If not using onSnapshot, trigger a refresh: setForceDataRefresh(prev => prev + 1);
-        // PRODUCTION TODO: Backend API call to notify user if status changed significantly (e.g., scheduled, cancelled)
     } catch (err) {
         console.error("Error updating booking:", selectedBookingForEdit.id, err);
         toast({ title: "Update Failed", description: "Could not update booking. Please try again.", variant: "destructive" });
@@ -440,13 +320,11 @@ export default function AdminBookingsPage() {
 
   const filteredBookings = useMemo(() => {
     let bookings = [...allBookingsData].sort((a, b) => {
-      // Sort by status priority first (pending > accepted/scheduled > completed > cancelled)
-      const statusOrder = { pending_approval: 0, accepted: 1, scheduled: 2, completed: 3, cancelled: 4, upcoming: 1 /* treat as accepted */ };
+      const statusOrder = { pending_approval: 0, accepted: 1, scheduled: 2, completed: 3, cancelled: 4 };
       const statusA = statusOrder[a.status as keyof typeof statusOrder] ?? 5;
       const statusB = statusOrder[b.status as keyof typeof statusOrder] ?? 5;
       if (statusA !== statusB) return statusA - statusB;
       
-      // Then sort by date (most recent first for non-pending, or oldest first for pending)
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
       return statusA === 0 ? dateA - dateB : dateB - dateA;
@@ -492,9 +370,9 @@ export default function AdminBookingsPage() {
     return (
       <div className="container py-12">
         <Alert variant="destructive">
-          <XCircle className="h-4 w-4" />
+          <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Error Loading Data</AlertTitle>
-          <AlertDescription>{error} <Button variant="link" onClick={() => setForceDataRefresh(p => p + 1)}>Try again</Button></AlertDescription>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
     );
@@ -570,7 +448,7 @@ export default function AdminBookingsPage() {
                         booking.paymentStatus === 'pay_later_pending' && 'bg-orange-100 text-orange-700'
                       )}
                      >
-                       {booking.paymentStatus.replace('_', ' ').toUpperCase()}
+                       {booking.paymentStatus.replace(/_/g, ' ')}
                      </UiBadge>
                     <div>
                         {booking.requestedRefund ? (
@@ -609,7 +487,7 @@ export default function AdminBookingsPage() {
                             booking.status === 'cancelled' && 'bg-red-100 text-red-700 line-through opacity-75'
                         )}
                     >
-                        {booking.status.replace('_', ' ').toUpperCase()}
+                        {booking.status.replace(/_/g, ' ')}
                     </UiBadge>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
