@@ -114,13 +114,21 @@ export default function SignupPage() {
 
   async function onSubmit(data: SignupFormValues) {
     setIsLoading(true);
+    // PRODUCTION TODO: Implement a multi-step UI for OTP verification.
+    // 1. After form validation, call a function to send OTP.
+    //    const verifier = await setupRecaptcha('recaptcha-container');
+    //    const confirmationResult = await sendOtp(data.phone, verifier);
+    //    // Store confirmationResult in state and show OTP input field.
+    // 2. When user submits OTP, call a verification function.
+    //    await verifyOtp(confirmationResult, otpFromUser);
+    // 3. If OTP is correct, then proceed with the rest of the user creation logic below.
     try {
-      // 1. Create user in Firebase Authentication
+      // Create user in Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const firebaseUser = userCredential.user;
       if (!firebaseUser) throw new Error("User creation failed in Firebase Auth.");
 
-      // 2. Send email verification
+      // Send email verification
       await sendEmailVerification(firebaseUser);
       toast({ title: 'Verification Email Sent', description: 'Please check your email to verify your account.' });
 
@@ -130,7 +138,7 @@ export default function SignupPage() {
         awardedBadgeIds.push(defaultBadge.id);
       }
       
-      // 3. Create user profile document in Firestore
+      // Create user profile document in Firestore
       const userProfileForDb: Omit<UserProfile, 'createdAt' | 'updatedAt' | 'uid' | 'awardedBadges'> & { awardedBadgeIds: string[], roles: string[] } = {
         name: data.name,
         email: data.email,
@@ -148,9 +156,6 @@ export default function SignupPage() {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      
-      // Since onAuthStateChanged will handle setting the user context, we don't need to call login here.
-      // The user is already logged in after creation.
       
       toast({
         title: 'Signup Successful!',
@@ -191,6 +196,7 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 p-4">
+       <div id="recaptcha-container"></div>
       <Card className="w-full max-w-lg shadow-xl animate-subtle-appear">
         <CardHeader className="space-y-1 text-center">
           <Link href="/" className="inline-block mb-4">

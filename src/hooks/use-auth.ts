@@ -4,9 +4,9 @@
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import type { UserProfile } from '@/types';
-import { auth, db, googleProvider } from '@/lib/firebase';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser, signInWithPopup } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db, googleProvider, RecaptchaVerifier, signInWithPhoneNumber } from '@/lib/firebase';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser, signInWithPopup, type ConfirmationResult } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firestore';
 
 
 interface AuthContextUser {
@@ -24,6 +24,9 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ user: AuthContextUser; isAdmin: boolean }>;
   loginWithGoogle: () => Promise<{ user: AuthContextUser; isAdmin: boolean; isNewUser: boolean; }>;
   logout: () => Promise<void>;
+  setupRecaptcha: (containerId: string) => Promise<RecaptchaVerifier>;
+  sendOtp: (phoneNumber: string, verifier: RecaptchaVerifier) => Promise<ConfirmationResult>;
+  verifyOtp: (confirmationResult: ConfirmationResult, otp: string) => Promise<void>;
   loadingAuth: boolean;
 }
 
@@ -49,8 +52,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
     } else {
       console.warn(`Profile not found for user ${firebaseUser.uid}. This might be a new Google sign-in. A profile will be created.`);
-      // This case is primarily for Google Sign-In where a profile might not exist yet.
-      // The calling function (loginWithGoogle) will handle creating it.
       return {
         uid: firebaseUser.uid,
         email: firebaseUser.email || 'no-email@example.com',
@@ -94,7 +95,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!userDocSnap.exists()) {
       isNewUser = true;
-      // If profile doesn't exist, create it. This is the "onUserCreate" logic for Google Sign-In.
       const newUserProfileData = {
         name: firebaseUser.displayName || 'Google User',
         email: firebaseUser.email,
@@ -113,7 +113,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         imageUrl: newUserProfileData.imageUrl,
       };
     } else {
-      // If profile exists, fetch it.
       const existingProfileData = userDocSnap.data() as UserProfile;
       userProfile = {
         uid: firebaseUser.uid,
@@ -128,18 +127,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { user: userProfile, isAdmin: userProfile.isAdmin, isNewUser };
   }, []);
 
-
   const logout = useCallback(async () => {
     await signOut(auth);
     setCurrentUser(null);
     router.push('/');
   }, [router]);
+  
+  // PRODUCTION TODO: Implement the full multi-step UI flow for OTP.
+  // These functions provide the Firebase logic.
+  const setupRecaptcha = useCallback(async (containerId: string) => {
+    // Ensure the reCAPTCHA container is visible and empty.
+    // window.recaptchaVerifier would be an instance variable if you need to access it across calls.
+    const recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+      'size': 'invisible',
+      'callback': (response: any) => {
+        // reCAPTCHA solved, allow signInWithPhoneNumber.
+        console.log("reCAPTCHA solved");
+      },
+       'expired-callback': () => {
+        // Response expired. Ask user to solve reCAPTCHA again.
+        console.log("reCAPTCHA expired");
+      }
+    });
+    return recaptchaVerifier;
+  }, []);
+
+  const sendOtp = useCallback(async (phoneNumber: string, verifier: RecaptchaVerifier) => {
+    // Phone number must be in E.164 format (e.g., +11234567890)
+    return await signInWithPhoneNumber(auth, phoneNumber, verifier);
+  }, []);
+
+  const verifyOtp = useCallback(async (confirmationResult: ConfirmationResult, otp: string) => {
+    await confirmationResult.confirm(otp);
+  }, []);
 
   const isLoggedIn = !!currentUser;
   const isAdmin = !!currentUser && currentUser.isAdmin;
 
   return (
-    <AuthContext.Provider value={{ currentUser, isLoggedIn, isAdmin, login, loginWithGoogle, logout, loadingAuth }}>
+    <AuthContext.Provider value={{ currentUser, isLoggedIn, isAdmin, login, loginWithGoogle, logout, setupRecaptcha, sendOtp, verifyOtp, loadingAuth }}>
       {children}
     </AuthContext.Provider>
   );

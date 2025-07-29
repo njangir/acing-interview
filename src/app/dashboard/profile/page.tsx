@@ -67,8 +67,6 @@ export default function ProfilePage() {
     }
     if (!currentUser) {
       setIsLoadingProfile(false);
-      // Optionally redirect to login if no user
-      // router.push('/login?redirect=/dashboard/profile');
       return;
     }
 
@@ -129,6 +127,15 @@ export default function ProfilePage() {
     }
 
     setIsSaving(true);
+    
+    // PRODUCTION TODO: If phone number has changed, trigger OTP verification flow.
+    // if (data.phone !== userProfile.phone) {
+    //   // 1. Show OTP modal/UI section.
+    //   // 2. const verifier = await setupRecaptcha('recaptcha-container-profile');
+    //   // 3. const confirmationResult = await sendOtp(data.phone, verifier);
+    //   // 4. Get OTP from user, then: await verifyOtp(confirmationResult, otpFromUser);
+    //   // 5. If successful, proceed with saving the rest of the profile.
+    // }
 
     const updatedProfileData: UserProfile = {
       ...userProfile, 
@@ -154,14 +161,7 @@ export default function ProfilePage() {
         imageUrl: updatedProfileData.imageUrl,
       };
       
-      // Update the user in the auth context to reflect changes immediately in UI
-      // This is a simplified stand-in for a more robust state management solution
-      // where the AuthProvider might re-fetch or listen for profile changes.
-      // For now, we manually update the context's current user.
       const auth = await import('@/hooks/use-auth');
-      // This is a trick to update context state if `login` function supports it.
-      // A better approach would be a dedicated `setCurrentUser` in context.
-      // But for this project structure, it can work.
       auth.useAuth.setState({ currentUser: updatedAuthUser });
 
 
@@ -197,6 +197,7 @@ export default function ProfilePage() {
 
   return (
     <>
+      <div id="recaptcha-container-profile"></div>
       <PageHeader
         title="My Dossier & Commendations"
         description="Manage your personal information, operational preferences, and view your earned badges."
@@ -242,7 +243,7 @@ export default function ProfilePage() {
                         type="button"
                         onClick={() => {
                             setSelectedAvatarForForm(avatar.url);
-                            form.setValue('imageUrl', avatar.url); // Keep form in sync if needed, though selectedAvatarForForm is primary for saving
+                            form.setValue('imageUrl', avatar.url);
                         }}
                         className={cn(
                             "rounded-full overflow-hidden border-2 transition-all w-16 h-16",
@@ -404,4 +405,3 @@ export default function ProfilePage() {
       </div>
     </>
   );
-    
