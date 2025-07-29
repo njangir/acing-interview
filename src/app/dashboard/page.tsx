@@ -5,61 +5,91 @@ import { useMemo, useState, useEffect } from 'react';
 import { PageHeader } from "@/components/core/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MOCK_BOOKINGS, MOCK_SERVICES, MOCK_RESOURCES, PREDEFINED_AVATARS } from "@/constants";
 import type { Resource as ResourceType, UserProfile, Badge as BadgeType, Booking } from '@/types';
 import { BookingCard } from "@/components/core/booking-card";
 import Link from "next/link";
 import Image from 'next/image';
-import { CalendarCheck, BookOpen, Edit, Award, Star, TrendingUp } from "lucide-react";
+import { CalendarCheck, BookOpen, Edit, Award, Star, TrendingUp, Loader2 } from "lucide-react";
 import { useAuth } from '@/hooks/use-auth';
 import { WeeklyScheduleView } from '@/components/core/weekly-schedule-view';
 import { UserSkillsChart } from '@/components/core/user-skills-chart';
+import { PREDEFINED_AVATARS } from '@/constants';
 
-
-const getPurchasedServiceIds = (): string[] => {
-  return [MOCK_SERVICES[0]?.id, MOCK_SERVICES[1]?.id, 'general'].filter(Boolean) as string[];
-};
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs, doc, getDoc, limit } from 'firebase/firestore';
 
 
 export default function DashboardOverviewPage() {
-  const { currentUser } = useAuth();
-  const [latestBadge, setLatestBadge] = useState<BadgeType | null>(null);
+  const { currentUser, loadingAuth } = useAuth();
   const [userProfileData, setUserProfileData] = useState<UserProfile | null>(null);
+  const [userBookings, setUserBookings] = useState<Booking[]>([]);
+  const [accessibleResources, setAccessibleResources] = useState<ResourceType[]>([]);
+  const [latestBadge, setLatestBadge] = useState<BadgeType | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (currentUser?.email) {
-      const mockUserProfileKey = `mockUserProfile_${currentUser.email}`;
-      const storedProfile = localStorage.getItem(mockUserProfileKey);
-      if (storedProfile) {
-        try {
-          const parsedProfile: UserProfile = JSON.parse(storedProfile);
-          setUserProfileData(parsedProfile); // Store the full profile
-          if (parsedProfile.awardedBadges && parsedProfile.awardedBadges.length > 0) {
-            setLatestBadge(parsedProfile.awardedBadges[parsedProfile.awardedBadges.length - 1]);
-          }
-        } catch (error) {
-          console.error("Error parsing user profile for badges:", error);
-        }
-      } else {
-        // Fallback to currentUser from auth context if no specific profile in localStorage
-         setUserProfileData({
-            name: currentUser.name,
-            email: currentUser.email,
-            phone: '', // Placeholder or fetch if available
-            imageUrl: currentUser.imageUrl || PREDEFINED_AVATARS[0].url,
-            awardedBadges: []
-        });
-      }
+    if (loadingAuth) {
+      setIsLoading(true);
+      return;
     }
-  }, [currentUser]);
+    if (!currentUser) {
+      setIsLoading(false);
+      return;
+    }
 
-  const userBookings = useMemo(() => {
-    if (!currentUser) return [];
-    return MOCK_BOOKINGS.filter(b => b.userEmail === currentUser.email);
-  }, [currentUser]);
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        // Fetch User Profile and Badges
+        const profileDocRef = doc(db, "userProfiles", currentUser.uid);
+        const profileSnap = await getDoc(profileDocRef);
+        if (profileSnap.exists()) {
+          const profileData = profileSnap.data() as UserProfile;
+          if (profileData.awardedBadgeIds && profileData.awardedBadgeIds.length > 0) {
+            const lastBadgeId = profileData.awardedBadgeIds[profileData.awardedBadgeIds.length - 1];
+            const badgeDocRef = doc(db, 'badges', lastBadgeId);
+            const badgeSnap = await getDoc(badgeDocRef);
+            if(badgeSnap.exists()){
+                setLatestBadge({ id: badgeSnap.id, ...badgeSnap.data() } as BadgeType);
+            }
+          }
+          setUserProfileData(profileData);
+        }
+
+        // Fetch User Bookings
+        const bookingsQuery = query(collection(db, 'bookings'), where('uid', '==', currentUser.uid), limit(50));
+        const bookingsSnap = await getDocs(bookingsQuery);
+        const bookingsData = bookingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
+        setUserBookings(bookingsData);
+
+        // Fetch Accessible Resources
+        const paidServiceIds = ['general'];
+        bookingsData.forEach(booking => {
+          if (booking.paymentStatus === 'paid') {
+            paidServiceIds.push(booking.serviceId);
+          }
+        });
+        const uniqueServiceIds = [...new Set(paidServiceIds)];
+
+        if (uniqueServiceIds.length > 0) {
+          const resourcesQuery = query(collection(db, 'resources'), where('serviceCategory', 'in', uniqueServiceIds));
+          const resourcesSnap = await getDocs(resourcesQuery);
+          setAccessibleResources(resourcesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ResourceType)));
+        }
+
+      } catch (error) {
+        console.error("Error loading dashboard data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [currentUser, loadingAuth]);
+
 
   const upcomingBookings = useMemo(() => {
-    return userBookings.filter(b => b.status === 'upcoming' || b.status === 'pending_approval' || b.status === 'scheduled' || b.status === 'accepted');
+    return userBookings.filter(b => ['pending_approval', 'accepted', 'scheduled'].includes(b.status));
   }, [userBookings]);
   
   const completedBookingsWithFeedback = useMemo(() => {
@@ -70,14 +100,18 @@ export default function DashboardOverviewPage() {
   }, [userBookings]);
 
 
-  const accessibleResourcesCount = useMemo(() => {
-    const purchasedServiceIds = getPurchasedServiceIds();
-    const filtered = MOCK_RESOURCES.filter(resource =>
-      purchasedServiceIds.includes(resource.serviceCategory)
+  if (isLoading || loadingAuth) {
+    return (
+        <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-8 w-8 animate-spin text-primary"/>
+            <span className="ml-2">Loading Dashboard...</span>
+        </div>
     );
-    return filtered.length;
-  }, []);
+  }
 
+  if (!currentUser) {
+    return <div>Please log in to view your dashboard.</div>;
+  }
 
   return (
     <>
@@ -104,7 +138,7 @@ export default function DashboardOverviewPage() {
               <BookOpen className="h-5 w-5 text-accent" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">{accessibleResourcesCount}</div>
+              <div className="text-2xl font-bold text-primary">{accessibleResources.length}</div>
               <p className="text-xs text-muted-foreground">intel resources accessible</p>
             </CardContent>
           </Card>
@@ -160,7 +194,7 @@ export default function DashboardOverviewPage() {
 
         {currentUser && (
           <WeeklyScheduleView
-            allBookings={MOCK_BOOKINGS}
+            allBookings={userBookings}
             currentUserEmail={currentUser.email}
             title="My Weekly Ops Schedule"
           />

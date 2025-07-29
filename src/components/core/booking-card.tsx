@@ -14,10 +14,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface BookingCardProps {
   booking: Booking;
-  onBookingUpdate?: (updatedBooking: Booking) => void;
+  onBookingUpdate?: (updatedBooking: Booking) => void; // This can be removed if relying on real-time updates
 }
 
 export function BookingCard({ booking: initialBooking, onBookingUpdate }: BookingCardProps) {
@@ -45,7 +47,7 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
   const isPayLaterPending = booking.paymentStatus === 'pay_later_pending' || booking.paymentStatus === 'pay_later_unpaid';
 
   useEffect(() => {
-    if (booking.status === 'scheduled' || booking.status === 'accepted') { // Check for 'scheduled' or 'accepted' which are upcoming
+    if (booking.status === 'scheduled' || booking.status === 'accepted') {
       const bookingDateTime = new Date(booking.date);
       const [timePart, ampm] = booking.time.split(' ');
       let [hours, minutes] = timePart.split(':').map(Number);
@@ -61,40 +63,53 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
     }
   }, [booking.date, booking.time, booking.status]);
 
-  const handleFeedbackSubmit = () => {
+  const handleFeedbackSubmit = async () => {
     if (!feedbackText.trim()) {
       toast({ title: "Feedback Empty", description: "Please enter your feedback before submitting.", variant: "destructive" });
       return;
     }
-    console.log("Feedback submitted for booking:", booking.id, "Feedback:", feedbackText);
-    toast({
-      title: "Feedback Submitted!",
-      description: "Thank you for your valuable feedback. It will be reviewed by our team.",
-    });
-    setIsFeedbackModalOpen(false);
-    setFeedbackText('');
+    
+    try {
+      const bookingDocRef = doc(db, 'bookings', booking.id);
+      await updateDoc(bookingDocRef, {
+        userFeedback: feedbackText,
+        updatedAt: serverTimestamp(),
+      });
+      toast({
+        title: "Feedback Submitted!",
+        description: "Thank you for your valuable feedback.",
+      });
+      setIsFeedbackModalOpen(false);
+      setFeedbackText('');
+    } catch (error) {
+       console.error("Error submitting feedback:", error);
+       toast({ title: "Submission Failed", description: "Could not submit your feedback.", variant: "destructive" });
+    }
   };
 
-  const handleRefundRequestSubmit = () => {
+  const handleRefundRequestSubmit = async () => {
     if (!refundReason.trim()) {
       toast({ title: "Reason Required", description: "Please provide a reason for your refund request.", variant: "destructive" });
       return;
     }
-    console.log("Refund requested for booking:", booking.id, "Reason:", refundReason);
-
-    const updatedBooking: Booking = { ...booking, requestedRefund: true, refundReason };
-    setBooking(updatedBooking);
-    if (onBookingUpdate) {
-      onBookingUpdate(updatedBooking);
+    
+    try {
+        const bookingDocRef = doc(db, 'bookings', booking.id);
+        await updateDoc(bookingDocRef, {
+            requestedRefund: true,
+            refundReason: refundReason,
+            updatedAt: serverTimestamp(),
+        });
+        toast({
+          title: "Refund Request Submitted",
+          description: `Your request for booking ${booking.serviceName} has been received. Admin will review it.`,
+        });
+        setIsRefundModalOpen(false);
+        setRefundReason('');
+    } catch(error) {
+        console.error("Error submitting refund request:", error);
+        toast({ title: "Request Failed", description: "Could not submit your refund request.", variant: "destructive" });
     }
-
-    toast({
-      title: "Refund Request Submitted",
-      description: `Your request for booking ${booking.serviceName} has been received. Reason: ${refundReason}. Admin will review it.`,
-      variant: "default"
-    });
-    setIsRefundModalOpen(false);
-    setRefundReason('');
   };
 
 
@@ -116,12 +131,12 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
                 booking.status === 'cancelled' ? 'bg-red-600 text-white' :
                 booking.status === 'completed' ? 'bg-gray-500 text-white' : ''
             }>
-              {booking.status.replace('_', ' ').toUpperCase()}
+              {booking.status.replace(/_/g, ' ').toUpperCase()}
             </Badge>
              <Badge variant={isPaid ? 'default' : 'secondary'}
               className={isPaid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}
             >
-              <DollarSign className="mr-1 h-3 w-3" /> {booking.paymentStatus.replace('_', ' ').toUpperCase()}
+              <DollarSign className="mr-1 h-3 w-3" /> {booking.paymentStatus.replace(/_/g, ' ').toUpperCase()}
             </Badge>
           </div>
 
@@ -322,4 +337,3 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
     </Card>
   );
 }
-

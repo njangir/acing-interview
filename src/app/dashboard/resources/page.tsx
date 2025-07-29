@@ -5,33 +5,29 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { PageHeader } from "@/components/core/page-header";
 import { ResourceCard } from "@/components/core/resource-card";
-import { MOCK_RESOURCES, MOCK_SERVICES } from "@/constants";
-import type { Resource as ResourceType } from '@/types';
+import type { Resource as ResourceType, Service } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { BookOpen, Loader2, AlertTriangle } from 'lucide-react'; // Added Loader2, AlertTriangle
-import { useAuth } from '@/hooks/use-auth'; // To get current user for entitlements
+import { BookOpen, Loader2, AlertTriangle } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
 
-// PRODUCTION TODO:
-// - Import Firebase and Firestore methods:
-// import { db } from '@/lib/firebase';
-// import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 
-// Mock function to simulate fetching user's purchased services
-// In a real app, this would come from a backend based on user authentication and their purchases.
-// For example, fetch user's profile which contains a list of purchasedServiceIds or query bookings.
+
 const getPurchasedServiceIdsForUser = async (userId: string | undefined): Promise<string[]> => {
-  if (!userId) return ['general']; // Default for non-logged-in or if UID is missing
-  // Simulate fetching user's purchased services.
-  // In a real app:
-  // 1. Fetch user's profile from Firestore: `doc(db, "userProfiles", userId)`
-  // 2. Extract an array like `userProfile.purchasedServiceIds`
-  // OR
-  // 1. Fetch user's paid bookings: `query(collection(db, "bookings"), where("uid", "==", userId), where("paymentStatus", "==", "paid"))`
-  // 2. Map these bookings to a unique set of `serviceId`s.
-  await new Promise(resolve => setTimeout(resolve, 300)); // Simulate async fetch
-  // For this mock, let's assume the user has purchased the first two mock services, plus 'general' resources
-  return [MOCK_SERVICES[0]?.id, MOCK_SERVICES[1]?.id, 'general'].filter(Boolean) as string[];
+  if (!userId) return ['general']; 
+  
+  const bookingsCol = collection(db, "bookings");
+  const q = query(bookingsCol, where("uid", "==", userId), where("paymentStatus", "==", "paid"));
+  const bookingsSnapshot = await getDocs(q);
+  
+  const serviceIds = new Set<string>(['general']); // All users get general resources
+  bookingsSnapshot.forEach(doc => {
+    serviceIds.add(doc.data().serviceId);
+  });
+  
+  return Array.from(serviceIds);
 };
 
 export default function MyResourcesPage() {
@@ -41,6 +37,7 @@ export default function MyResourcesPage() {
 
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
   const [allFetchedResources, setAllFetchedResources] = useState<ResourceType[]>([]);
+  const [allServices, setAllServices] = useState<Service[]>([]);
   const [userAccessibleServiceIds, setUserAccessibleServiceIds] = useState<string[]>(['general']);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,35 +52,23 @@ export default function MyResourcesPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const accessibleIds = await getPurchasedServiceIdsForUser(currentUser?.uid);
+        const [accessibleIds, servicesSnapshot, resourcesSnapshot] = await Promise.all([
+          getPurchasedServiceIdsForUser(currentUser?.uid),
+          getDocs(collection(db, 'services')),
+          getDocs(collection(db, 'resources'))
+        ]);
+        
         setUserAccessibleServiceIds(accessibleIds);
+        
+        const fetchedServices = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
+        setAllServices(fetchedServices);
 
-        // PRODUCTION TODO: Fetch resources from Firestore
-        // const resourcesCol = collection(db, 'resources');
-        // Let's assume you want to fetch all resources for simplicity here,
-        // or you could query based on accessibleIds directly if your data structure supports it
-        // (e.g., where('serviceCategory', 'in', accessibleIds) - requires an index).
-        // const resourceSnapshot = await getDocs(resourcesCol);
-        // const fetchedResources = resourceSnapshot.docs.map(doc => {
-        //   const data = doc.data();
-        //   return {
-        //     id: doc.id,
-        //     ...data,
-        //     // Ensure timestamp fields are handled correctly if they exist
-        //     // createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
-        //     // updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : new Date().toISOString(),
-        //   } as ResourceType;
-        // });
-        // setAllFetchedResources(fetchedResources);
-
-        // Simulate API call delay for fetching resources
-        await new Promise(resolve => setTimeout(resolve, 700));
-        setAllFetchedResources(MOCK_RESOURCES); // Use mock data for now
+        const fetchedResources = resourcesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ResourceType));
+        setAllFetchedResources(fetchedResources);
 
       } catch (err) {
         console.error("Error fetching resources or entitlements:", err);
         setError("Failed to load resources. Please try again later.");
-        setAllFetchedResources(MOCK_RESOURCES); // Fallback to mock on error for demo
       } finally {
         setIsLoading(false);
       }
@@ -101,12 +86,11 @@ export default function MyResourcesPage() {
   const serviceCategories = useMemo(() => {
     const categories = new Set(accessibleResources.map(r => r.serviceCategory));
     return Array.from(categories).map(id => {
-      const service = MOCK_SERVICES.find(s => s.id === id);
-      // Handle "general" category label
+      const service = allServices.find(s => s.id === id);
       const label = id === 'general' ? 'General Resources' : service ? service.name : id.charAt(0).toUpperCase() + id.slice(1);
       return { value: id, label: label };
-    });
-  }, [accessibleResources]);
+    }).sort((a,b) => a.label.localeCompare(b.label));
+  }, [accessibleResources, allServices]);
 
   const displayedResources = useMemo(() => {
     if (selectedCategory === 'all') {
@@ -167,7 +151,7 @@ export default function MyResourcesPage() {
     );
   }
   
-  if (userAccessibleServiceIds.length === 0 && !isLoading) { // Check after loading and if not general access
+  if (userAccessibleServiceIds.length === 1 && userAccessibleServiceIds.includes('general') && !isLoading) {
     return (
        <>
         <PageHeader
@@ -179,7 +163,7 @@ export default function MyResourcesPage() {
                 <BookOpen className="h-4 w-4" />
                 <AlertTitle>No Resources Yet</AlertTitle>
                 <AlertDescription>
-                You currently do not have access to any specific service resources. General resources may still be available if any.
+                You currently do not have access to any specific service resources. Book a service to get access to more materials.
                 </AlertDescription>
             </Alert>
         </div>
@@ -219,7 +203,7 @@ export default function MyResourcesPage() {
       ) : (
         <div className="text-center py-10">
           <p className="text-muted-foreground mb-4">
-            No resources found for the selected category, or you might not have access to resources for this service yet.
+            No resources found for the selected category.
           </p>
         </div>
       )}
