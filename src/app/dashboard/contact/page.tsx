@@ -25,7 +25,6 @@ const contactFormSchema = z.object({
   subject: z.string().min(5, { message: "Subject must be at least 5 characters." }),
   message: z.string().min(20, { message: "Message must be at least 20 characters." }),
   confirmContact: z.boolean().refine(val => val === true, { message: "Please confirm your contact details." }),
-  isNotRobot: z.boolean().refine(val => val === true, { message: "Please complete the CAPTCHA." }),
 });
 
 type ContactFormValues = z.infer<typeof contactFormSchema>;
@@ -41,7 +40,6 @@ export default function ContactSupportPage() {
       subject: "",
       message: "",
       confirmContact: false,
-      isNotRobot: false,
     },
   });
 
@@ -169,29 +167,6 @@ export default function ContactSupportPage() {
                       </FormLabel>
                       <FormDescription>
                         My email (<strong className="text-foreground">{currentUser.email}</strong>) is correct, and I understand replies will be sent here.
-                      </FormDescription>
-                      <FormMessage />
-                    </div>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="isNotRobot"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>
-                        CAPTCHA
-                      </FormLabel>
-                      <FormDescription>
-                        Please tick this box to confirm you're not a robot.
                       </FormDescription>
                       <FormMessage />
                     </div>

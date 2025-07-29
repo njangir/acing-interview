@@ -39,7 +39,6 @@ const testimonialFormSchema = z.object({
   numberOfAttempts: z.coerce.number().min(1, "Number of attempts must be at least 1.").optional(),
   bodyImageUrl: z.string().url().optional().or(z.literal('')), 
   bodyImageDataAiHint: z.string().max(50, "AI hint should be concise").optional(),
-  isNotRobot: z.boolean().refine(val => val === true, { message: "Please confirm you're not a robot." }),
 }).superRefine((data, ctx) => {
     if (data.submissionStatus === 'selected_cleared') {
         if (!data.selectedForce) {
@@ -91,7 +90,6 @@ export default function SubmitTestimonialPage() {
       numberOfAttempts: undefined,
       bodyImageUrl: "",
       bodyImageDataAiHint: "",
-      isNotRobot: false,
     },
   });
 
@@ -205,7 +203,6 @@ export default function SubmitTestimonialPage() {
           numberOfAttempts: undefined,
           bodyImageUrl: "",
           bodyImageDataAiHint: "",
-          isNotRobot: false,
       });
       setBodyImageFile(null);
       setBodyImagePreview(null);
@@ -449,26 +446,6 @@ export default function SubmitTestimonialPage() {
                 </Card>
               )}
 
-              <FormField
-                control={form.control}
-                name="isNotRobot"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>
-                        CAPTCHA
-                      </FormLabel>
-                      <FormMessage />
-                    </div>
-                  </FormItem>
-                )}
-              />
             </CardContent>
             <CardFooter>
               <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSubmitting}>
@@ -482,5 +459,3 @@ export default function SubmitTestimonialPage() {
     </>
   );
 }
-
-    
