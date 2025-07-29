@@ -12,7 +12,6 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { MOCK_BADGES } from "./constants";
 import Razorpay from "razorpay";
 import { defineString } from "firebase-functions/params";
 import crypto from "crypto";
@@ -27,14 +26,22 @@ exports.oncreateuser = onUserCreate(async (event) => {
   logger.info("New user created:", event.data.uid);
 
   const { uid, email, displayName, photoURL } = event.data;
-
-  // Find the default badge to award to new users.
-  const defaultBadge = MOCK_BADGES.find(
-    (badge) => badge.id === "commendable_effort"
-  );
+  const firestore = getFirestore();
   const awardedBadgeIds: string[] = [];
-  if (defaultBadge) {
-    awardedBadgeIds.push(defaultBadge.id);
+
+  try {
+    // Fetch the default badge from the 'badges' collection instead of mocks.
+    // This assumes a badge with the document ID 'commendable_effort' exists.
+    const defaultBadgeRef = firestore.collection("badges").doc("commendable_effort");
+    const defaultBadgeSnap = await defaultBadgeRef.get();
+    if (defaultBadgeSnap.exists) {
+      awardedBadgeIds.push(defaultBadgeSnap.id);
+      logger.info(`Found default badge 'commendable_effort' for user: ${uid}`);
+    } else {
+        logger.warn(`Default badge with ID 'commendable_effort' not found in Firestore. Skipping default badge award for user: ${uid}`);
+    }
+  } catch (badgeError) {
+      logger.error(`Error fetching default badge for user ${uid}:`, badgeError);
   }
 
   // Create a new user profile document in the 'userProfiles' collection.
@@ -50,7 +57,6 @@ exports.oncreateuser = onUserCreate(async (event) => {
   };
 
   try {
-    const firestore = getFirestore();
     await firestore.collection("userProfiles").doc(uid).set(newUserProfile);
     logger.info(`Successfully created profile for user: ${uid}`);
     return;
