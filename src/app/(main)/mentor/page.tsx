@@ -1,6 +1,6 @@
 
-// import { getDoc, doc } from 'firebase/firestore';
-// import { db } from '@/lib/firebase'; // Assuming you have a firebase.ts config file
+import { getDoc, doc } from 'firebase/firestore';
+import { db } from '@/lib/firebase'; // Assuming you have a firebase.ts config file
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,23 +15,23 @@ export default async function MentorProfilePage() {
   let mentorProfile: MentorProfileData | null = null;
 
   // PRODUCTION TODO: Replace MENTOR_PROFILE with actual Firestore data fetching.
-  // try {
-  //   // Example: Fetching from a document named 'mainMentor' in a 'siteProfiles' collection
-  //   const mentorDocRef = doc(db, 'siteProfiles', 'mainMentor'); 
-  //   const mentorDocSnap = await getDoc(mentorDocRef);
+  try {
+    // Example: Fetching from a document named 'mainMentor' in a 'siteProfiles' collection
+    const mentorDocRef = doc(db, 'siteProfiles', 'mainMentor'); 
+    const mentorDocSnap = await getDoc(mentorDocRef);
 
-  //   if (mentorDocSnap.exists()) {
-  //     mentorProfile = mentorDocSnap.data() as MentorProfileData;
-  //     // Ensure timestamp fields are handled correctly if they exist (e.g., toDate().toISOString())
-  //   } else {
-  //     console.warn("Mentor profile document not found in Firestore.");
-  //     // Fallback to mock data if not found, or handle error appropriately
-  //   }
-  // } catch (error) {
-  //   console.error("Error fetching mentor profile:", error);
-  //   // Optionally, render an error message or fallback UI
-  //   // For now, it will fall back to MOCK_SERVICES if fetching fails or is commented out.
-  // }
+    if (mentorDocSnap.exists()) {
+      mentorProfile = mentorDocSnap.data() as MentorProfileData;
+      // Ensure timestamp fields are handled correctly if they exist (e.g., toDate().toISOString())
+    } else {
+      console.warn("Mentor profile document not found in Firestore.");
+      // Fallback to mock data if not found, or handle error appropriately
+    }
+  } catch (error) {
+    console.error("Error fetching mentor profile:", error);
+    // Optionally, render an error message or fallback UI
+    // For now, it will fall back to MOCK_SERVICES if fetching fails or is commented out.
+  }
 
   // Fallback to mock data if mentorProfile is null (e.g., Firestore fetch failed or is commented out)
   if (!mentorProfile) {

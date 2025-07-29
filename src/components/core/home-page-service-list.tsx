@@ -7,28 +7,49 @@ import { ServiceCard } from '@/components/core/service-card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import type { Service } from '@/types';
+import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { Skeleton } from '../ui/skeleton';
 
 export function HomePageServiceList() {
-  // Use state to hold services, allowing re-render if MOCK_SERVICES reference or content changes
-  // This is a simplified way to try and react to mutations of the MOCK_SERVICES constant
-  const [services, setServices] = useState<Service[]>(MOCK_SERVICES.slice(0, 3));
+  const [services, setServices] = useState<Service[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // This effect will run on mount and potentially if the component is forced to re-render.
-    // In a real app, you'd fetch fresh data or use a proper state management solution.
-    // For this mock, we re-set state from the (potentially mutated) MOCK_SERVICES.
-    setServices(MOCK_SERVICES.slice(0, 3));
-  }, []); // Empty dependency array means it runs once on mount, but MOCK_SERVICES itself is a module-level const.
-          // If MOCK_SERVICES is mutated and this component re-renders due to navigation, it *should* pick up the change.
+    const fetchServices = async () => {
+      setIsLoading(true);
+      try {
+        const servicesCol = collection(db, 'services');
+        const q = query(servicesCol, where('isBookable', '==', true), limit(3));
+        const servicesSnap = await getDocs(q);
+        if (servicesSnap.empty) {
+          setServices(MOCK_SERVICES.slice(0, 3));
+        } else {
+          setServices(servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
+        }
+      } catch (error) {
+        console.error("Failed to fetch services for homepage, using fallback.", error);
+        setServices(MOCK_SERVICES.slice(0, 3));
+      }
+      setIsLoading(false);
+    };
+    fetchServices();
+  }, []);
 
   return (
     <section id="services" className="py-16 bg-secondary">
       <div className="container">
         <h2 className="text-3xl font-bold text-center mb-12 font-headline text-primary">Our Services</h2>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {services.map((service) => (
-            <ServiceCard key={service.id} service={service} />
-          ))}
+          {isLoading ? (
+            Array.from({ length: 3 }).map((_, index) => (
+              <CardSkeleton key={index} />
+            ))
+          ) : (
+            services.map((service) => (
+              <ServiceCard key={service.id} service={service} />
+            ))
+          )}
         </div>
         <div className="text-center mt-12">
           <Button asChild variant="outline" size="lg" className="border-primary text-primary hover:bg-primary/10">
@@ -39,3 +60,13 @@ export function HomePageServiceList() {
     </section>
   );
 }
+
+const CardSkeleton = () => (
+  <div className="flex flex-col space-y-3">
+    <Skeleton className="h-[225px] w-full rounded-xl" />
+    <div className="space-y-2">
+      <Skeleton className="h-4 w-[250px]" />
+      <Skeleton className="h-4 w-[200px]" />
+    </div>
+  </div>
+);

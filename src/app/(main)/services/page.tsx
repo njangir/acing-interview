@@ -1,6 +1,6 @@
 
-// import { getDocs, collection, query, orderBy } from 'firebase/firestore';
-// import { db } from '@/lib/firebase'; // Assuming you have a firebase.ts config file
+import { getDocs, collection, query, orderBy } from 'firebase/firestore';
+import { db } from '@/lib/firebase'; // Assuming you have a firebase.ts config file
 import { PageHeader } from "@/components/core/page-header";
 import { ServiceCard } from "@/components/core/service-card";
 import { MOCK_SERVICES } from "@/constants"; // Keep for now for UI rendering during transition
@@ -11,21 +11,21 @@ export default async function ServicesPage() {
   let services: Service[] = [];
 
   // PRODUCTION TODO: Replace MOCK_SERVICES with actual Firestore data fetching.
-  // try {
-  //   const servicesCollectionRef = collection(db, 'services');
-  //   // Example: Query services and order them, e.g., by a 'order' field or 'name'
-  //   // const q = query(servicesCollectionRef, orderBy('name', 'asc'));
-  //   const servicesSnapshot = await getDocs(servicesCollectionRef); // or await getDocs(q);
-  //   services = servicesSnapshot.docs.map(doc => ({
-  //     id: doc.id,
-  //     ...doc.data(),
-  //     // Ensure timestamp fields are handled correctly if they exist (e.g., toDate().toISOString())
-  //   })) as Service[];
-  // } catch (error) {
-  //   console.error("Error fetching services:", error);
-  //   // Optionally, render an error message or fallback UI
-  //   // For now, it will fall back to MOCK_SERVICES if fetching fails or is commented out.
-  // }
+  try {
+    const servicesCollectionRef = collection(db, 'services');
+    // Example: Query services and order them, e.g., by a 'order' field or 'name'
+    const q = query(servicesCollectionRef, orderBy('name', 'asc'));
+    const servicesSnapshot = await getDocs(q); // or await getDocs(q);
+    services = servicesSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      // Ensure timestamp fields are handled correctly if they exist (e.g., toDate().toISOString())
+    })) as Service[];
+  } catch (error) {
+    console.error("Error fetching services:", error);
+    // Optionally, render an error message or fallback UI
+    // For now, it will fall back to MOCK_SERVICES if fetching fails or is commented out.
+  }
 
   // Fallback to mock data if services array is empty (e.g., Firestore fetch failed or is commented out)
   if (services.length === 0) {

@@ -12,8 +12,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // PRODUCTION TODO:
 // - Import Firebase and Firestore methods:
-// import { db } from '@/lib/firebase'; // Assuming firebase.ts setup
-// import { collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase'; // Assuming firebase.ts setup
+import { collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
 
 const ITEMS_PER_PAGE = 6; // 2 rows of 3 cards
 
@@ -29,25 +29,20 @@ export default function TestimonialsPage() {
       setError(null);
       try {
         // PRODUCTION TODO: Replace with actual Firestore data fetching
-        // const testimonialsCol = collection(db, 'testimonials');
-        // const q = query(testimonialsCol, where('status', '==', 'approved'), orderBy('createdAt', 'desc'));
-        // const testimonialSnapshot = await getDocs(q);
-        // const fetchedTestimonials = testimonialSnapshot.docs.map(doc => {
-        //   const data = doc.data();
-        //   return {
-        //     id: doc.id,
-        //     ...data,
-        //     // Ensure timestamp fields are handled correctly (e.g., toDate().toISOString() if stored as Firestore Timestamps)
-        //     createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
-        //     updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : new Date().toISOString(),
-        //   } as Testimonial;
-        // });
-        // setAllTestimonials(fetchedTestimonials);
-
-        // Simulate API call delay and use mock data
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const approvedMockTestimonials = MOCK_TESTIMONIALS.filter(t => t.status === 'approved');
-        setAllTestimonials(approvedMockTestimonials);
+        const testimonialsCol = collection(db, 'testimonials');
+        const q = query(testimonialsCol, where('status', '==', 'approved'), orderBy('createdAt', 'desc'));
+        const testimonialSnapshot = await getDocs(q);
+        const fetchedTestimonials = testimonialSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            // Ensure timestamp fields are handled correctly (e.g., toDate().toISOString() if stored as Firestore Timestamps)
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
+            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : new Date().toISOString(),
+          } as Testimonial;
+        });
+        setAllTestimonials(fetchedTestimonials);
 
       } catch (err) {
         console.error("Error fetching testimonials:", err);
