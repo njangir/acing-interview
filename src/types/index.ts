@@ -128,6 +128,17 @@ export interface UserProfile {
   updatedAt?: any;
 }
 
+export interface UserNotification {
+  id: string;
+  userId: string;
+  message: string;
+  href: string;
+  seen: boolean;
+  timestamp: any;
+  type: 'booking_update' | 'message_reply' | 'general';
+}
+
+
 export interface FeedbackSubmissionHistoryEntry {
   id: string; // Unique ID for the history entry
   submissionDate: any; // ISO date string

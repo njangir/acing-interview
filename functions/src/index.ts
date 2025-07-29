@@ -11,10 +11,13 @@ import { onUserCreate } from "firebase-functions/v2/auth";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import { initializeApp } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import Razorpay from "razorpay";
 import { defineString } from "firebase-functions/params";
 import crypto from "crypto";
+import { onDocumentUpdated, onDocumentCreated } from "firebase-functions/v2/firestore";
+import type { Booking, UserMessage } from "./types";
+
 
 initializeApp();
 
@@ -168,6 +171,64 @@ exports.verifyPayment = onCall(async (request) => {
     throw new HttpsError(
       "internal",
       "Payment verified, but failed to update booking."
+    );
+  }
+});
+
+
+const createNotification = async (userId: string, message: string, href: string) => {
+  if (!userId) return;
+  const firestore = getFirestore();
+  const notificationData = {
+    userId,
+    message,
+    href,
+    seen: false,
+    timestamp: FieldValue.serverTimestamp(),
+    type: 'booking_update',
+  };
+  try {
+    await firestore.collection(`userProfiles/${userId}/notifications`).add(notificationData);
+    logger.info(`Notification created for user ${userId}:`, message);
+  } catch (e) {
+    logger.error(`Failed to create notification for user ${userId}:`, e);
+  }
+};
+
+exports.onBookingUpdate = onDocumentUpdated("bookings/{bookingId}", async (event) => {
+  if (!event.data) return;
+
+  const before = event.data.before.data() as Booking;
+  const after = event.data.after.data() as Booking;
+
+  const serviceName = after.serviceName.length > 20 ? `${after.serviceName.substring(0, 17)}...` : after.serviceName;
+
+  // Status changed to 'scheduled' (link added)
+  if (before.status !== 'scheduled' && after.status === 'scheduled' && after.meetingLink) {
+    return createNotification(after.uid, `Session for '${serviceName}' is scheduled.`, '/dashboard/bookings');
+  }
+
+  // Status changed to 'cancelled'
+  if (before.status !== 'cancelled' && after.status === 'cancelled') {
+    return createNotification(after.uid, `Session for '${serviceName}' was cancelled.`, '/dashboard/bookings');
+  }
+
+  // Report/Feedback added
+  if (!before.reportUrl && after.reportUrl) {
+    return createNotification(after.uid, `Feedback report for '${serviceName}' is now available.`, '/dashboard/bookings');
+  }
+});
+
+exports.onAdminMessage = onDocumentCreated("userMessages/{messageId}", async (event) => {
+  if (!event.data) return;
+  const message = event.data.data() as UserMessage;
+
+  if (message.senderType === 'admin') {
+    const subjectSnippet = message.subject.replace("Re: ", "").substring(0, 25);
+    return createNotification(
+      message.uid,
+      `Admin replied in: "${subjectSnippet}${subjectSnippet.length === 25 ? "..." : ""}"`,
+      '/dashboard/contact'
     );
   }
 });

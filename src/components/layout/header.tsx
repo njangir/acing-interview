@@ -14,11 +14,11 @@ import { Logo } from '@/components/icons/logo';
 import { useAuth } from '@/hooks/use-auth';
 import { usePathname } from 'next/navigation';
 import { DASHBOARD_NAV_LINKS, ADMIN_DASHBOARD_NAV_LINKS } from '@/constants';
-import type { Booking, UserMessage } from '@/types';
+import type { UserNotification } from '@/types';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, Timestamp, doc, updateDoc, writeBatch } from 'firebase/firestore';
 
 
 const mainSiteNavItems: Array<{ href: string; label: string; icon: LucideIcon }> = [
@@ -28,18 +28,6 @@ const mainSiteNavItems: Array<{ href: string; label: string; icon: LucideIcon }>
   { href: '/testimonials', label: 'Success Stories', icon: MessageSquare },
 ];
 
-interface NotificationItem {
-  id: string; 
-  message: string;
-  timestamp: Date;
-  href: string;
-  type: 'booking' | 'message';
-}
-
-const getNotificationEventId = (itemId: string, type: string, subType?: string): string => {
-  return `${type}-${itemId}${subType ? `-${subType}` : ''}`;
-};
-
 
 export function Header() {
   const { currentUser, logout, isAdmin } = useAuth();
@@ -47,147 +35,60 @@ export function Header() {
   const pathname = usePathname();
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [isMounted, setIsMounted] = useState(false);
-
-  const [notificationsToShow, setNotificationsToShow] = useState<NotificationItem[]>([]);
+  const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [isNotificationPopoverOpen, setIsNotificationPopoverOpen] = useState(false);
-
+  
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  const getSeenNotifications = useCallback((): string[] => {
-    if (typeof window === 'undefined' || !currentUser) return [];
-    const seen = localStorage.getItem(`seenNotifications_${currentUser.uid}`);
-    return seen ? JSON.parse(seen) : [];
-  }, [currentUser]);
-
-  const calculateAndSetNotifications = useCallback((bookings: Booking[], messages: UserMessage[]) => {
-    if (typeof window === 'undefined' || !isLoggedIn || isAdmin || !currentUser) {
-      setNotificationsToShow([]);
-      return;
-    }
-
-    const seenNotifications = getSeenNotifications();
-    const currentActiveNotifications: NotificationItem[] = [];
-
-    bookings.forEach(booking => {
-      let eventId: string | null = null;
-      let message: string | null = null;
-      let eventTimestamp = booking.updatedAt instanceof Timestamp ? booking.updatedAt.toDate() : new Date();
-      const href = '/dashboard/bookings';
-      const serviceName = booking.serviceName.length > 20 ? booking.serviceName.substring(0, 17) + '...' : booking.serviceName;
-      const bookingWasOriginallyPaid = booking.transactionId !== null && booking.paymentStatus !== 'pay_later_pending' && booking.paymentStatus !== 'pay_later_unpaid';
-
-      if ((booking.status === 'accepted' || booking.status === 'scheduled')) {
-        eventId = getNotificationEventId(booking.id, 'booking', booking.status);
-        message = `Booking for '${serviceName}' is ${booking.status}.`;
-         const linkAddedEventId = getNotificationEventId(booking.id, 'booking', 'link_added');
-         if (booking.meetingLink && !seenNotifications.includes(linkAddedEventId) && booking.paymentStatus === 'paid') {
-             eventId = linkAddedEventId;
-             message = `Meeting link for '${serviceName}' on ${booking.date} is available.`;
-         }
-      } else if (booking.status === 'cancelled') {
-        eventId = getNotificationEventId(booking.id, 'booking', 'cancelled');
-        message = `Booking for '${serviceName}' on ${booking.date} was cancelled.`;
-      } else if (booking.status === 'completed' && (booking.reportUrl || (booking.detailedFeedback && booking.detailedFeedback.length > 0))) {
-        const feedbackReadyEventId = getNotificationEventId(booking.id, 'booking', 'feedback_ready');
-        if (!seenNotifications.includes(feedbackReadyEventId)){
-          eventId = feedbackReadyEventId;
-          message = `Feedback/Report for '${serviceName}' is ready.`;
-        }
-      }
-      
-      if (bookingWasOriginallyPaid && booking.requestedRefund === false && booking.status === 'cancelled' && (booking.paymentStatus === 'pay_later_unpaid')) {
-          const refundEventId = getNotificationEventId(booking.id, 'booking', 'refund_processed');
-          const alreadyNotifiedRefund = currentActiveNotifications.some(n => n.id === refundEventId) || seenNotifications.includes(refundEventId);
-          if (!alreadyNotifiedRefund) {
-               currentActiveNotifications.push({
-                  id: refundEventId,
-                  message: `Your refund for '${serviceName}' has been processed.`,
-                  timestamp: eventTimestamp,
-                  href,
-                  type: 'booking',
-               });
-          }
-      }
-
-      if (eventId && message && !seenNotifications.includes(eventId) && !currentActiveNotifications.some(n=>n.id === eventId)) {
-        currentActiveNotifications.push({ id: eventId, message, timestamp: eventTimestamp, href, type: 'booking' });
-      }
-    });
-
-    const userMessageThreads: { [key: string]: UserMessage[] } = {};
-    messages.forEach(msg => {
-      const threadKey = msg.subject.startsWith("Re:") ? msg.subject.substring(3).trim() : msg.subject.trim();
-      if (!userMessageThreads[threadKey]) {
-           userMessageThreads[threadKey] = [];
-      }
-      userMessageThreads[threadKey].push(msg);
-    });
-
-    Object.values(userMessageThreads).forEach(thread => {
-        const lastMessage = thread.sort((a,b) => (a.timestamp as Timestamp).toMillis() - (b.timestamp as Timestamp).toMillis()).pop();
-        if (lastMessage && lastMessage.senderType === 'admin') {
-            const eventId = getNotificationEventId(lastMessage.id, 'message', 'admin_reply');
-            const subjectSnippet = lastMessage.subject.replace('Re: ','').substring(0,25);
-            if (!seenNotifications.includes(eventId)  && !currentActiveNotifications.some(n=>n.id === eventId)) {
-                currentActiveNotifications.push({
-                    id: eventId,
-                    message: `Admin replied in: "${subjectSnippet}${subjectSnippet.length === 25 ? '...' : ''}"`,
-                    timestamp: (lastMessage.timestamp as Timestamp).toDate(),
-                    href: '/dashboard/contact',
-                    type: 'message',
-                });
-            }
-        }
-    });
-
-    currentActiveNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-    setNotificationsToShow(currentActiveNotifications);
-
-  }, [isLoggedIn, isAdmin, currentUser, getSeenNotifications]);
-
   useEffect(() => {
-    if (!isLoggedIn || isAdmin || !currentUser?.uid) {
-      setNotificationsToShow([]);
+    if (!isLoggedIn || !currentUser?.uid) {
+      setNotifications([]);
       return;
     }
 
-    const bookingsQuery = query(collection(db, 'bookings'), where('uid', '==', currentUser.uid));
-    const messagesQuery = query(collection(db, 'userMessages'), where('userEmail', '==', currentUser.email));
-    
-    let bookingsData: Booking[] = [];
-    let messagesData: UserMessage[] = [];
+    const notifsColRef = collection(db, `userProfiles/${currentUser.uid}/notifications`);
+    const q = query(notifsColRef, orderBy('timestamp', 'desc'));
 
-    const unsubBookings = onSnapshot(bookingsQuery, (snapshot) => {
-      bookingsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
-      calculateAndSetNotifications(bookingsData, messagesData);
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedNotifications = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: (doc.data().timestamp as Timestamp).toDate(),
+      } as UserNotification));
+      setNotifications(fetchedNotifications);
     });
 
-    const unsubMessages = onSnapshot(messagesQuery, (snapshot) => {
-      messagesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserMessage));
-      calculateAndSetNotifications(bookingsData, messagesData);
-    });
-    
-    return () => {
-      unsubBookings();
-      unsubMessages();
-    };
-  }, [isLoggedIn, isAdmin, currentUser, calculateAndSetNotifications]);
+    return () => unsubscribe();
+  }, [isLoggedIn, currentUser]);
 
-  const handleNotificationClick = (notificationId: string) => {
-    if (typeof window === 'undefined' || !currentUser) return;
-    
-    const seenNotifications = getSeenNotifications();
-    const updatedSeenNotifications = Array.from(new Set([...seenNotifications, notificationId]));
-    localStorage.setItem(`seenNotifications_${currentUser.uid}`, JSON.stringify(updatedSeenNotifications));
-    
-    const updatedNotifications = notificationsToShow.filter(n => n.id !== notificationId);
-    setNotificationsToShow(updatedNotifications);
+
+  const unreadNotifications = notifications.filter(n => !n.seen);
+
+
+  const handleNotificationClick = async (notificationId: string) => {
+    if (!currentUser) return;
+    const notifRef = doc(db, `userProfiles/${currentUser.uid}/notifications/${notificationId}`);
+    try {
+      await updateDoc(notifRef, { seen: true });
+    } catch (e) {
+      console.error("Failed to mark notification as seen:", e);
+    }
   };
 
-  const handlePopoverOpenChange = (open: boolean) => {
-    setIsNotificationPopoverOpen(open);
+  const handleMarkAllAsRead = async () => {
+    if (!currentUser || unreadNotifications.length === 0) return;
+    const batch = writeBatch(db);
+    unreadNotifications.forEach(notif => {
+      const notifRef = doc(db, `userProfiles/${currentUser.uid}/notifications`, notif.id);
+      batch.update(notifRef, { seen: true });
+    });
+    try {
+      await batch.commit();
+    } catch(e) {
+      console.error("Failed to mark all notifications as read:", e);
+    }
   };
 
   React.useEffect(() => {
@@ -235,15 +136,6 @@ export function Header() {
     });
   };
 
-  const getOverallNotificationsLink = () => {
-    if (notificationsToShow.length === 0) return "/dashboard";
-    const bookingNotifs = notificationsToShow.filter(n => n.type === 'booking').length;
-    const messageNotifs = notificationsToShow.filter(n => n.type === 'message').length;
-    if (bookingNotifs > 0) return "/dashboard/bookings";
-    if (messageNotifs > 0) return "/dashboard/contact";
-    return "/dashboard";
-  };
-
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
@@ -279,13 +171,13 @@ export function Header() {
           {isLoggedIn ? (
             <>
               {currentUser && !isAdmin && (
-                <Popover open={isNotificationPopoverOpen} onOpenChange={handlePopoverOpenChange}>
+                <Popover open={isNotificationPopoverOpen} onOpenChange={setIsNotificationPopoverOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="ghost" size="icon" className="relative mr-1">
                       <Bell className="h-5 w-5" />
-                      {notificationsToShow.length > 0 && (
+                      {unreadNotifications.length > 0 && (
                         <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full transform translate-x-1/2 -translate-y-1/2">
-                          {notificationsToShow.length}
+                          {unreadNotifications.length}
                         </span>
                       )}
                       <span className="sr-only">Notifications</span>
@@ -299,49 +191,34 @@ export function Header() {
                   >
                     <div className="flex justify-between items-center p-3 border-b">
                         <h3 className="font-medium text-sm">Notifications</h3>
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-6 w-6" 
-                            onClick={() => setIsNotificationPopoverOpen(false)}
-                            aria-label="Close notifications"
-                        >
-                            <XIcon className="h-4 w-4" />
-                        </Button>
+                        {unreadNotifications.length > 0 && (
+                          <Button variant="link" size="sm" className="h-auto p-0" onClick={handleMarkAllAsRead}>Mark all as read</Button>
+                        )}
                     </div>
                     <ScrollArea className="h-auto max-h-80 custom-scrollbar">
-                      {notificationsToShow.length > 0 ? (
-                        notificationsToShow.map((item) => (
+                      {notifications.length > 0 ? (
+                        notifications.map((item) => (
                           <Link
                             key={item.id}
                             href={item.href}
-                            className="block p-3 hover:bg-accent/50 text-sm"
+                            className={cn("block p-3 hover:bg-accent/50 text-sm", !item.seen && "bg-blue-50/50 dark:bg-blue-900/20")}
                             onClick={() => {
-                              handleNotificationClick(item.id);
+                              if (!item.seen) handleNotificationClick(item.id);
                               setIsNotificationPopoverOpen(false);
                             }} 
                           >
-                            <p className="truncate font-medium text-foreground">{item.message}</p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className={cn("truncate", !item.seen ? "font-semibold text-foreground" : "font-normal text-muted-foreground")}>{item.message}</p>
+                            <p className="text-xs text-muted-foreground/80">
                               {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
                             </p>
                           </Link>
                         ))
                       ) : (
                         <div className="p-4 text-sm text-center text-muted-foreground">
-                          No new notifications.
+                          No notifications yet.
                         </div>
                       )}
                     </ScrollArea>
-                     {notificationsToShow.length > 0 && (
-                         <div className="p-2 border-t text-center">
-                            <Button variant="link" size="sm" asChild onClick={() => setIsNotificationPopoverOpen(false)}>
-                                <Link href={getOverallNotificationsLink()}>
-                                  View All in Dashboard
-                                </Link>
-                            </Button>
-                        </div>
-                    )}
                   </PopoverContent>
                 </Popover>
               )}
