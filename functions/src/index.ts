@@ -191,6 +191,57 @@ exports.verifyPayment = onCall(async (request) => {
   }
 });
 
+exports.processRefund = onCall(async (request) => {
+  await ensureAdmin(request.auth?.uid);
+  const { bookingId } = request.data;
+  if (!bookingId) {
+    throw new HttpsError("invalid-argument", "The function must be called with a 'bookingId'.");
+  }
+
+  const firestore = getFirestore();
+  const bookingDocRef = firestore.collection("bookings").doc(bookingId);
+  const bookingSnap = await bookingDocRef.get();
+
+  if (!bookingSnap.exists) {
+    throw new HttpsError("not-found", `Booking with ID ${bookingId} not found.`);
+  }
+
+  const booking = bookingSnap.data() as Booking;
+  if (booking.paymentStatus !== 'paid' || !booking.transactionId) {
+    throw new HttpsError("failed-precondition", "Booking is not in a refundable state (not paid or no transaction ID).");
+  }
+
+  const razorpay = new Razorpay({
+    key_id: RAZORPAY_KEY_ID.value(),
+    key_secret: RAZORPAY_KEY_SECRET.value(),
+  });
+
+  try {
+    logger.info(`Attempting to refund Razorpay payment: ${booking.transactionId}`);
+    // Process a full refund. Partial refunds are also possible by adding an 'amount' field.
+    await razorpay.payments.refund(booking.transactionId, {});
+    logger.info(`Successfully processed refund for payment: ${booking.transactionId}`);
+
+    // Now update the booking in Firestore
+    await bookingDocRef.update({
+      status: 'cancelled',
+      paymentStatus: 'pay_later_unpaid', // Using this status to represent refunded state
+      requestedRefund: false, // Clear the request flag
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    logger.info(`Booking ${bookingId} successfully updated to cancelled/refunded state.`);
+    return { success: true, message: "Refund processed and booking cancelled." };
+  } catch (error: any) {
+    logger.error(`Error processing refund for booking ${bookingId} with payment ${booking.transactionId}:`, error);
+    
+    // Check if error is from Razorpay and has a description
+    const errorMessage = error.error?.description || "An internal error occurred with the payment provider.";
+    
+    throw new HttpsError("internal", errorMessage, error);
+  }
+});
+
 
 const createNotification = async (userId: string, message: string, href: string) => {
   if (!userId) return;

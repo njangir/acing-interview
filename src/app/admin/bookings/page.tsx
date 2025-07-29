@@ -22,7 +22,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { Booking, Service } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck, PlusCircle, CalendarIcon, Edit, Filter, InfoIcon, Video, ChevronLeft, ChevronRight, Eye, Loader2, AlertTriangle } from 'lucide-react';
+import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck, PlusCircle, CalendarIcon, Edit, Filter, InfoIcon, Video, ChevronLeft, ChevronRight, Eye, Loader2, AlertTriangle, RotateCcw } from 'lucide-react';
 import { Badge as UiBadge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { format, parse } from 'date-fns';
@@ -32,9 +32,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/hooks/use-auth';
 
 // PRODUCTION TODO: Import Firebase and Firestore methods
-import { db } from '@/lib/firebase';
-import { collection, doc, addDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, onSnapshot, where, writeBatch, getDocs } from 'firebase/firestore';
+import { db, functions } from '@/lib/firebase';
+import { collection, doc, addDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, onSnapshot, where, writeBatch, getDocs, getDoc } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 
+const processRefund = httpsCallable(functions, 'processRefund');
 
 const ITEMS_PER_PAGE = 7;
 
@@ -66,6 +68,7 @@ export default function AdminBookingsPage() {
   const [allBookingsData, setAllBookingsData] = useState<Booking[]>([]); // Holds fetched or mock bookings
   const [allServicesData, setAllServicesData] = useState<Service[]>([]); // Holds fetched or mock services
   const [isLoading, setIsLoading] = useState(true);
+  const [isProcessingAction, setIsProcessingAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [selectedBookingForEdit, setSelectedBookingForEdit] = useState<Booking | null>(null);
@@ -76,6 +79,8 @@ export default function AdminBookingsPage() {
 
   const [isCancelAlertOpen, setIsCancelAlertOpen] = useState(false);
   const [bookingToCancel, setBookingToCancel] = useState<Booking | null>(null);
+  const [bookingToRefund, setBookingToRefund] = useState<Booking | null>(null);
+  const [isRefundAlertOpen, setIsRefundAlertOpen] = useState(false);
 
   const [isViewFeedbackModalOpen, setIsViewFeedbackModalOpen] = useState(false);
   const [selectedBookingForFeedback, setSelectedBookingForFeedback] = useState<Booking | null>(null);
@@ -156,11 +161,28 @@ export default function AdminBookingsPage() {
 
 
   const handleAdminAction = async (bookingId: string, action: 'accept' | 'cancel' | 'complete' | 'approve_refund') => {
+    setIsProcessingAction(bookingId);
     let message = '';
     const bookingDocRef = doc(db, "bookings", bookingId);
+
+    if (action === 'approve_refund') {
+      try {
+        await processRefund({ bookingId });
+        message = `Refund for booking ${bookingId} processed successfully.`;
+        toast({ title: "Action Successful", description: message });
+      } catch (err: any) {
+        console.error(`Error processing refund for booking ${bookingId}:`, err);
+        toast({ title: "Refund Failed", description: err.message || "An unknown error occurred.", variant: "destructive" });
+      } finally {
+        setIsProcessingAction(null);
+      }
+      return;
+    }
+    
     const bookingToUpdateSnap = await getDoc(bookingDocRef);
     if (!bookingToUpdateSnap.exists()) {
         toast({ title: "Error", description: "Booking not found.", variant: "destructive"});
+        setIsProcessingAction(null);
         return;
     }
     const bookingToUpdate = bookingToUpdateSnap.data() as Booking;
@@ -179,12 +201,7 @@ export default function AdminBookingsPage() {
     } else if (action === 'complete') {
       message = `Booking ${bookingId} marked as completed.`;
       updatePayload.status = 'completed';
-    } else if (action === 'approve_refund' && bookingToUpdate.paymentStatus === 'paid' && bookingToUpdate.requestedRefund) {
-      message = `Refund for booking ${bookingId} approved. Booking cancelled.`;
-      updatePayload.status = 'cancelled';
-      updatePayload.paymentStatus = 'pay_later_unpaid';
-      updatePayload.requestedRefund = false; 
-    }
+    } 
 
     try {
         await updateDoc(bookingDocRef, { ...updatePayload, updatedAt: serverTimestamp() });
@@ -192,6 +209,8 @@ export default function AdminBookingsPage() {
     } catch (err) {
         console.error(`Error performing action ${action} on booking ${bookingId}:`, err);
         toast({ title: "Action Failed", description: `Could not perform action: ${action}. Please try again.`, variant: "destructive" });
+    } finally {
+        setIsProcessingAction(null);
     }
   };
 
@@ -204,6 +223,13 @@ export default function AdminBookingsPage() {
     if (booking.status !== 'cancelled') {
       setBookingToCancel(booking);
       setIsCancelAlertOpen(true);
+    }
+  };
+  
+  const openRefundDialog = (booking: Booking) => {
+    if (booking.paymentStatus === 'paid' && booking.requestedRefund) {
+      setBookingToRefund(booking);
+      setIsRefundAlertOpen(true);
     }
   };
 
@@ -422,6 +448,8 @@ export default function AdminBookingsPage() {
               {paginatedBookings.length > 0 ? paginatedBookings.map((booking) => {
                 const showAsAddLink = booking.status === 'accepted' && booking.paymentStatus === 'paid' && !booking.meetingLink;
                 const hasFeedback = booking.status === 'completed' && (booking.detailedFeedback || booking.userFeedback);
+                const isActionInProgress = isProcessingAction === booking.id;
+
                 return (
                 <TableRow key={booking.id}>
                   <TableCell>
@@ -471,85 +499,88 @@ export default function AdminBookingsPage() {
                     </div>
                    </TableCell>
                   <TableCell className="text-right">
-                     <UiBadge
-                        variant={
-                            booking.status === 'pending_approval' ? 'secondary' :
-                            booking.status === 'accepted' ? 'outline' :
-                            booking.status === 'scheduled' ? 'default' :
-                            booking.status === 'completed' ? 'outline' :
-                            'destructive'
-                        }
-                        className={cn(
-                            "mb-1 block w-fit ml-auto", 
-                            booking.status === 'scheduled' && 'bg-blue-100 text-blue-700',
-                            booking.status === 'pending_approval' && 'bg-yellow-100 text-yellow-700',
-                            booking.status === 'accepted' && 'bg-orange-100 text-orange-700',
-                            booking.status === 'cancelled' && 'bg-red-100 text-red-700 line-through opacity-75'
-                        )}
-                    >
-                        {booking.status.replace(/_/g, ' ')}
-                    </UiBadge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0 mt-1">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                           {booking.status === 'scheduled' && booking.meetingLink && (
-                                <DropdownMenuItem asChild>
-                                    <Link href={booking.meetingLink} target="_blank" rel="noopener noreferrer" className="flex items-center">
-                                        <Video className="mr-2 h-4 w-4 text-green-500" /> Join Meeting
-                                    </Link>
+                    <div className="flex justify-end items-center gap-2">
+                        {isActionInProgress && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+                        <UiBadge
+                            variant={
+                                booking.status === 'pending_approval' ? 'secondary' :
+                                booking.status === 'accepted' ? 'outline' :
+                                booking.status === 'scheduled' ? 'default' :
+                                booking.status === 'completed' ? 'outline' :
+                                'destructive'
+                            }
+                            className={cn(
+                                "mb-1 block w-fit ml-auto", 
+                                booking.status === 'scheduled' && 'bg-blue-100 text-blue-700',
+                                booking.status === 'pending_approval' && 'bg-yellow-100 text-yellow-700',
+                                booking.status === 'accepted' && 'bg-orange-100 text-orange-700',
+                                booking.status === 'cancelled' && 'bg-red-100 text-red-700 line-through opacity-75'
+                            )}
+                        >
+                            {booking.status.replace(/_/g, ' ')}
+                        </UiBadge>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild disabled={isActionInProgress}>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            {booking.status === 'scheduled' && booking.meetingLink && (
+                                    <DropdownMenuItem asChild>
+                                        <Link href={booking.meetingLink} target="_blank" rel="noopener noreferrer" className="flex items-center">
+                                            <Video className="mr-2 h-4 w-4 text-green-500" /> Join Meeting
+                                        </Link>
+                                    </DropdownMenuItem>
+                                )}
+                            <DropdownMenuItem
+                                onClick={() => openEditModal(booking)}
+                                disabled={booking.status === 'cancelled' || booking.status === 'completed'}
+                            >
+                                {showAsAddLink ? (
+                                <Video className="mr-2 h-4 w-4 text-green-500" />
+                                ) : (
+                                <Edit className="mr-2 h-4 w-4 text-blue-500" />
+                                )}
+                                {showAsAddLink ? 'Add Meeting Link & Schedule' : 'Edit Details / Reschedule'}
+                            </DropdownMenuItem>
+                            {hasFeedback && (
+                                <DropdownMenuItem onClick={() => openViewFeedbackModal(booking)}>
+                                <Eye className="mr-2 h-4 w-4 text-purple-500" /> View Feedback
                                 </DropdownMenuItem>
                             )}
-                          <DropdownMenuItem
-                            onClick={() => openEditModal(booking)}
-                            disabled={booking.status === 'cancelled' || booking.status === 'completed'}
-                          >
-                            {showAsAddLink ? (
-                              <Video className="mr-2 h-4 w-4 text-green-500" />
-                            ) : (
-                              <Edit className="mr-2 h-4 w-4 text-blue-500" />
+                            {booking.status === 'pending_approval' && (
+                                <DropdownMenuItem onClick={() => handleAdminAction(booking.id, 'accept')}>
+                                <CheckCircle className="mr-2 h-4 w-4 text-green-500" /> Accept Request
+                                </DropdownMenuItem>
                             )}
-                            {showAsAddLink ? 'Add Meeting Link & Schedule' : 'Edit Details / Reschedule'}
-                          </DropdownMenuItem>
-                           {hasFeedback && (
-                            <DropdownMenuItem onClick={() => openViewFeedbackModal(booking)}>
-                              <Eye className="mr-2 h-4 w-4 text-purple-500" /> View Feedback
-                            </DropdownMenuItem>
-                          )}
-                          {booking.status === 'pending_approval' && (
-                            <DropdownMenuItem onClick={() => handleAdminAction(booking.id, 'accept')}>
-                              <CheckCircle className="mr-2 h-4 w-4 text-green-500" /> Accept Request
-                            </DropdownMenuItem>
-                          )}
-                           {booking.status !== 'cancelled' && booking.status !== 'completed' && booking.paymentStatus === 'paid' && booking.requestedRefund &&(
-                             <DropdownMenuItem onClick={() => handleAdminAction(booking.id, 'approve_refund')} className="text-green-600 hover:!text-green-600">
-                                <ShieldCheck className="mr-2 h-4 w-4" /> Approve Refund
-                              </DropdownMenuItem>
-                           )}
-                           {(booking.status === 'scheduled' || booking.status === 'accepted') && (
-                            <DropdownMenuItem onClick={() => handleAdminAction(booking.id, 'complete')}>
-                               <CalendarClock className="mr-2 h-4 w-4 text-purple-500" /> Mark as Completed
-                            </DropdownMenuItem>
-                           )}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className={cn(
-                                "text-red-600 hover:!text-red-600",
-                                booking.status === 'cancelled' && 'opacity-50 cursor-not-allowed'
+                            {booking.status !== 'cancelled' && booking.status !== 'completed' && booking.paymentStatus === 'paid' && booking.requestedRefund &&(
+                                <DropdownMenuItem onClick={() => openRefundDialog(booking)} className="text-green-600 hover:!text-green-600">
+                                    <RotateCcw className="mr-2 h-4 w-4" /> Process Refund
+                                </DropdownMenuItem>
                             )}
-                            disabled={booking.status === 'cancelled'}
-                            onClick={() => openCancelDialog(booking)}
-                            onSelect={(e) => { if (booking.status === 'cancelled') e.preventDefault();}}
-                          >
-                            <XCircle className="mr-2 h-4 w-4" /> Cancel Booking
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                            {(booking.status === 'scheduled' || booking.status === 'accepted') && (
+                                <DropdownMenuItem onClick={() => handleAdminAction(booking.id, 'complete')}>
+                                <CalendarClock className="mr-2 h-4 w-4 text-purple-500" /> Mark as Completed
+                                </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                className={cn(
+                                    "text-red-600 hover:!text-red-600",
+                                    booking.status === 'cancelled' && 'opacity-50 cursor-not-allowed'
+                                )}
+                                disabled={booking.status === 'cancelled'}
+                                onClick={() => openCancelDialog(booking)}
+                                onSelect={(e) => { if (booking.status === 'cancelled') e.preventDefault();}}
+                            >
+                                <XCircle className="mr-2 h-4 w-4" /> Cancel Booking
+                            </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -589,7 +620,7 @@ export default function AdminBookingsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently cancel the booking for {bookingToCancel?.userName} and notify them.
+              This action will permanently cancel the booking for {bookingToCancel?.userName}. This does not process a refund automatically.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -604,6 +635,31 @@ export default function AdminBookingsPage() {
                 setIsCancelAlertOpen(false);
               }}>
               Confirm Cancellation
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+       <AlertDialog open={isRefundAlertOpen} onOpenChange={setIsRefundAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Refund Processing</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to process a refund for {bookingToRefund?.userName} for the service "{bookingToRefund?.serviceName}". This will trigger a transaction via Razorpay and cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setBookingToRefund(null)}>Back</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={() => {
+                if (bookingToRefund) {
+                  handleAdminAction(bookingToRefund.id, 'approve_refund');
+                  setBookingToRefund(null);
+                }
+                setIsRefundAlertOpen(false);
+              }}>
+              Yes, Process Refund
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
