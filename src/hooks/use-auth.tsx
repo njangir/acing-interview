@@ -3,10 +3,10 @@
 
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import type { UserProfile } from '@/types';
+import type { UserProfile, Booking } from '@/types';
 import { auth, db, googleProvider, RecaptchaVerifier, signInWithPhoneNumber } from '@/lib/firebase';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser, signInWithPopup, type ConfirmationResult, sendEmailVerification } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 
 
 interface AuthContextUser {
@@ -33,6 +33,58 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Helper function to check and cancel expired unpaid bookings
+const checkAndCancelExpiredBookings = async (userId: string) => {
+    try {
+        const now = new Date();
+        const bookingsRef = collection(db, "bookings");
+        const q = query(
+            bookingsRef,
+            where("uid", "==", userId),
+            where("paymentStatus", "==", "pay_later_pending"),
+            where("status", "in", ["pending_approval", "accepted"])
+        );
+
+        const querySnapshot = await getDocs(q);
+        if (querySnapshot.empty) {
+            return; // No bookings to check for this user
+        }
+        
+        const batch = writeBatch(db);
+        let bookingsToCancel = 0;
+
+        querySnapshot.forEach(doc => {
+            const booking = doc.data() as Booking;
+            const bookingDateTime = new Date(booking.date);
+            const [timePart, ampm] = booking.time.split(' ');
+            let [hours, minutes] = timePart.split(':').map(Number);
+            if (ampm === 'PM' && hours < 12) hours += 12;
+            if (ampm === 'AM' && hours === 12) hours = 0;
+            bookingDateTime.setHours(hours, minutes, 0, 0);
+
+            // If the booking time is in the past, cancel it
+            if (bookingDateTime < now) {
+                const bookingDocRef = doc(db, "bookings", doc.id);
+                batch.update(bookingDocRef, {
+                    status: 'cancelled',
+                    paymentStatus: 'pay_later_unpaid',
+                    updatedAt: serverTimestamp()
+                });
+                bookingsToCancel++;
+            }
+        });
+
+        if (bookingsToCancel > 0) {
+            await batch.commit();
+            console.log(`Auto-cancelled ${bookingsToCancel} expired unpaid booking(s) for user ${userId}.`);
+        }
+    } catch (error) {
+        console.error("Error auto-cancelling expired bookings:", error);
+        // We don't need to inform the user about this background task failing.
+    }
+};
+
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<AuthContextUser | null>(null);
@@ -76,6 +128,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           const userProfile = await fetchUserProfile(firebaseUser);
           setCurrentUser(userProfile);
+          // Run the expired booking check in the background after setting the user
+          checkAndCancelExpiredBookings(firebaseUser.uid);
         }
       } else {
         setCurrentUser(null);
@@ -96,6 +150,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const userProfile = await fetchUserProfile(firebaseUser);
     setCurrentUser(userProfile);
+    // Also run the check on manual login
+    checkAndCancelExpiredBookings(firebaseUser.uid);
     return { user: userProfile, isAdmin: userProfile.isAdmin };
   }, [fetchUserProfile]);
 
@@ -141,6 +197,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     setCurrentUser(userProfile);
+    // Also run the check on Google login
+    checkAndCancelExpiredBookings(firebaseUser.uid);
     return { user: userProfile, isAdmin: userProfile.isAdmin, isNewUser };
   }, []);
 
