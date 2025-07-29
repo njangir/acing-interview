@@ -6,6 +6,12 @@ import { HomePageTestimonialList } from '@/components/core/home-page-testimonial
 import { CheckCircle, Shield, Target } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  description: 'Achieve your armed forces dream with expert-led SSB mock interviews, personalized feedback, and proven strategies from a 4-time recommended professional.',
+};
+
 
 export default function HomePage() {
   return (

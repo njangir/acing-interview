@@ -6,7 +6,10 @@ import { AuthProvider } from '@/hooks/use-auth'; // Import AuthProvider
 import Script from 'next/script';
 
 export const metadata: Metadata = {
-  title: 'Armed Forces Interview Ace',
+  title: {
+    default: 'Armed Forces Interview Ace',
+    template: '%s | Armed Forces Interview Ace',
+  },
   description: 'SSB Interview Mock & Counselling Platform',
 };
 

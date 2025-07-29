@@ -6,6 +6,12 @@ import { ServiceCard } from "@/components/core/service-card";
 import type { Service } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Our Services',
+  description: 'Explore our range of SSB mock interviews, personal counselling, and AFCAT guidance services designed to help you succeed in your armed forces career.',
+};
 
 // This is a Server Component, so data fetching can be done directly.
 export default async function ServicesPage() {

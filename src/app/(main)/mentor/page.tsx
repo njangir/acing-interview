@@ -9,6 +9,37 @@ import { CheckCircle, Award, MessageSquareHeart, AlertTriangle } from "lucide-re
 import Image from "next/image";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import type { Metadata } from 'next';
+
+async function getMentorProfile(): Promise<MentorProfileData | null> {
+  try {
+    const mentorDocRef = doc(db, 'siteProfiles', 'mainMentor'); 
+    const mentorDocSnap = await getDoc(mentorDocRef);
+    if (mentorDocSnap.exists()) {
+      return mentorDocSnap.data() as MentorProfileData;
+    }
+    return null;
+  } catch (err) {
+    console.error("Error fetching mentor profile for metadata:", err);
+    return null;
+  }
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const mentor = await getMentorProfile();
+
+  if (!mentor) {
+    return {
+      title: "Meet Your Mentor",
+      description: "Learn about the expertise and experience of our lead mentor at Armed Forces Interview Ace.",
+    }
+  }
+
+  return {
+    title: `Meet Your Mentor - ${mentor.name}`,
+    description: `${mentor.bio.substring(0, 155)}... Learn more about the experience and mentorship philosophy of ${mentor.name}.`,
+  }
+}
 
 // This is a Server Component, so data fetching can be done directly.
 export default async function MentorProfilePage() {

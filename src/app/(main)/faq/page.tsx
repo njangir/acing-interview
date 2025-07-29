@@ -2,6 +2,12 @@
 import { PageHeader } from "@/components/core/page-header";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Frequently Asked Questions (FAQ)',
+  description: 'Find answers to common questions about our SSB mock interviews, counselling, booking process, and payment options for armed forces aspirants.',
+};
 
 const FAQ_ITEMS = [
   {
