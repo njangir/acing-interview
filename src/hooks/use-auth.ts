@@ -5,8 +5,8 @@ import { useState, useEffect, useCallback, createContext, useContext, type React
 import { useRouter } from 'next/navigation';
 import type { UserProfile } from '@/types';
 import { auth, db, googleProvider, RecaptchaVerifier, signInWithPhoneNumber } from '@/lib/firebase';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser, signInWithPopup, type ConfirmationResult } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firestore';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser, signInWithPopup, type ConfirmationResult, sendEmailVerification } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 
 
 interface AuthContextUser {
@@ -15,6 +15,7 @@ interface AuthContextUser {
   name: string;
   isAdmin: boolean;
   imageUrl?: string;
+  emailVerified: boolean;
 }
 
 interface AuthContextType {
@@ -27,6 +28,7 @@ interface AuthContextType {
   setupRecaptcha: (containerId: string) => Promise<RecaptchaVerifier>;
   sendOtp: (phoneNumber: string, verifier: RecaptchaVerifier) => Promise<ConfirmationResult>;
   verifyOtp: (confirmationResult: ConfirmationResult, otp: string) => Promise<void>;
+  resendVerificationEmail: () => Promise<void>;
   loadingAuth: boolean;
 }
 
@@ -49,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: userProfileData.name,
         isAdmin: userProfileData.roles?.includes('admin') || false,
         imageUrl: userProfileData.imageUrl,
+        emailVerified: firebaseUser.emailVerified,
       };
     } else {
       console.warn(`Profile not found for user ${firebaseUser.uid}. This might be a new Google sign-in. A profile will be created.`);
@@ -58,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: firebaseUser.displayName || 'New User',
         isAdmin: false,
         imageUrl: firebaseUser.photoURL || undefined,
+        emailVerified: firebaseUser.emailVerified,
       };
     }
   }, []);
@@ -65,8 +69,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const userProfile = await fetchUserProfile(firebaseUser);
-        setCurrentUser(userProfile);
+        // For email/password users, they can only be "current" if their email is verified.
+        // Google users are considered verified by default.
+        if (firebaseUser.providerData.some(p => p.providerId === 'password') && !firebaseUser.emailVerified) {
+          setCurrentUser(null);
+        } else {
+          const userProfile = await fetchUserProfile(firebaseUser);
+          setCurrentUser(userProfile);
+        }
       } else {
         setCurrentUser(null);
       }
@@ -79,6 +89,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const firebaseUser = userCredential.user;
+
+    if (!firebaseUser.emailVerified) {
+      throw new Error('Email not verified');
+    }
+
     const userProfile = await fetchUserProfile(firebaseUser);
     setCurrentUser(userProfile);
     return { user: userProfile, isAdmin: userProfile.isAdmin };
@@ -111,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: newUserProfileData.name,
         isAdmin: false,
         imageUrl: newUserProfileData.imageUrl,
+        emailVerified: firebaseUser.emailVerified,
       };
     } else {
       const existingProfileData = userDocSnap.data() as UserProfile;
@@ -120,6 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: existingProfileData.name,
         isAdmin: existingProfileData.roles?.includes('admin') || false,
         imageUrl: existingProfileData.imageUrl,
+        emailVerified: firebaseUser.emailVerified,
       };
     }
     
@@ -132,6 +149,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCurrentUser(null);
     router.push('/');
   }, [router]);
+
+  const resendVerificationEmail = useCallback(async () => {
+    const firebaseUser = auth.currentUser;
+    if (firebaseUser) {
+      await sendEmailVerification(firebaseUser);
+    } else {
+      throw new Error("No user is currently signed in to resend verification email.");
+    }
+  }, []);
   
   // PRODUCTION TODO: Implement the full multi-step UI flow for OTP.
   // These functions provide the Firebase logic.
@@ -164,8 +190,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isLoggedIn = !!currentUser;
   const isAdmin = !!currentUser && currentUser.isAdmin;
 
+  const value = {
+      currentUser,
+      isLoggedIn,
+      isAdmin,
+      login,
+      loginWithGoogle,
+      logout,
+      setupRecaptcha,
+      sendOtp,
+      verifyOtp,
+      resendVerificationEmail,
+      loadingAuth,
+  };
+
   return (
-    <AuthContext.Provider value={{ currentUser, isLoggedIn, isAdmin, login, loginWithGoogle, logout, setupRecaptcha, sendOtp, verifyOtp, loadingAuth }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

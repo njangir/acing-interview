@@ -51,7 +51,7 @@ export default function LoginPage() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login: authContextLogin, loginWithGoogle } = useAuth();
+  const { login: authContextLogin, loginWithGoogle, resendVerificationEmail } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
@@ -72,6 +72,25 @@ export default function LoginPage() {
     }
   };
 
+  async function handleResendVerification() {
+    setIsLoading(true);
+    try {
+        await resendVerificationEmail();
+        toast({
+            title: "Verification Email Sent",
+            description: "A new verification link has been sent to your email address.",
+        });
+    } catch (error) {
+        toast({
+            title: "Error",
+            description: "Failed to resend verification email. Please try again later.",
+            variant: "destructive",
+        });
+    } finally {
+        setIsLoading(false);
+    }
+  }
+
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
     try {
@@ -81,7 +100,18 @@ export default function LoginPage() {
     } catch (error: any) {
       console.error("Login error:", error);
       let errorMessage = "Login failed. Please check your credentials and try again.";
-      if (error.code) { // Firebase error codes
+      if (error.message === 'Email not verified') {
+        toast({
+          title: "Email Not Verified",
+          description: "Please check your inbox and verify your email address before logging in.",
+          variant: "destructive",
+          action: (
+            <Button variant="secondary" size="sm" onClick={handleResendVerification}>
+              Resend Email
+            </Button>
+          ),
+        });
+      } else if (error.code) { // Firebase error codes
         switch (error.code) {
           case 'auth/user-not-found':
           case 'auth/wrong-password':
@@ -97,8 +127,10 @@ export default function LoginPage() {
           default:
             errorMessage = `An unexpected error occurred. Please try again.`;
         }
+        if(error.message !== 'Email not verified') {
+            toast({ title: 'Login Failed', description: errorMessage, variant: 'destructive' });
+        }
       }
-      toast({ title: 'Login Failed', description: errorMessage, variant: 'destructive' });
     } finally {
         setIsLoading(false);
     }

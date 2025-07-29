@@ -132,36 +132,14 @@ export default function SignupPage() {
       await sendEmailVerification(firebaseUser);
       toast({ title: 'Verification Email Sent', description: 'Please check your email to verify your account.' });
 
-      const defaultBadge = MOCK_BADGES.find(badge => badge.id === 'commendable_effort');
-      const awardedBadgeIds: string[] = [];
-      if (defaultBadge) {
-        awardedBadgeIds.push(defaultBadge.id);
-      }
-      
-      // Create user profile document in Firestore
-      const userProfileForDb: Omit<UserProfile, 'createdAt' | 'updatedAt' | 'uid' | 'awardedBadges'> & { awardedBadgeIds: string[], roles: string[] } = {
-        name: data.name,
-        email: data.email,
-        phone: data.phone,
-        gender: data.gender,
-        targetOrganization: data.targetOrganization,
-        imageUrl: selectedAvatar,
-        awardedBadgeIds: awardedBadgeIds,
-        roles: ['user'], // Default role
-      };
-
-      const userDocRef = doc(db, "userProfiles", firebaseUser.uid);
-      await setDoc(userDocRef, {
-        ...userProfileForDb,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      // The onUserCreate Firebase Function will now handle Firestore profile creation.
+      // We no longer need to manually setDoc from the client here.
       
       toast({
-        title: 'Signup Successful!',
-        description: 'Your account has been created. Redirecting to dashboard...',
+        title: 'Account Created!',
+        description: 'Please check your inbox to verify your email address before logging in.',
       });
-      router.push('/dashboard');
+      router.push('/login'); // Redirect to login page after signup
 
     } catch (error: any) {
       console.error("Signup error:", error);
