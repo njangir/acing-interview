@@ -12,17 +12,16 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from "@/components/ui/switch";
 import { Badge } from '@/components/ui/badge';
-import { MOCK_SERVICES } from "@/constants"; // Keep for fallback/initial display
 import type { Service } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Edit, Trash2, ToggleLeft, ToggleRight, Loader2, AlertTriangle } from 'lucide-react'; // Added Loader2, AlertTriangle
+import { PlusCircle, Edit, Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import Image from 'next/image';
 
 // PRODUCTION TODO: Import Firebase and Firestore methods
-// import { db, storage } from '@/lib/firebase'; // Assuming firebase.ts setup
-// import { collection, doc, addDoc, setDoc, updateDoc, deleteDoc, getDocs, onSnapshot, serverTimestamp } from 'firebase/firestore';
-// import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '@/lib/firebase'; // Assuming firebase.ts setup
+import { collection, doc, addDoc, setDoc, updateDoc, deleteDoc, getDocs, onSnapshot, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const initialServiceFormState: Omit<Service, 'id' | 'features'> & { features: string } = {
   name: '',
@@ -38,7 +37,7 @@ const initialServiceFormState: Omit<Service, 'id' | 'features'> & { features: st
 
 export default function AdminServicesPage() {
   const { toast } = useToast();
-  const [servicesData, setServicesData] = useState<Service[]>(MOCK_SERVICES); // Holds fetched or mock services
+  const [servicesData, setServicesData] = useState<Service[]>([]); // Holds fetched or mock services
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,60 +53,29 @@ export default function AdminServicesPage() {
     setIsLoading(true);
     setError(null);
 
-    // PRODUCTION TODO: Fetch services from Firestore
-    // Option 1: Fetch once
-    /*
-    const fetchServices = async () => {
-      try {
-        const servicesColRef = collection(db, 'services');
-        // const q = query(servicesColRef, orderBy('name', 'asc')); // Example ordering
-        const servicesSnap = await getDocs(servicesColRef);
-        const fetchedServices = servicesSnap.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            // Ensure timestamp fields are handled (e.g., toDate().toISOString())
-            // createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
-            // updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : new Date().toISOString(),
-          } as Service;
-        });
-        setServicesData(fetchedServices);
-      } catch (err) {
-        console.error("Error fetching services:", err);
-        setError("Failed to load services. Displaying mock data.");
-        setServicesData(MOCK_SERVICES); // Fallback to mock
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchServices();
-    */
-
-    // Option 2: Real-time updates with onSnapshot (preferred for admin dashboards)
-    /*
     const servicesColRef = collection(db, 'services');
-    // const q = query(servicesColRef, orderBy('name', 'asc'));
-    const unsubscribe = onSnapshot(servicesColRef, (querySnapshot) => { // Use q for ordering
+    const q = query(servicesColRef, orderBy('name', 'asc'));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const fetchedServices = querySnapshot.docs.map(doc => {
         const data = doc.data();
-        return { id: doc.id, ...data } as Service; // Adjust for timestamps if needed
+        return { 
+            id: doc.id, 
+            ...data,
+            // Ensure timestamp fields are handled if needed, though not directly used in this component's UI
+            // createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : undefined,
+            // updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : undefined,
+        } as Service;
       });
       setServicesData(fetchedServices);
       setIsLoading(false);
       setError(null);
     }, (err) => {
       console.error("Error with real-time services listener:", err);
-      setError("Failed to load services in real-time. Displaying potentially stale data.");
-      setServicesData(MOCK_SERVICES); // Fallback
+      setError("Failed to load services in real-time. Please check your connection or security rules.");
       setIsLoading(false);
     });
-    return () => unsubscribe(); // Cleanup listener
-    */
 
-    // For this refactor, we'll stick to MOCK_SERVICES simulation
-    setServicesData(MOCK_SERVICES);
-    setIsLoading(false);
+    return () => unsubscribe(); // Cleanup listener on component unmount
   }, []);
 
 
@@ -165,18 +133,12 @@ export default function AdminServicesPage() {
 
     let finalImageUrl = formData.image;
 
-    // PRODUCTION TODO: Handle Image Upload to Firebase Storage
     if (selectedFile) {
       try {
-        // const imageFileName = `${Date.now()}_${selectedFile.name.replace(/\s+/g, '_')}`;
-        // const imageRef = storageRef(storage, `services/${imageFileName}`);
-        // await uploadBytes(imageRef, selectedFile);
-        // finalImageUrl = await getDownloadURL(imageRef);
-        // console.log("File uploaded to Firebase Storage:", finalImageUrl);
-        
-        // MOCK: Simulate upload and URL generation
-        finalImageUrl = `https://placehold.co/600x400.png?text=Uploaded+${selectedFile.name.substring(0,10)}`;
-        console.log("Simulating upload of:", selectedFile.name, "New URL:", finalImageUrl);
+        const imageFileName = `${Date.now()}_${selectedFile.name.replace(/\s+/g, '_')}`;
+        const imageRef = storageRef(storage, `services/${imageFileName}`);
+        await uploadBytes(imageRef, selectedFile);
+        finalImageUrl = await getDownloadURL(imageRef);
       } catch (uploadError) {
         console.error("Error uploading image:", uploadError);
         toast({ title: "Image Upload Failed", description: "Could not upload the service image. Please try again.", variant: "destructive" });
@@ -196,26 +158,11 @@ export default function AdminServicesPage() {
 
     try {
       if (currentService) {
-        // PRODUCTION TODO: Update existing document in Firestore
-        // const serviceDocRef = doc(db, "services", currentService.id);
-        // await updateDoc(serviceDocRef, { ...serviceToSave, updatedAt: serverTimestamp() });
-        
-        // MOCK:
-        setServicesData(prev => prev.map(s => s.id === currentService.id ? { ...serviceToSave, id: currentService.id } as Service : s));
-        const mockIndex = MOCK_SERVICES.findIndex(s => s.id === currentService.id);
-        if (mockIndex > -1) MOCK_SERVICES[mockIndex] = { ...serviceToSave, id: currentService.id } as Service;
-        
+        const serviceDocRef = doc(db, "services", currentService.id);
+        await updateDoc(serviceDocRef, { ...serviceToSave, updatedAt: serverTimestamp() });
         toast({ title: "Service Updated", description: `${serviceToSave.name} has been updated.` });
       } else {
-        // PRODUCTION TODO: Add new document to Firestore
-        // const docRef = await addDoc(collection(db, "services"), { ...serviceToSave, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-        
-        // MOCK:
-        const newId = `service-${Date.now()}`;
-        const newServiceWithId = { ...serviceToSave, id: newId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Service;
-        setServicesData(prev => [...prev, newServiceWithId]);
-        MOCK_SERVICES.push(newServiceWithId);
-        
+        await addDoc(collection(db, "services"), { ...serviceToSave, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
         toast({ title: "Service Added", description: `${serviceToSave.name} has been added.` });
       }
       setIsModalOpen(false);
@@ -229,15 +176,8 @@ export default function AdminServicesPage() {
 
   const handleDelete = async (serviceId: string, serviceName: string) => {
     try {
-      // PRODUCTION TODO: Delete document from Firestore
-      // const serviceDocRef = doc(db, "services", serviceId);
-      // await deleteDoc(serviceDocRef);
-
-      // MOCK:
-      setServicesData(prev => prev.filter(s => s.id !== serviceId));
-      const serviceIndex = MOCK_SERVICES.findIndex(s => s.id === serviceId);
-      if (serviceIndex > -1) MOCK_SERVICES.splice(serviceIndex, 1);
-      
+      const serviceDocRef = doc(db, "services", serviceId);
+      await deleteDoc(serviceDocRef);
       toast({ title: "Service Deleted", description: `Service "${serviceName}" has been deleted.`});
     } catch (dbError) {
       console.error("Error deleting service:", dbError);
@@ -248,20 +188,8 @@ export default function AdminServicesPage() {
   const handleBookingToggle = async (serviceId: string, serviceName: string, currentIsBookable?: boolean) => {
     const newIsBookable = !(currentIsBookable === undefined ? true : currentIsBookable);
     try {
-      // PRODUCTION TODO: Update isBookable field in Firestore
-      // const serviceDocRef = doc(db, "services", serviceId);
-      // await updateDoc(serviceDocRef, { isBookable: newIsBookable, updatedAt: serverTimestamp() });
-
-      // MOCK:
-      const updatedServices = servicesData.map(s =>
-        s.id === serviceId ? { ...s, isBookable: newIsBookable } : s
-      );
-      setServicesData(updatedServices);
-      const mockServiceIndex = MOCK_SERVICES.findIndex(s => s.id === serviceId);
-      if (mockServiceIndex > -1) {
-        MOCK_SERVICES[mockServiceIndex].isBookable = newIsBookable;
-      }
-
+      const serviceDocRef = doc(db, "services", serviceId);
+      await updateDoc(serviceDocRef, { isBookable: newIsBookable, updatedAt: serverTimestamp() });
       toast({
         title: "Booking Status Updated",
         description: `Bookings for "${serviceName}" are now ${newIsBookable ? 'ENABLED' : 'DISABLED'}.`,
@@ -450,4 +378,3 @@ export default function AdminServicesPage() {
     </>
   );
 }
-
