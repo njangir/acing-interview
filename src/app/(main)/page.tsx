@@ -1,9 +1,8 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { TestimonialCard } from '@/components/core/testimonial-card';
-import { HomePageServiceList } from '@/components/core/home-page-service-list'; // Import the new component
-import { MOCK_TESTIMONIALS } from '@/constants'; // MOCK_SERVICES removed from here
+import { HomePageServiceList } from '@/components/core/home-page-service-list';
+import { HomePageTestimonialList } from '@/components/core/home-page-testimonial-list';
 import { CheckCircle, Shield, Target } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -70,11 +69,7 @@ export default function HomePage() {
       <section id="testimonials" className="py-16 bg-background">
         <div className="container">
           <h2 className="text-3xl font-bold text-center mb-12 font-headline text-primary">Success Stories</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {MOCK_TESTIMONIALS.filter(t => t.status === 'approved').slice(0,3).map((testimonial) => (
-              <TestimonialCard key={testimonial.id} testimonial={testimonial} />
-            ))}
-          </div>
+          <HomePageTestimonialList />
            <div className="text-center mt-12">
             <Button asChild variant="outline" size="lg" className="border-primary text-primary hover:bg-primary/10">
               <Link href="/testimonials">More Testimonials</Link>

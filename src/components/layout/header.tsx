@@ -13,15 +13,13 @@ import type { LucideIcon } from 'lucide-react';
 import { Logo } from '@/components/icons/logo';
 import { useAuth } from '@/hooks/use-auth';
 import { usePathname } from 'next/navigation';
-import { DASHBOARD_NAV_LINKS, ADMIN_DASHBOARD_NAV_LINKS, MOCK_BOOKINGS, MOCK_USER_MESSAGES } from '@/constants';
+import { DASHBOARD_NAV_LINKS, ADMIN_DASHBOARD_NAV_LINKS } from '@/constants';
 import type { Booking, UserMessage } from '@/types';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
+import { db } from '@/lib/firebase';
+import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 
-// PRODUCTION TODO: For a production notification system:
-// - Notifications should ideally be fetched from a dedicated Firestore collection (e.g., "userNotifications/{userId}/notifications").
-// - These notifications would be created by backend triggers (Cloud Functions) in response to events like new messages, booking status changes, etc.
-// - The "seen" status of notifications should also be stored in Firestore for persistence across devices.
 
 const mainSiteNavItems: Array<{ href: string; label: string; icon: LucideIcon }> = [
   { href: '/', label: 'Home Base', icon: Home },
@@ -31,14 +29,13 @@ const mainSiteNavItems: Array<{ href: string; label: string; icon: LucideIcon }>
 ];
 
 interface NotificationItem {
-  id: string; // Unique ID for the notification event (e.g., "booking-booking1-status-scheduled")
+  id: string; 
   message: string;
   timestamp: Date;
   href: string;
   type: 'booking' | 'message';
 }
 
-// Helper to create consistent notification event IDs
 const getNotificationEventId = (itemId: string, type: string, subType?: string): string => {
   return `${type}-${itemId}${subType ? `-${subType}` : ''}`;
 };
@@ -51,7 +48,6 @@ export function Header() {
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  const [notificationCount, setNotificationCount] = useState(0);
   const [notificationsToShow, setNotificationsToShow] = useState<NotificationItem[]>([]);
   const [isNotificationPopoverOpen, setIsNotificationPopoverOpen] = useState(false);
 
@@ -61,14 +57,12 @@ export function Header() {
 
   const getSeenNotifications = useCallback((): string[] => {
     if (typeof window === 'undefined' || !currentUser) return [];
-    // For mock, using email. In production, use currentUser.uid for localStorage key or fetch from Firestore.
-    const seen = localStorage.getItem(`seenNotifications_${currentUser.email}`);
+    const seen = localStorage.getItem(`seenNotifications_${currentUser.uid}`);
     return seen ? JSON.parse(seen) : [];
   }, [currentUser]);
 
-  const calculateNotifications = useCallback(() => {
+  const calculateAndSetNotifications = useCallback((bookings: Booking[], messages: UserMessage[]) => {
     if (typeof window === 'undefined' || !isLoggedIn || isAdmin || !currentUser) {
-      setNotificationCount(0);
       setNotificationsToShow([]);
       return;
     }
@@ -76,87 +70,71 @@ export function Header() {
     const seenNotifications = getSeenNotifications();
     const currentActiveNotifications: NotificationItem[] = [];
 
-    // PRODUCTION TODO: Fetch actual bookings and messages for the current user (currentUser.uid)
-    // from Firestore instead of using MOCK_BOOKINGS and MOCK_USER_MESSAGES.
-    // This logic would then process these fetched items to generate notifications.
+    bookings.forEach(booking => {
+      let eventId: string | null = null;
+      let message: string | null = null;
+      let eventTimestamp = booking.updatedAt instanceof Timestamp ? booking.updatedAt.toDate() : new Date();
+      const href = '/dashboard/bookings';
+      const serviceName = booking.serviceName.length > 20 ? booking.serviceName.substring(0, 17) + '...' : booking.serviceName;
+      const bookingWasOriginallyPaid = booking.transactionId !== null && booking.paymentStatus !== 'pay_later_pending' && booking.paymentStatus !== 'pay_later_unpaid';
 
-    // Mock processing of MOCK_BOOKINGS
-    MOCK_BOOKINGS.forEach(booking => {
-      if (booking.userEmail === currentUser.email) { // Filter for current user
-        let eventId: string | null = null;
-        let message: string | null = null;
-        let eventTimestamp = new Date(booking.date);
-        const href = '/dashboard/bookings';
-        const serviceName = booking.serviceName.length > 20 ? booking.serviceName.substring(0, 17) + '...' : booking.serviceName;
-
-        // Mock check for initial payment status (simplified)
-        const bookingWasOriginallyPaid = booking.transactionId !== null && booking.paymentStatus !== 'pay_later_pending' && booking.paymentStatus !== 'pay_later_unpaid';
-
-        if ((booking.status === 'accepted' || booking.status === 'scheduled')) {
-          eventId = getNotificationEventId(booking.id, 'booking', booking.status);
-          message = `Booking for '${serviceName}' is ${booking.status}.`;
-           const linkAddedEventId = getNotificationEventId(booking.id, 'booking', 'link_added');
-           if (booking.meetingLink && !seenNotifications.includes(linkAddedEventId) && booking.paymentStatus === 'paid') {
-               eventId = linkAddedEventId;
-               message = `Meeting link for '${serviceName}' on ${booking.date} is available.`;
-               eventTimestamp = new Date();
-           }
-        } else if (booking.status === 'cancelled') {
-          eventId = getNotificationEventId(booking.id, 'booking', 'cancelled');
-          message = `Booking for '${serviceName}' on ${booking.date} was cancelled.`;
-          eventTimestamp = new Date();
-        } else if (booking.status === 'completed' && (booking.reportUrl || (booking.detailedFeedback && booking.detailedFeedback.length > 0))) {
-          const feedbackReadyEventId = getNotificationEventId(booking.id, 'booking', 'feedback_ready');
-          if (!seenNotifications.includes(feedbackReadyEventId)){
-            eventId = feedbackReadyEventId;
-            message = `Feedback/Report for '${serviceName}' is ready.`;
-            eventTimestamp = new Date();
+      if ((booking.status === 'accepted' || booking.status === 'scheduled')) {
+        eventId = getNotificationEventId(booking.id, 'booking', booking.status);
+        message = `Booking for '${serviceName}' is ${booking.status}.`;
+         const linkAddedEventId = getNotificationEventId(booking.id, 'booking', 'link_added');
+         if (booking.meetingLink && !seenNotifications.includes(linkAddedEventId) && booking.paymentStatus === 'paid') {
+             eventId = linkAddedEventId;
+             message = `Meeting link for '${serviceName}' on ${booking.date} is available.`;
+         }
+      } else if (booking.status === 'cancelled') {
+        eventId = getNotificationEventId(booking.id, 'booking', 'cancelled');
+        message = `Booking for '${serviceName}' on ${booking.date} was cancelled.`;
+      } else if (booking.status === 'completed' && (booking.reportUrl || (booking.detailedFeedback && booking.detailedFeedback.length > 0))) {
+        const feedbackReadyEventId = getNotificationEventId(booking.id, 'booking', 'feedback_ready');
+        if (!seenNotifications.includes(feedbackReadyEventId)){
+          eventId = feedbackReadyEventId;
+          message = `Feedback/Report for '${serviceName}' is ready.`;
+        }
+      }
+      
+      if (bookingWasOriginallyPaid && booking.requestedRefund === false && booking.status === 'cancelled' && (booking.paymentStatus === 'pay_later_unpaid')) {
+          const refundEventId = getNotificationEventId(booking.id, 'booking', 'refund_processed');
+          const alreadyNotifiedRefund = currentActiveNotifications.some(n => n.id === refundEventId) || seenNotifications.includes(refundEventId);
+          if (!alreadyNotifiedRefund) {
+               currentActiveNotifications.push({
+                  id: refundEventId,
+                  message: `Your refund for '${serviceName}' has been processed.`,
+                  timestamp: eventTimestamp,
+                  href,
+                  type: 'booking',
+               });
           }
-        }
-        
-        // Notification for refund processing (mock)
-        if (bookingWasOriginallyPaid && booking.requestedRefund === false && booking.status === 'cancelled' && (booking.paymentStatus === 'pay_later_unpaid' /* or a specific 'refunded' status */)) {
-            const refundEventId = getNotificationEventId(booking.id, 'booking', 'refund_processed');
-            const alreadyNotifiedRefund = currentActiveNotifications.some(n => n.id === refundEventId) || seenNotifications.includes(refundEventId);
-            if (!alreadyNotifiedRefund) {
-                 currentActiveNotifications.push({
-                    id: refundEventId,
-                    message: `Your refund for '${serviceName}' has been processed.`,
-                    timestamp: new Date(),
-                    href,
-                    type: 'booking',
-                 });
-            }
-        }
+      }
 
-        if (eventId && message && !seenNotifications.includes(eventId) && !currentActiveNotifications.some(n=>n.id === eventId)) {
-          currentActiveNotifications.push({ id: eventId, message, timestamp: eventTimestamp, href, type: 'booking' });
-        }
+      if (eventId && message && !seenNotifications.includes(eventId) && !currentActiveNotifications.some(n=>n.id === eventId)) {
+        currentActiveNotifications.push({ id: eventId, message, timestamp: eventTimestamp, href, type: 'booking' });
       }
     });
 
-    // Mock processing of MOCK_USER_MESSAGES
     const userMessageThreads: { [key: string]: UserMessage[] } = {};
-     MOCK_USER_MESSAGES.forEach(msg => {
-        if (msg.userEmail === currentUser.email) { // Filter for current user
-            const threadKey = msg.userEmail + (msg.subject.startsWith("Re:") ? msg.subject.substring(3).trim() : msg.subject.trim());
-            if (!userMessageThreads[threadKey]) {
-                 userMessageThreads[threadKey] = [];
-            }
-            userMessageThreads[threadKey].push(msg);
-        }
+    messages.forEach(msg => {
+      const threadKey = msg.subject.startsWith("Re:") ? msg.subject.substring(3).trim() : msg.subject.trim();
+      if (!userMessageThreads[threadKey]) {
+           userMessageThreads[threadKey] = [];
+      }
+      userMessageThreads[threadKey].push(msg);
     });
 
     Object.values(userMessageThreads).forEach(thread => {
-        const lastMessage = thread.sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).pop();
-        if (lastMessage && lastMessage.senderType === 'admin') { // Admin reply notification
+        const lastMessage = thread.sort((a,b) => (a.timestamp as Timestamp).toMillis() - (b.timestamp as Timestamp).toMillis()).pop();
+        if (lastMessage && lastMessage.senderType === 'admin') {
             const eventId = getNotificationEventId(lastMessage.id, 'message', 'admin_reply');
             const subjectSnippet = lastMessage.subject.replace('Re: ','').substring(0,25);
             if (!seenNotifications.includes(eventId)  && !currentActiveNotifications.some(n=>n.id === eventId)) {
                 currentActiveNotifications.push({
                     id: eventId,
                     message: `Admin replied in: "${subjectSnippet}${subjectSnippet.length === 25 ? '...' : ''}"`,
-                    timestamp: new Date(lastMessage.timestamp),
+                    timestamp: (lastMessage.timestamp as Timestamp).toDate(),
                     href: '/dashboard/contact',
                     type: 'message',
                 });
@@ -166,36 +144,53 @@ export function Header() {
 
     currentActiveNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
     setNotificationsToShow(currentActiveNotifications);
-    setNotificationCount(currentActiveNotifications.length);
 
   }, [isLoggedIn, isAdmin, currentUser, getSeenNotifications]);
 
-
   useEffect(() => {
-    calculateNotifications();
-  }, [calculateNotifications, pathname]); // Recalculate on path change too, e.g. if a notification leads to a page that resolves it
+    if (!isLoggedIn || isAdmin || !currentUser?.uid) {
+      setNotificationsToShow([]);
+      return;
+    }
+
+    const bookingsQuery = query(collection(db, 'bookings'), where('uid', '==', currentUser.uid));
+    const messagesQuery = query(collection(db, 'userMessages'), where('userEmail', '==', currentUser.email));
+    
+    let bookingsData: Booking[] = [];
+    let messagesData: UserMessage[] = [];
+
+    const unsubBookings = onSnapshot(bookingsQuery, (snapshot) => {
+      bookingsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
+      calculateAndSetNotifications(bookingsData, messagesData);
+    });
+
+    const unsubMessages = onSnapshot(messagesQuery, (snapshot) => {
+      messagesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserMessage));
+      calculateAndSetNotifications(bookingsData, messagesData);
+    });
+    
+    return () => {
+      unsubBookings();
+      unsubMessages();
+    };
+  }, [isLoggedIn, isAdmin, currentUser, calculateAndSetNotifications]);
 
   const handleNotificationClick = (notificationId: string) => {
     if (typeof window === 'undefined' || !currentUser) return;
     
-    // For mock, using email. In production, use currentUser.uid.
     const seenNotifications = getSeenNotifications();
     const updatedSeenNotifications = Array.from(new Set([...seenNotifications, notificationId]));
-    localStorage.setItem(`seenNotifications_${currentUser.email}`, JSON.stringify(updatedSeenNotifications));
+    localStorage.setItem(`seenNotifications_${currentUser.uid}`, JSON.stringify(updatedSeenNotifications));
     
-    calculateNotifications();
+    const updatedNotifications = notificationsToShow.filter(n => n.id !== notificationId);
+    setNotificationsToShow(updatedNotifications);
   };
 
   const handlePopoverOpenChange = (open: boolean) => {
     setIsNotificationPopoverOpen(open);
-    if (open) {
-        calculateNotifications();
-    }
   };
 
-
   React.useEffect(() => {
-    // Close mobile sheet on route change
     setIsSheetOpen(false);
   }, [pathname]);
 
@@ -203,31 +198,26 @@ export function Header() {
   const isAdminPath = pathname.startsWith('/admin');
 
   let contextualNavItems: Array<{ href: string; label: string; icon: LucideIcon }> = [];
-  let contextualNavTitle = "Field Menu"; // Default title for main site navigation
+  let contextualNavTitle = "Field Menu";
   
   if (isLoggedIn && !isAdmin) {
     if (isDashboardPath) {
       contextualNavTitle = "Officer Candidate HQ";
-      // Remove "My " prefix for brevity in mobile menu
       contextualNavItems = DASHBOARD_NAV_LINKS.map(link => ({...link, label: link.label.replace("My ", "")}));
     } else {
-      // When on main site pages, non-admin logged-in users still see "Field Menu"
-      // and main site nav items, plus a prominent link to their dashboard.
-      contextualNavItems = []; // Main site nav items will be primary
+      contextualNavItems = [];
     }
   } else if (isAdmin && isAdminPath) {
     contextualNavTitle = "Admin Command";
     contextualNavItems = ADMIN_DASHBOARD_NAV_LINKS;
   }
 
-
   const renderNavLinks = (items: Array<{ href: string; label: string; icon: LucideIcon }>) => {
     return items.map((link) => {
       const LinkIcon = link.icon;
-      // Adjusted isActive logic for more precise highlighting
       const isActive = pathname === link.href ||
-                       (link.href === '/dashboard' && isDashboardPath && pathname.startsWith('/dashboard')) || // Highlight "Dashboard" if anywhere in dashboard
-                       (link.href === '/admin' && isAdminPath && pathname.startsWith('/admin')) || // Highlight "Admin" if anywhere in admin
+                       (link.href === '/dashboard' && isDashboardPath && pathname.startsWith('/dashboard')) ||
+                       (link.href === '/admin' && isAdminPath && pathname.startsWith('/admin')) ||
                        (link.href !== '/' && link.href !== '/dashboard' && link.href !== '/admin' && pathname.startsWith(link.href) && link.href.length > 1);
       return (
         <Link
@@ -246,10 +236,9 @@ export function Header() {
   };
 
   const getOverallNotificationsLink = () => {
-    if (notificationsToShow.length === 0) return "/dashboard"; // Default if no specific preference
+    if (notificationsToShow.length === 0) return "/dashboard";
     const bookingNotifs = notificationsToShow.filter(n => n.type === 'booking').length;
     const messageNotifs = notificationsToShow.filter(n => n.type === 'message').length;
-    // Prioritize booking notifications if they exist, otherwise message notifications, then default
     if (bookingNotifs > 0) return "/dashboard/bookings";
     if (messageNotifs > 0) return "/dashboard/contact";
     return "/dashboard";
@@ -261,7 +250,6 @@ export function Header() {
         <Link href="/" className="mr-6 flex items-center space-x-2">
           <Logo />
         </Link>
-        {/* Desktop Navigation */}
         <nav className="hidden md:flex gap-6 items-center">
           {mainSiteNavItems.map((link) => (
             <Link
@@ -275,7 +263,7 @@ export function Header() {
               {link.label}
             </Link>
           ))}
-          {isLoggedIn && !isAdmin && ( // Link to Dashboard for regular logged-in users
+          {isLoggedIn && !isAdmin && (
              <Link
               href="/dashboard"
               className={cn(
@@ -290,14 +278,14 @@ export function Header() {
         <div className="flex flex-1 items-center justify-end space-x-2">
           {isLoggedIn ? (
             <>
-              {currentUser && !isAdmin && ( // Notification bell for regular users
+              {currentUser && !isAdmin && (
                 <Popover open={isNotificationPopoverOpen} onOpenChange={handlePopoverOpenChange}>
                   <PopoverTrigger asChild>
                     <Button variant="ghost" size="icon" className="relative mr-1">
                       <Bell className="h-5 w-5" />
-                      {notificationCount > 0 && (
+                      {notificationsToShow.length > 0 && (
                         <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full transform translate-x-1/2 -translate-y-1/2">
-                          {notificationCount}
+                          {notificationsToShow.length}
                         </span>
                       )}
                       <span className="sr-only">Notifications</span>
@@ -315,7 +303,7 @@ export function Header() {
                             variant="ghost" 
                             size="icon" 
                             className="h-6 w-6" 
-                            onClick={() => setIsNotificationPopoverOpen(false)} // Ensure popover closes
+                            onClick={() => setIsNotificationPopoverOpen(false)}
                             aria-label="Close notifications"
                         >
                             <XIcon className="h-4 w-4" />
@@ -330,7 +318,7 @@ export function Header() {
                             className="block p-3 hover:bg-accent/50 text-sm"
                             onClick={() => {
                               handleNotificationClick(item.id);
-                              setIsNotificationPopoverOpen(false); // Close popover on click
+                              setIsNotificationPopoverOpen(false);
                             }} 
                           >
                             <p className="truncate font-medium text-foreground">{item.message}</p>
@@ -379,7 +367,7 @@ export function Header() {
               </Button>
             </>
           )}
-           {isAdmin && !isAdminPath && ( // Link to Admin panel for admins if not already in admin section
+           {isAdmin && !isAdminPath && (
              <Button asChild variant="outline" size="sm" className="hidden lg:flex border-primary text-primary hover:bg-primary/10 ml-2">
                 <Link href="/admin">
                   <ShieldCheck className="mr-2 h-4 w-4" /> Admin Command
@@ -387,7 +375,6 @@ export function Header() {
               </Button>
            )}
         </div>
-        {/* Mobile Menu Trigger - Conditionally rendered after mount */}
         {isMounted && (
             <div className="md:hidden ml-2">
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
@@ -407,19 +394,16 @@ export function Header() {
                         <Logo />
                     </Link>
 
-                    {/* Contextual Nav Section for Mobile */}
                     {contextualNavItems.length > 0 && (
                         <>
                             <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">{contextualNavTitle}</h3>
                             {renderNavLinks(contextualNavItems)}
                             <Separator className="my-2" />
-                            {/* Show main site links only if contextual nav is not the main site nav itself */}
                             {(isDashboardPath || isAdminPath) && <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">Main Menu</h3>}
                             {(isDashboardPath || isAdminPath) && renderNavLinks(mainSiteNavItems)}
                         </>
                     )}
 
-                    {/* If no specific contextual items (e.g., logged out, or logged-in user on main site) */}
                     {contextualNavItems.length === 0 && (
                         <>
                             <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground">{contextualNavTitle}</h3>
@@ -427,7 +411,6 @@ export function Header() {
                         </>
                     )}
                     
-                    {/* Explicit link to Dashboard if logged in, not admin, and not on a dashboard page */}
                     {isLoggedIn && !isAdmin && !isDashboardPath && !contextualNavItems.some(item => item.href.startsWith('/dashboard')) && (
                         <>
                         <Separator className="my-2" />
@@ -444,7 +427,6 @@ export function Header() {
                         </>
                     )}
 
-                    {/* Explicit link to Admin Command if admin and not on an admin page */}
                     {isAdmin && !isAdminPath && (
                         <>
                         <Separator className="my-2" />
@@ -459,7 +441,6 @@ export function Header() {
                         </>
                     )}
 
-                    {/* Auth actions at the bottom */}
                     <div className="pt-4 mt-2 border-t">
                         {isLoggedIn ? (
                             <Button variant="outline" size="sm" onClick={() => { logout(); setIsSheetOpen(false);}} className="w-full">
@@ -490,7 +471,3 @@ export function Header() {
     </header>
   );
 }
-    
-    
-
-    

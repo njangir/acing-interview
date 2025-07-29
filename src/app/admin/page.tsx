@@ -1,30 +1,107 @@
 
 'use client'; 
 
-import { useMemo } from 'react'; 
+import { useState, useEffect } from 'react'; 
 import { PageHeader } from "@/components/core/page-header";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { ADMIN_DASHBOARD_NAV_LINKS, MOCK_BOOKINGS, MOCK_USER_MESSAGES, MOCK_SERVICES } from "@/constants";
-import { ArrowRight, BellRing, TrendingUp, MessagesSquare, Star } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BellRing, TrendingUp, MessagesSquare, Star, Loader2, AlertTriangle } from "lucide-react";
 import { WeeklyScheduleView } from '@/components/core/weekly-schedule-view';
+import type { Booking, Service, UserMessage } from '@/types';
+import { db } from '@/lib/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function AdminOverviewPage() {
-  const newBookingRequests = useMemo(() => MOCK_BOOKINGS.filter(b => b.status === 'pending_approval').length, []);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [messages, setMessages] = useState<UserMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsLoading(true);
+    const queries = [
+      { collectionName: 'bookings', setter: setBookings },
+      { collectionName: 'services', setter: setServices },
+      { collectionName: 'userMessages', setter: setMessages },
+    ];
+    const unsubs: (() => void)[] = [];
+    let active = true;
+
+    Promise.all(queries.map(q => {
+      return new Promise<void>((resolve, reject) => {
+        const unsub = onSnapshot(
+          collection(db, q.collectionName),
+          (snapshot) => {
+            if (active) {
+              const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+              q.setter(data as any);
+            }
+            resolve();
+          },
+          (err) => {
+            console.error(`Error fetching ${q.collectionName}:`, err);
+            reject(err);
+          }
+        );
+        unsubs.push(unsub);
+      });
+    }))
+    .then(() => {
+      if (active) setIsLoading(false);
+    })
+    .catch(() => {
+      if (active) {
+        setError("Failed to load one or more data sources for the dashboard. Please check your connection and security rules.");
+        setIsLoading(false);
+      }
+    });
+
+    return () => {
+      active = false;
+      unsubs.forEach(unsub => unsub());
+    };
+  }, []);
+
+  const newBookingRequests = bookings.filter(b => b.status === 'pending_approval').length;
   
-  const totalSales = useMemo(() => MOCK_BOOKINGS.reduce((acc, booking) => {
+  const totalSales = bookings.reduce((acc, booking) => {
     if (booking.paymentStatus === 'paid') {
-      const service = MOCK_SERVICES.find(s => s.id === booking.serviceId); 
+      const service = services.find(s => s.id === booking.serviceId); 
       if (service) {
         return acc + service.price;
       }
     }
     return acc;
-  }, 0), []);
+  }, 0);
 
-  const newMessagesCount = useMemo(() => MOCK_USER_MESSAGES.filter(m => m.status === 'new').length, []);
-  const averageRating = "4.7/5 Stars"; 
+  const newMessagesCount = messages.filter(m => m.status === 'new' && m.senderType === 'user').length;
+  const averageRating = "4.7/5 Stars"; // This remains a placeholder as we don't have a rating system yet.
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2 text-muted-foreground">Loading dashboard data...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+     return (
+       <>
+        <PageHeader
+            title="Admin Dashboard Overview"
+            description="Welcome to the admin panel. Get quick insights and manage your application's operations from here."
+        />
+        <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Error Loading Dashboard</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+        </Alert>
+       </>
+    );
+  }
 
   return (
     <>
@@ -32,7 +109,6 @@ export default function AdminOverviewPage() {
         title="Admin Dashboard Overview"
         description="Welcome to the admin panel. Get quick insights and manage your application's operations from here."
       />
-      
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
         <Card className="shadow">
@@ -78,11 +154,10 @@ export default function AdminOverviewPage() {
       </div>
 
       <WeeklyScheduleView
-        allBookings={MOCK_BOOKINGS}
+        allBookings={bookings}
         title="Admin - Weekly Bookings Overview"
         showUserName={true}
       />
-      
     </>
   );
 }
