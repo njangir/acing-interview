@@ -4,7 +4,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { useState, useEffect } from 'react'; // Added useEffect
+import { useState, useEffect } from 'react';
 
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from '@/components/ui/button';
@@ -14,14 +14,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { MailQuestion, Loader2 } from 'lucide-react'; // Added Loader2
-import { MOCK_USER_MESSAGES } from '@/constants'; // For adding to mock messages
+import { MailQuestion, Loader2 } from 'lucide-react';
 import type { UserMessage } from '@/types';
-import { useAuth } from '@/hooks/use-auth'; // Import useAuth
+import { useAuth } from '@/hooks/use-auth';
 
-// PRODUCTION TODO: Import Firebase and Firestore methods
-// import { db } from '@/lib/firebase';
-// import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 const contactFormSchema = z.object({
   subject: z.string().min(5, { message: "Subject must be at least 5 characters." }),
@@ -34,7 +32,7 @@ type ContactFormValues = z.infer<typeof contactFormSchema>;
 
 export default function ContactSupportPage() {
   const { toast } = useToast();
-  const { currentUser, loadingAuth } = useAuth(); // Get the current logged-in user and loading state
+  const { currentUser, loadingAuth } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<ContactFormValues>({
@@ -59,36 +57,24 @@ export default function ContactSupportPage() {
 
     setIsSubmitting(true);
 
-    const newMessageData: Omit<UserMessage, 'id' | 'createdAt' | 'updatedAt'> = {
+    const newMessageData: Omit<UserMessage, 'id' | 'createdAt' | 'updatedAt' | 'timestamp'> = {
       uid: currentUser.uid,
       userName: currentUser.name,
       userEmail: currentUser.email,
       subject: data.subject,
       messageBody: data.message,
-      timestamp: new Date(), // For Firestore, use serverTimestamp() for 'createdAt'
       status: 'new',
       senderType: 'user',
     };
     
     try {
-      // PRODUCTION TODO: Add new message document to Firestore 'userMessages' collection
-      // const messagesColRef = collection(db, "userMessages");
-      // await addDoc(messagesColRef, {
-      //   ...newMessageData,
-      //   timestamp: serverTimestamp(), // Use server timestamp for consistent ordering
-      //   createdAt: serverTimestamp(),
-      //   updatedAt: serverTimestamp(),
-      // });
-
-      // MOCK: Add to MOCK_USER_MESSAGES array for prototype
-      MOCK_USER_MESSAGES.push({
+      const messagesColRef = collection(db, "userMessages");
+      await addDoc(messagesColRef, {
         ...newMessageData,
-        id: `msg-user-${Date.now()}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      } as UserMessage);
-      console.log("Message submitted (simulated backend send):", newMessageData);
-      // END MOCK
+        timestamp: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
 
       toast({
         title: "Message Sent!",
@@ -225,4 +211,3 @@ export default function ContactSupportPage() {
     </>
   );
 }
-
