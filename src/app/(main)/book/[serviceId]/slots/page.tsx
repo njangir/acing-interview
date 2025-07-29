@@ -167,13 +167,6 @@ export default function SlotSelectionPage() {
         time: selectedTime
     }));
 
-    const userDetailsToStore = {
-      name: currentUser.name,
-      email: currentUser.email,
-      // phone: currentUser.phone || "", // If phone is part of AuthUser/UserProfile
-    };
-    localStorage.setItem('userDetails', JSON.stringify(userDetailsToStore));
-
     router.push(`/book/${serviceId}/payment`);
   };
 

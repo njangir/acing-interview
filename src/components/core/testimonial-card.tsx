@@ -1,43 +1,24 @@
 
-'use client'; // Required for localStorage and useEffect/useState
+'use client'; 
 
-import type { Testimonial, UserProfile } from '@/types';
+import type { Testimonial } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Quote } from 'lucide-react';
-import Image from 'next/image'; // For displaying the body image
-import { useState, useEffect } from 'react';
+import Image from 'next/image';
 
 interface TestimonialCardProps {
   testimonial: Testimonial;
 }
 
 export function TestimonialCard({ testimonial }: TestimonialCardProps) {
-  const [displayAvatarUrl, setDisplayAvatarUrl] = useState<string | undefined>(testimonial.imageUrl);
-
-  useEffect(() => {
-    if (testimonial.userEmail) {
-      try {
-        const userProfileString = localStorage.getItem(`mockUserProfile_${testimonial.userEmail}`);
-        if (userProfileString) {
-          const userProfile: UserProfile = JSON.parse(userProfileString);
-          if (userProfile.imageUrl) {
-            setDisplayAvatarUrl(userProfile.imageUrl);
-          }
-        }
-      } catch (error) {
-        console.error("Failed to parse user profile for avatar:", error);
-        // Fallback to testimonial.imageUrl is already handled by initial state
-      }
-    }
-  }, [testimonial.userEmail, testimonial.imageUrl]);
-
+  
   return (
     <Card className="h-full shadow-lg bg-card flex flex-col hover:shadow-xl hover:scale-[1.02] transition-all duration-300 ease-in-out">
       <CardHeader className="flex flex-row items-center gap-4 pb-2">
         <Avatar className="h-12 w-12">
           <AvatarImage 
-            src={displayAvatarUrl || `https://placehold.co/100x100.png?text=${testimonial.name.charAt(0)}`} 
+            src={testimonial.imageUrl || `https://placehold.co/100x100.png?text=${testimonial.name.charAt(0)}`} 
             alt={testimonial.name}
             data-ai-hint={testimonial.dataAiHint || 'person'}
           />

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState, useRef } from 'react'; 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
@@ -24,24 +24,14 @@ interface ConfirmationDetails {
 export default function BookingConfirmationPage() {
   const router = useRouter();
   const [details, setDetails] = useState<ConfirmationDetails | null>(null);
-  const effectGuard = useRef(false); 
 
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      if (effectGuard.current) {
-        return; 
-      }
-      effectGuard.current = true; 
-    }
-
-    if (details) {
-      return;
-    }
-
+    // This effect runs once on component mount to retrieve details
+    // and clean up localStorage to prevent re-using old confirmation data.
     const storedDetails = localStorage.getItem('confirmationDetails');
     if (storedDetails) {
       try {
-        const parsedDetails = JSON.parse(storedDetails) as ConfirmationDetails; // Ensure type
+        const parsedDetails = JSON.parse(storedDetails) as ConfirmationDetails;
         setDetails(parsedDetails);
         localStorage.removeItem('bookingDetails');
         localStorage.removeItem('userDetails');
@@ -52,11 +42,10 @@ export default function BookingConfirmationPage() {
       }
     } else {
       console.warn("No confirmationDetails found in localStorage on page load. Redirecting to services.");
-      if (!details) {
-         router.push('/services');
-      }
+      // If there are no details, redirect away to prevent a blank page.
+      router.push('/services');
     }
-  }, [router, details]); 
+  }, [router]); 
 
   if (!details) {
     return <div className="container py-12">Loading confirmation...</div>;

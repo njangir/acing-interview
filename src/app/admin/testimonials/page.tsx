@@ -151,22 +151,11 @@ export default function AdminTestimonialsPage() {
     const usersMap = new Map<string, SelectableUser>();
     MOCK_BOOKINGS.forEach(booking => { // MOCK_BOOKINGS is still used here for user list derivation
       if (booking.userEmail && !usersMap.has(booking.userEmail)) {
-        let avatarUrl = PREDEFINED_AVATARS[0].url; 
-        try {
-          const userProfileString = localStorage.getItem(`mockUserProfile_${booking.userEmail}`);
-          if (userProfileString) {
-            const userProfile: UserProfile = JSON.parse(userProfileString);
-            if (userProfile.imageUrl) {
-              avatarUrl = userProfile.imageUrl;
-            }
-          }
-        } catch (e) { console.error("Error parsing profile for user list", e); }
-        
         usersMap.set(booking.userEmail, {
           id: booking.userEmail, // Using email as ID for mock
           name: booking.userName,
           email: booking.userEmail,
-          avatarUrl: avatarUrl,
+          avatarUrl: PREDEFINED_AVATARS[0].url, // Needs a better way to get user avatar in prod
         });
       }
     });
@@ -277,24 +266,9 @@ export default function AdminTestimonialsPage() {
   const allFilteredTestimonials = useMemo(() => {
     let filtered = [...allTestimonialsData]; 
     if (filterBadgeId !== 'all') {
-      // PRODUCTION TODO: This filtering logic is based on mock localStorage.
-      // In production, if filtering by user badges is needed, it would require:
-      // 1. Fetching user profiles that have this badge.
-      // 2. Then fetching testimonials for those users.
-      // OR, denormalizing some badge info into the testimonial document (less ideal).
-      // OR, more complex Firestore queries if testimonials store `uid`.
-      console.warn("Filtering by badge is using mock localStorage data and is not production-ready.");
-      filtered = filtered.filter(testimonial => {
-        if (!testimonial.userEmail) return false;
-        const mockUserProfileKey = `mockUserProfile_${testimonial.userEmail}`;
-        const storedProfileData = localStorage.getItem(mockUserProfileKey);
-
-        if (storedProfileData) {
-          const userProfile: UserProfile = JSON.parse(storedProfileData);
-          return userProfile.awardedBadges?.some(badge => badge.id === filterBadgeId);
-        }
-        return false;
-      });
+      // This is a mock-only feature and would require complex queries in production
+      console.warn("Filtering by badge is a mock-only feature for now.");
+      filtered = []; 
     }
     return filtered.sort((a,b) => {
         const statusOrder = { pending: 0, approved: 1, rejected: 2 };
@@ -327,15 +301,9 @@ export default function AdminTestimonialsPage() {
     const selectedService = allServicesData.find(s => s.id === data.serviceId);
 
     // PRODUCTION TODO: Determine UID if user is selected.
-    // This logic needs to be robust. If a user is selected from `selectableUsers`,
-    // we need their actual UID from Firestore (not just email which is used as ID in mock).
-    // For 'manual' entry without a UID, you might store it as an anonymous testimonial or require admin to find/assign UID.
     let userUid: string | undefined = undefined;
     if (data.selectedUserId && data.selectedUserId !== "manual") {
-        // In mock, `selectableUsers.id` is userEmail. In production, it should be UID.
-        // For this mock, we'll just log it.
         console.log("Selected user's email (used as ID in mock):", data.selectedUserId);
-        // Example: userUid = await getUidForEmail(data.userEmail); // This function would query Firestore
     }
 
     const newTestimonialData: Omit<Testimonial, 'id' | 'createdAt' | 'updatedAt'> & { uid?: string } = {
@@ -461,7 +429,7 @@ export default function AdminTestimonialsPage() {
           <CardTitle>Testimonial Submissions</CardTitle>
           <CardDescription>
             Showing {paginatedTestimonials.length} of {allFilteredTestimonials.length} testimonials.
-            {filterBadgeId !== 'all' && <span className="block text-xs text-orange-600">Note: Badge filter is currently using mock data and may not reflect live user badge assignments.</span>}
+            {filterBadgeId !== 'all' && <span className="block text-xs text-orange-600">Note: Badge filter is a mock feature and will not show results.</span>}
           </CardDescription>
         </CardHeader>
         <CardContent>
