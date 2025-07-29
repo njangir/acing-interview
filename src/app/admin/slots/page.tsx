@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react'; // Added useEffect and useMemo
+import { useState, useEffect } from 'react';
 import { addDays, format, startOfWeek, endOfWeek, nextSaturday, nextSunday, isBefore, startOfToday } from 'date-fns';
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
@@ -10,15 +10,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { AVAILABLE_SLOTS } from '@/constants'; // For simulation & temporary dual update
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Info, CalendarCheck, CalendarX, Loader2, AlertTriangle } from 'lucide-react'; // Added Loader2, AlertTriangle
+import { Info, CalendarCheck, CalendarX, Loader2, AlertTriangle } from 'lucide-react';
 
 // PRODUCTION TODO: Import Firebase and Firestore methods
-// import { db } from '@/lib/firebase';
-// import { collection, doc, getDoc, setDoc, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { collection, doc, getDoc, setDoc, getDocs, writeBatch } from 'firebase/firestore';
 
-// Structure for slots data fetched from/sent to Firestore
+
 type FirestoreSlotsData = Record<string, string[]>;
 
 export default function AdminSlotsPage() {
@@ -37,25 +36,16 @@ export default function AdminSlotsPage() {
       setIsLoading(true);
       setError(null);
       try {
-        // PRODUCTION TODO: Fetch all (or a relevant range of) slot data from Firestore
-        // Example: Assuming a collection 'globalAvailability' where doc ID is 'YYYY-MM-DD'
-        // const availabilityColRef = collection(db, 'globalAvailability');
-        // const snapshot = await getDocs(availabilityColRef);
-        // const fetchedData: FirestoreSlotsData = {};
-        // snapshot.forEach(doc => {
-        //   fetchedData[doc.id] = doc.data().timeSlots || [];
-        // });
-        // setFirestoreSlotsData(fetchedData);
-
-        // MOCK: Simulate fetch by using a copy of AVAILABLE_SLOTS
-        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
-        setFirestoreSlotsData({ ...AVAILABLE_SLOTS }); // Initialize with current mock state for demo
-
+        const availabilityColRef = collection(db, 'globalAvailability');
+        const snapshot = await getDocs(availabilityColRef);
+        const fetchedData: FirestoreSlotsData = {};
+        snapshot.forEach(doc => {
+          fetchedData[doc.id] = doc.data().timeSlots || [];
+        });
+        setFirestoreSlotsData(fetchedData);
       } catch (err) {
         console.error("Error fetching availability data:", err);
         setError("Failed to load availability data. Please try again.");
-        // Fallback to mock if fetch fails, to keep UI somewhat functional
-        setFirestoreSlotsData({ ...AVAILABLE_SLOTS });
       } finally {
         setIsLoading(false);
       }
@@ -95,32 +85,24 @@ export default function AdminSlotsPage() {
       }
     }
 
-    // To reflect changes immediately in UI
     const updatedFirestoreSlots: FirestoreSlotsData = { ...firestoreSlotsData };
-
+    
     try {
-      // PRODUCTION TODO: Batch write to Firestore
-      // const batch = writeBatch(db);
+      const batch = writeBatch(db);
       for (const date of dates) {
         const dateString = format(date, 'yyyy-MM-dd');
-        // PRODUCTION TODO: Update Firestore document for this dateString
-        // Example: const docRef = doc(db, 'globalAvailability', dateString);
-        // batch.set(docRef, { timeSlots: slotsToApply });
-
-        // MOCK: Update local state for Firestore simulation
+        const docRef = doc(db, 'globalAvailability', dateString);
+        batch.set(docRef, { timeSlots: slotsToApply });
         updatedFirestoreSlots[dateString] = slotsToApply;
-        // MOCK: Also update the global AVAILABLE_SLOTS for other parts of the prototype
-        AVAILABLE_SLOTS[dateString] = slotsToApply;
       }
-      // PRODUCTION TODO: await batch.commit();
+      await batch.commit();
 
-      setFirestoreSlotsData(updatedFirestoreSlots); // Update local state to re-render calendar
+      setFirestoreSlotsData(updatedFirestoreSlots);
 
       toast({
-        title: `Availability ${actionType === 'set' ? 'Updated' : 'Cleared'} (Simulated Firestore & Mock)`,
-        description: `Slots for ${dates.length} date(s) have been ${actionType === 'set' ? 'set' : 'cleared'}.`,
+        title: `Availability ${actionType === 'set' ? 'Updated' : 'Cleared'}`,
+        description: `Slots for ${dates.length} date(s) have been successfully ${actionType === 'set' ? 'set' : 'cleared'} in Firestore.`,
       });
-      // Force re-render of calendar by changing selectedDate slightly if needed or use a dedicated state
       setSelectedDate(new Date(selectedDate || Date.now()));
 
     } catch (err) {
@@ -175,8 +157,7 @@ export default function AdminSlotsPage() {
 
   const todayForCalendar = startOfToday();
 
-  // Calendar modifiers will now use firestoreSlotsData
-  const modifiers = useMemo(() => ({
+  const modifiers = {
     available: (date: Date) => {
       if (isBefore(date, todayForCalendar)) return false;
       const dateString = format(date, 'yyyy-MM-dd');
@@ -187,7 +168,7 @@ export default function AdminSlotsPage() {
       const dateString = format(date, 'yyyy-MM-dd');
       return !firestoreSlotsData[dateString] || firestoreSlotsData[dateString].length === 0;
     }
-  }), [firestoreSlotsData, todayForCalendar]);
+  };
 
   const modifiersClassNames = {
     available: 'day-available',
@@ -235,11 +216,10 @@ export default function AdminSlotsPage() {
       />
       <Alert className="mb-6 bg-primary/5 text-primary border-primary/20">
         <Info className="h-4 w-4 !text-primary" />
-        <AlertTitle>PRODUCTION TODO & Simulation Notice</AlertTitle>
+        <AlertTitle>Availability Management Notice</AlertTitle>
         <AlertDescription>
-          This page demonstrates managing global availability. For production, consider if slots should be per-service (requiring a service selector and more complex Firestore structure, e.g., `serviceAvailabilities/{serviceId}/{dateString}`).
-          Changes here simulate saving to Firestore and also update the `AVAILABLE_SLOTS` mock constant for prototype-wide reflection.
-          Date colors: <span className="font-semibold text-green-600">Green</span> for available, <span className="font-semibold text-red-600">Red</span> for unavailable/no slots (future dates).
+          You are now editing live availability data from Firestore.
+          Date colors: <span className="font-semibold text-green-600">Green</span> for available, <span className="font-semibold text-red-600">Red</span> for unavailable (future dates).
         </AlertDescription>
       </Alert>
       <div className="grid md:grid-cols-2 gap-8">
@@ -316,5 +296,3 @@ export default function AdminSlotsPage() {
     </>
   );
 }
-
-    
