@@ -81,7 +81,7 @@ export interface UserMessage {
   userEmail: string; // Email of the user, used as a conversation key
   subject: string;
   messageBody: string;
-  timestamp: Date;
+  timestamp: string; // Changed from Date to string
   status: 'new' | 'read' | 'replied' | 'closed'; // Status can apply to individual message or conversation
   senderType: 'user' | 'admin'; // Who sent THIS specific message
   adminName?: string; // Name of admin if senderType is 'admin'
@@ -95,6 +95,8 @@ export interface Badge {
   rankName: string;
   imageUrl: string;
   dataAiHint: string;
+  createdAt?: string; // Added for production readiness
+  updatedAt?: string; // Added for production readiness
 }
 
 export interface UserProfile {
