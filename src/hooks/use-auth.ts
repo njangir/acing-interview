@@ -4,9 +4,9 @@
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import type { UserProfile } from '@/types';
-import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { auth, db, googleProvider } from '@/lib/firebase';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser, signInWithPopup } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 
 interface AuthContextUser {
@@ -22,6 +22,7 @@ interface AuthContextType {
   isLoggedIn: boolean;
   isAdmin: boolean;
   login: (email: string, password: string) => Promise<{ user: AuthContextUser; isAdmin: boolean }>;
+  loginWithGoogle: () => Promise<{ user: AuthContextUser; isAdmin: boolean }>;
   logout: () => Promise<void>;
   loadingAuth: boolean;
 }
@@ -47,7 +48,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         imageUrl: userProfileData.imageUrl,
       };
     } else {
-      console.warn(`Profile not found for user ${firebaseUser.uid}. Using default auth info.`);
+      console.warn(`Profile not found for user ${firebaseUser.uid}. This might be a new Google sign-in. A profile will be created.`);
+      // This case is primarily for Google Sign-In where a profile might not exist yet.
+      // The calling function (loginWithGoogle) will handle creating it.
       return {
         uid: firebaseUser.uid,
         email: firebaseUser.email || 'no-email@example.com',
@@ -80,6 +83,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { user: userProfile, isAdmin: userProfile.isAdmin };
   }, [fetchUserProfile]);
 
+  const loginWithGoogle = useCallback(async () => {
+    const userCredential = await signInWithPopup(auth, googleProvider);
+    const firebaseUser = userCredential.user;
+    const userDocRef = doc(db, "userProfiles", firebaseUser.uid);
+    const userDocSnap = await getDoc(userDocRef);
+
+    let userProfile: AuthContextUser;
+
+    if (!userDocSnap.exists()) {
+      // If profile doesn't exist, create it. This is the "onUserCreate" logic for Google Sign-In.
+      const newUserProfileData = {
+        name: firebaseUser.displayName || 'Google User',
+        email: firebaseUser.email,
+        phone: firebaseUser.phoneNumber || '',
+        imageUrl: firebaseUser.photoURL || undefined,
+        roles: ['user'],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      await setDoc(userDocRef, newUserProfileData);
+      userProfile = {
+        uid: firebaseUser.uid,
+        email: newUserProfileData.email!,
+        name: newUserProfileData.name,
+        isAdmin: false,
+        imageUrl: newUserProfileData.imageUrl,
+      };
+    } else {
+      // If profile exists, fetch it.
+      const existingProfileData = userDocSnap.data() as UserProfile;
+      userProfile = {
+        uid: firebaseUser.uid,
+        email: existingProfileData.email,
+        name: existingProfileData.name,
+        isAdmin: existingProfileData.roles?.includes('admin') || false,
+        imageUrl: existingProfileData.imageUrl,
+      };
+    }
+    
+    setCurrentUser(userProfile);
+    return { user: userProfile, isAdmin: userProfile.isAdmin };
+  }, []);
+
 
   const logout = useCallback(async () => {
     await signOut(auth);
@@ -91,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = !!currentUser && currentUser.isAdmin;
 
   return (
-    <AuthContext.Provider value={{ currentUser, isLoggedIn, isAdmin, login, logout, loadingAuth }}>
+    <AuthContext.Provider value={{ currentUser, isLoggedIn, isAdmin, login, loginWithGoogle, logout, loadingAuth }}>
       {children}
     </AuthContext.Provider>
   );
