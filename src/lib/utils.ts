@@ -1,6 +1,8 @@
 
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { FileText, Video, Link as LinkIcon, LucideIcon } from 'lucide-react';
+import type { Resource } from "@/types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -16,4 +18,15 @@ export function getFutureDate(daysToAdd: number): string {
   const futureDate = new Date(today);
   futureDate.setDate(today.getDate() + daysToAdd);
   return futureDate.toISOString().split('T')[0];
+};
+
+/**
+ * Returns the appropriate Lucide icon component for a given resource type.
+ * @param type The type of the resource.
+ * @returns A LucideIcon component.
+ */
+export function getIconForResourceType(type: Resource['type']): LucideIcon {
+    if (type === 'document') return FileText;
+    if (type === 'video') return Video;
+    return LinkIcon;
 };

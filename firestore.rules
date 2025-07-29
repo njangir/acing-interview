@@ -4,105 +4,71 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
   
-    // Helper functions
-    function isUserAuthenticated() {
-      return request.auth != null;
+    // Helper function to check if a user is an admin
+    function isAdmin(userId) {
+      return exists(/databases/$(database)/documents/userProfiles/$(userId)) && 
+             get(/databases/$(database)/documents/userProfiles/$(userId)).data.roles.hasAny(['admin']);
     }
 
-    function isUser(uid) {
-      return isUserAuthenticated() && request.auth.uid == uid;
-    }
-
-    function isAdmin() {
-      // Check if user has 'admin' in their roles array in their profile
-      return isUserAuthenticated() && get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.roles.hasAny(['admin']);
-    }
-
-    // USER PROFILES
-    // - Users can read and write to their own profile.
-    // - Admins can read all profiles but cannot write to them (to prevent accidental changes).
-    match /userProfiles/{userId} {
-      allow read, update: if isUser(userId) || isAdmin();
-      allow create: if isUserAuthenticated();
-      allow list: if isAdmin();
-    }
-    
-    // SERVICES
-    // - Publicly readable by anyone.
-    // - Writable only by admins.
+    // Publicly readable collections
     match /services/{serviceId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if request.auth != null && isAdmin(request.auth.uid);
+    }
+    
+    match /testimonials/{testimonialId} {
+        allow read: if resource.data.status == 'approved';
+        allow create: if request.auth != null;
+        allow update, delete: if request.auth != null && isAdmin(request.auth.uid);
     }
 
-    // SITE PROFILES (e.g., Mentor Profile)
-    // - Publicly readable.
-    // - Writable only by admins.
     match /siteProfiles/{profileId} {
         allow read: if true;
-        allow write: if isAdmin();
+        allow write: if request.auth != null && isAdmin(request.auth.uid);
     }
-    
-    // GLOBAL AVAILABILITY (SLOTS)
-    // - Publicly readable for booking.
-    // - Writable only by admins.
+
     match /globalAvailability/{date} {
-      allow read: if true;
-      allow write: if isAdmin();
+        allow read: if true;
+        allow write: if request.auth != null && isAdmin(request.auth.uid);
     }
 
-    // BOOKINGS
-    // - Users can create their own bookings.
-    // - Users can read their own bookings.
-    // - Users can update their own bookings only to request a refund.
-    // - Admins can read and write all bookings.
-    match /bookings/{bookingId} {
-      allow read: if isUser(resource.data.uid) || isAdmin();
-      allow create: if isUser(request.resource.data.uid);
-      allow update: if (isUser(resource.data.uid) && request.resource.data.requestedRefund == true) || isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    // TESTIMONIALS
-    // - Logged-in users can create testimonials.
-    // - Admins can manage (read, update status) all testimonials.
-    // - Public can only read approved testimonials.
-    match /testimonials/{testimonialId} {
-      allow read: if resource.data.status == 'approved' || isAdmin();
-      allow create: if isUser(request.resource.data.uid);
-      allow update, delete: if isAdmin();
-    }
-    
-    // RESOURCES
-    // - Publicly readable for now (can be restricted later based on purchase).
-    // - Writable only by admins.
-    match /resources/{resourceId} {
-      allow read: if true; // Or check for entitlements
-      allow write: if isAdmin();
-    }
-
-    // USER MESSAGES
-    // - Users can create messages (i.e., submit contact forms).
-    // - Users can only read messages in their own "thread" (matching their email).
-    // - Admins can read all messages and create replies.
-    match /userMessages/{messageId} {
-      allow read: if (isUserAuthenticated() && request.auth.token.email == resource.data.userEmail) || isAdmin();
-      allow create: if isUser(request.resource.data.uid) || isAdmin();
-      allow update, delete: if isAdmin();
-    }
-
-    // BADGES
-    // - Publicly readable by anyone.
-    // - Writable only by admins.
     match /badges/{badgeId} {
         allow read: if true;
-        allow write: if isAdmin();
+        allow write: if request.auth != null && isAdmin(request.auth.uid);
     }
 
-    // FEEDBACK SUBMISSIONS (Admin audit log)
-    // - Writable and readable only by admins.
+    // User-specific or admin-only collections
+    match /userProfiles/{userId} {
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null && isAdmin(request.auth.uid);
+      allow create: if request.auth != null; // Allows new user profile creation
+    }
+    
+    match /bookings/{bookingId} {
+      // User can read their own bookings
+      allow read: if request.auth != null && (request.auth.uid == resource.data.uid || isAdmin(request.auth.uid));
+      // User can create new bookings or request refunds on their own bookings.
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update: if request.auth != null && ( (request.auth.uid == resource.data.uid && request.resource.data.requestedRefund == true) || isAdmin(request.auth.uid));
+      // Admins can manage all bookings
+      allow write: if request.auth != null && isAdmin(request.auth.uid);
+    }
+    
+    match /resources/{resourceId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && isAdmin(request.auth.uid);
+    }
+
+    match /userMessages/{messageId} {
+        // Users can create messages and read their own threads.
+        allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+        allow read: if request.auth != null && (resource.data.uid == request.auth.uid || isAdmin(request.auth.uid));
+        // Admins can manage all messages.
+        allow write: if request.auth != null && isAdmin(request.auth.uid);
+    }
+    
     match /feedbackSubmissions/{submissionId} {
-        allow read, write: if isAdmin();
+        allow read, write: if request.auth != null && isAdmin(request.auth.uid);
     }
   }
 }

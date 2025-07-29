@@ -1,24 +1,28 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription as DialogDesc } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MOCK_RESOURCES, MOCK_SERVICES } from "@/constants";
-import type { Resource } from '@/types';
+import type { Resource, Service } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Edit, Trash2, FileText, Video, Link as LinkIcon } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, FileText, Video, Link as LinkIcon, Loader2, AlertTriangle } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { getIconForResourceType } from '@/lib/utils'; // Assuming this helper exists or is created
 
+// PRODUCTION TODO: Import Firebase and Firestore methods
+import { db, storage } from '@/lib/firebase';
+import { collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
-const initialResourceFormState: Omit<Resource, 'id' | 'icon'> = {
+const initialResourceFormState: Omit<Resource, 'id' | 'createdAt' | 'updatedAt' | 'icon'> = {
   title: '',
   type: 'link',
   url: '',
@@ -28,11 +32,42 @@ const initialResourceFormState: Omit<Resource, 'id' | 'icon'> = {
 
 export default function AdminResourcesPage() {
   const { toast } = useToast();
-  const [resources, setResources] = useState<Resource[]>(MOCK_RESOURCES);
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentResource, setCurrentResource] = useState<Resource | null>(null);
-  const [formData, setFormData] = useState<Omit<Resource, 'id' | 'icon'>>(initialResourceFormState);
+  const [formData, setFormData] = useState<Omit<Resource, 'id' | 'createdAt' | 'updatedAt' | 'icon'>>(initialResourceFormState);
   const [resourceFile, setResourceFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    setIsLoading(true);
+    setError(null);
+    
+    const resourcesQuery = query(collection(db, 'resources'), orderBy('title', 'asc'));
+    const unsubscribeResources = onSnapshot(resourcesQuery, (snapshot) => {
+      const fetchedResources = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Resource));
+      setResources(fetchedResources);
+      setIsLoading(false);
+    }, (err) => {
+      console.error("Error fetching resources:", err);
+      setError("Failed to load resources data.");
+      setIsLoading(false);
+    });
+
+    const servicesQuery = query(collection(db, 'services'), orderBy('name', 'asc'));
+    const unsubscribeServices = onSnapshot(servicesQuery, (snapshot) => {
+        setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
+    });
+
+    return () => {
+      unsubscribeResources();
+      unsubscribeServices();
+    };
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -46,16 +81,8 @@ export default function AdminResourcesPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setResourceFile(e.target.files[0]);
-      // For file uploads, we might want to set the URL to the file name or a placeholder
-      // Actual URL will be determined by upload storage
       setFormData(prev => ({ ...prev, url: e.target.files![0].name }));
     }
-  };
-
-  const getIconForType = (type: Resource['type']) => {
-    if (type === 'document') return FileText;
-    if (type === 'video') return Video;
-    return LinkIcon;
   };
 
   const handleEdit = (resource: Resource) => {
@@ -78,37 +105,83 @@ export default function AdminResourcesPage() {
     setIsModalOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Simulate file upload if a file is selected and type is document/video
-    if (resourceFile && (formData.type === 'document' || formData.type === 'video')) {
-      console.log("Simulating upload of file:", resourceFile.name);
-      // In a real app, formData.url would be set to the Stored URL post-upload
+    setIsSubmitting(true);
+
+    let finalResourceUrl = formData.url;
+
+    if (resourceFile && formData.type === 'document') {
+      try {
+        const fileRef = storageRef(storage, `resources/${Date.now()}-${resourceFile.name}`);
+        await uploadBytes(fileRef, resourceFile);
+        finalResourceUrl = await getDownloadURL(fileRef);
+      } catch (uploadError) {
+        console.error("Error uploading resource file:", uploadError);
+        toast({ title: "File Upload Failed", description: "Could not upload the resource file.", variant: "destructive" });
+        setIsSubmitting(false);
+        return;
+      }
     }
-    
-    const resourceToSave: Resource = {
+
+    const resourceDataToSave = {
       ...formData,
-      id: currentResource?.id || `res-${Date.now()}`,
-      icon: getIconForType(formData.type),
+      url: finalResourceUrl,
     };
 
-    if (currentResource) {
-      setResources(prev => prev.map(r => r.id === currentResource.id ? resourceToSave : r));
-      toast({ title: "Resource Updated", description: `${resourceToSave.title} has been updated.` });
-    } else {
-      setResources(prev => [...prev, resourceToSave]);
-      toast({ title: "Resource Added", description: `${resourceToSave.title} has been added.` });
+    try {
+        if (currentResource) {
+          const resourceDocRef = doc(db, "resources", currentResource.id);
+          await updateDoc(resourceDocRef, { ...resourceDataToSave, updatedAt: serverTimestamp() });
+          toast({ title: "Resource Updated", description: `${resourceDataToSave.title} has been updated.` });
+        } else {
+          await addDoc(collection(db, "resources"), { ...resourceDataToSave, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+          toast({ title: "Resource Added", description: `${resourceDataToSave.title} has been added.` });
+        }
+        setIsModalOpen(false);
+    } catch (dbError) {
+        console.error("Error saving resource:", dbError);
+        toast({ title: "Database Error", description: "Could not save the resource.", variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
     }
-    console.log("Saving resource:", resourceToSave);
-    setIsModalOpen(false);
   };
   
-  const handleDelete = (resourceId: string) => {
-    setResources(prev => prev.filter(r => r.id !== resourceId));
-    toast({ title: "Resource Deleted", description: `Resource has been deleted.`});
-    console.log("Deleting resource:", resourceId);
+  const handleDelete = async (resource: Resource) => {
+    try {
+        // If it's a document, delete from storage first
+        if (resource.type === 'document' && resource.url.includes('firebasestorage.googleapis.com')) {
+            const fileRef = storageRef(storage, resource.url);
+            await deleteObject(fileRef);
+        }
+        
+        await deleteDoc(doc(db, "resources", resource.id));
+        toast({ title: "Resource Deleted", description: `"${resource.title}" has been deleted.`});
+    } catch (err) {
+        console.error("Error deleting resource:", err);
+        toast({ title: "Delete Failed", description: "Could not delete the resource.", variant: "destructive" });
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="container py-12 flex justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+     return (
+      <div className="container py-12">
+        <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -124,6 +197,7 @@ export default function AdminResourcesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Existing Resources</CardTitle>
+          <CardDescription>View and manage all available resources. There are {resources.length} resources.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -139,8 +213,11 @@ export default function AdminResourcesPage() {
               {resources.map((resource) => (
                 <TableRow key={resource.id}>
                   <TableCell className="font-medium">{resource.title}</TableCell>
-                  <TableCell className="capitalize">{resource.type}</TableCell>
-                  <TableCell>{MOCK_SERVICES.find(s => s.id === resource.serviceCategory)?.name || resource.serviceCategory}</TableCell>
+                  <TableCell className="capitalize flex items-center gap-1">
+                    {React.createElement(getIconForResourceType(resource.type), { className: 'h-4 w-4 text-muted-foreground' })}
+                    {resource.type}
+                  </TableCell>
+                  <TableCell>{services.find(s => s.id === resource.serviceCategory)?.name || resource.serviceCategory}</TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button variant="outline" size="sm" onClick={() => handleEdit(resource)}>
                       <Edit className="h-4 w-4" />
@@ -155,12 +232,12 @@ export default function AdminResourcesPage() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Are you sure you want to delete the resource "{resource.title}"? This action cannot be undone.
+                            Are you sure you want to delete the resource "{resource.title}"? This action cannot be undone and may delete the associated file from storage.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(resource.id)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                          <AlertDialogAction onClick={() => handleDelete(resource)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
@@ -180,6 +257,7 @@ export default function AdminResourcesPage() {
           <form onSubmit={handleSubmit}>
             <DialogHeader>
               <DialogTitle>{currentResource ? 'Edit Resource' : 'Add New Resource'}</DialogTitle>
+              <DialogDesc>Fill in the details for the resource.</DialogDesc>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="space-y-1">
@@ -202,7 +280,7 @@ export default function AdminResourcesPage() {
                   <Label htmlFor="resourceFile">Upload File</Label>
                   <Input id="resourceFile" type="file" accept=".pdf" onChange={handleFileChange} />
                   {resourceFile && <p className="text-xs text-muted-foreground mt-1">Selected: {resourceFile.name}</p>}
-                   {currentResource && formData.type === 'document' && !resourceFile && <p className="text-xs text-muted-foreground mt-1">Current file: {formData.url}</p>}
+                   {currentResource && formData.type === 'document' && !resourceFile && <p className="text-xs text-muted-foreground mt-1">Current file: <a href={formData.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">{formData.url.split('?')[0].split('/').pop()}</a></p>}
                 </div>
               ) : (
                 <div className="space-y-1">
@@ -220,7 +298,7 @@ export default function AdminResourcesPage() {
                   <SelectTrigger id="serviceCategory"><SelectValue placeholder="Select service" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="general">General</SelectItem>
-                    {MOCK_SERVICES.map(service => (
+                    {services.map(service => (
                       <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -228,8 +306,11 @@ export default function AdminResourcesPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-              <Button type="submit">{currentResource ? 'Save Changes' : 'Add Resource'}</Button>
+              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                {isSubmitting ? 'Saving...' : (currentResource ? 'Save Changes' : 'Add Resource')}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

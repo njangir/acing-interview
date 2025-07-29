@@ -12,6 +12,8 @@ export interface Service {
   dataAiHint?: string;
   defaultForce?: 'Air Force' | 'Army' | 'Navy' | 'General';
   isBookable?: boolean; // New field
+  createdAt?: any; // Should be Firestore Timestamp
+  updatedAt?: any; // Should be Firestore Timestamp
 }
 
 export interface Testimonial {
@@ -32,8 +34,8 @@ export interface Testimonial {
   numberOfAttempts?: number;
   bodyImageUrl?: string; // New field for image within the testimonial body
   bodyImageDataAiHint?: string; // New field for AI hint for body image
-  createdAt?: string; // ISO string for dates
-  updatedAt?: string; // ISO string for dates
+  createdAt?: any; // ISO string for dates
+  updatedAt?: any; // ISO string for dates
 }
 
 export interface Booking {
@@ -46,7 +48,7 @@ export interface Booking {
   userName: string;
   userEmail: string;
   meetingLink: string;
-  status: 'accepted' | 'scheduled' | 'completed' | 'cancelled' | 'pending_approval';
+  status: 'accepted' | 'scheduled' | 'completed' | 'cancelled' | 'pending_approval' | 'pending_payment';
   paymentStatus: 'paid' | 'pay_later_pending' | 'pay_later_unpaid';
   reportUrl?: string;
   userFeedback?: string;
@@ -54,8 +56,8 @@ export interface Booking {
   refundReason?: string;
   transactionId?: string | null;
   detailedFeedback?: { skill: string; rating: string; comments?: string }[];
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 export interface Resource {
@@ -66,8 +68,8 @@ export interface Resource {
   description?: string;
   serviceCategory: string;
   icon?: LucideIcon;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 export interface MentorProfileData {
@@ -81,6 +83,7 @@ export interface MentorProfileData {
   quote: string;
   contactEmail: string;
   contactPhone: string;
+  updatedAt?: any;
 }
 
 export interface UserMessage {
@@ -90,12 +93,12 @@ export interface UserMessage {
   userEmail: string; // Email of the user, used as a conversation key
   subject: string;
   messageBody: string;
-  timestamp: Date; // Keep as Date object for sorting
+  timestamp: any; // Keep as Date object for sorting
   status: 'new' | 'read' | 'replied' | 'closed'; // Status can apply to individual message or conversation
   senderType: 'user' | 'admin'; // Who sent THIS specific message
   adminName?: string; // Name of admin if senderType is 'admin'
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 export interface Badge {
@@ -106,8 +109,8 @@ export interface Badge {
   rankName: string;
   imageUrl: string;
   dataAiHint: string;
-  createdAt?: string; // Added for production readiness
-  updatedAt?: string; // Added for production readiness
+  createdAt?: any; // Added for production readiness
+  updatedAt?: any; // Added for production readiness
 }
 
 export interface UserProfile {
@@ -121,16 +124,18 @@ export interface UserProfile {
   awardedBadges?: Badge[]; // For frontend display, may be populated after fetching details from awardedBadgeIds
   gender?: 'Male' | 'Female' | 'Other' | 'Prefer not to say';
   targetOrganization?: 'Army' | 'Navy' | 'Air Force' | 'Other';
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 export interface FeedbackSubmissionHistoryEntry {
   id: string; // Unique ID for the history entry
-  submissionDate: string; // ISO date string
+  submissionDate: any; // ISO date string
   bookingId: string;
   userName: string;
   serviceName: string;
   reportFileName?: string;
   badgeAssignedName?: string;
+  adminUid?: string;
+  createdAt?: any;
 }

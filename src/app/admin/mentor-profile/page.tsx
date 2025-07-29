@@ -1,10 +1,11 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
+import Image from 'next/image';
 
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from '@/components/ui/button';
@@ -13,10 +14,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { MENTOR_PROFILE } from '@/constants';
 import type { MentorProfileData } from '@/types';
-import Image from 'next/image';
-import { UserCog } from 'lucide-react';
+import { UserCog, Loader2, AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+
+// PRODUCTION TODO: Import Firebase and Firestore methods
+import { db } from '@/lib/firebase';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+
 
 const mentorProfileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -24,43 +29,98 @@ const mentorProfileSchema = z.object({
   contactEmail: z.string().email("Invalid email address."),
   contactPhone: z.string().min(10, "Phone number must be at least 10 digits."),
   bio: z.string().min(50, "Bio must be at least 50 characters."),
-  // Experience, philosophy, quote could be added here if made editable via more complex fields
+  philosophy: z.string().min(50, "Philosophy must be at least 50 characters."),
+  quote: z.string().min(10, "Quote must be at least 10 characters."),
+  experience: z.string().min(20, "Experience must be at least 20 characters.").transform(val => val.split('\n').map(s => s.trim()).filter(Boolean)),
+  imageUrl: z.string().url("Please enter a valid URL for the image."),
+  dataAiHint: z.string().max(50, "AI hint should be concise").optional(),
 });
 
 type MentorProfileFormValues = z.infer<typeof mentorProfileSchema>;
 
 export default function AdminMentorProfilePage() {
   const { toast } = useToast();
-  // For this admin page, we'll "load" the current mentor profile for editing
-  // In a real app, this would be fetched and updated in a database
-  const [editableProfile, setEditableProfile] = useState<MentorProfileData>(MENTOR_PROFILE);
+  const [editableProfile, setEditableProfile] = useState<MentorProfileData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const form = useForm<MentorProfileFormValues>({
     resolver: zodResolver(mentorProfileSchema),
-    defaultValues: {
-      name: editableProfile.name,
-      title: editableProfile.title,
-      contactEmail: editableProfile.contactEmail,
-      contactPhone: editableProfile.contactPhone,
-      bio: editableProfile.bio,
-    },
   });
 
-  function onSubmit(data: MentorProfileFormValues) {
-    // Simulate updating the mentor profile
-    const updatedProfile: MentorProfileData = {
-      ...editableProfile, // Keep non-editable fields like imageUrl, experience, etc.
-      ...data, // Update editable fields
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const profileDocRef = doc(db, 'siteProfiles', 'mainMentor');
+        const docSnap = await getDoc(profileDocRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data() as MentorProfileData;
+          setEditableProfile(data);
+          form.reset({
+            ...data,
+            experience: data.experience.join('\n'), // Convert array to newline-separated string for textarea
+          });
+        } else {
+          setError("Mentor profile not found. It might need to be created first.");
+        }
+      } catch (err) {
+        console.error("Error fetching mentor profile:", err);
+        setError("Failed to load mentor profile data.");
+      }
+      setIsLoading(false);
     };
-    setEditableProfile(updatedProfile); // Update local state for demo
-    console.log("Mentor Profile Updated (Simulated):", updatedProfile);
-    
-    toast({
-      title: "Mentor Profile Updated",
-      description: "The public mentor profile has been successfully updated.",
-    });
-    // In a real app, you would likely re-fetch or confirm MENTOR_PROFILE constant source is updated
-    // For this demo, changes are only in local state `editableProfile`
+    fetchProfile();
+  }, [form]);
+
+  async function onSubmit(data: MentorProfileFormValues) {
+    setIsSaving(true);
+    try {
+      const profileToSave: MentorProfileData = {
+          ...data,
+      };
+      
+      const profileDocRef = doc(db, 'siteProfiles', 'mainMentor');
+      await setDoc(profileDocRef, { ...profileToSave, updatedAt: serverTimestamp() }, { merge: true });
+
+      setEditableProfile(profileToSave); // Update local state to reflect changes
+      
+      toast({
+        title: "Mentor Profile Updated",
+        description: "The public mentor profile has been successfully updated.",
+      });
+    } catch (err) {
+      console.error("Error saving mentor profile:", err);
+      toast({ title: "Save Failed", description: "Could not save mentor profile.", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="container py-12 flex justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+     return (
+      <div className="container py-12">
+        <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (!editableProfile) {
+    return <div className="container py-12">No profile data loaded.</div>
   }
 
   return (
@@ -83,7 +143,7 @@ export default function AdminMentorProfilePage() {
             <CardTitle className="font-headline text-2xl text-primary flex items-center">
                 <UserCog className="h-6 w-6 mr-2 text-primary"/> Edit: {editableProfile.name}
             </CardTitle>
-            <CardDescription>Modify the contact details and description below.</CardDescription>
+            <CardDescription>Modify all profile details below. Changes are live upon saving.</CardDescription>
           </div>
         </CardHeader>
         <Form {...form}>
@@ -107,6 +167,28 @@ export default function AdminMentorProfilePage() {
                   <FormItem>
                     <FormLabel>Title / Designation</FormLabel>
                     <FormControl><Input placeholder="Mentor's title" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="imageUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Image URL</FormLabel>
+                    <FormControl><Input type="url" placeholder="https://placehold.co/300x300.png" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="dataAiHint"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Image AI Hint (Optional)</FormLabel>
+                    <FormControl><Input placeholder="e.g., female mentor portrait" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -139,26 +221,50 @@ export default function AdminMentorProfilePage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Bio / Description</FormLabel>
-                    <FormControl><Textarea rows={5} placeholder="Mentor's biography" {...field} /></FormControl>
+                    <FormControl><Textarea rows={6} placeholder="Mentor's biography" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              {/* For experience, philosophy, quote - these are currently non-editable text for simplicity based on wireframe
-                  Could be expanded with more complex form fields (e.g., array inputs for experience) */}
-                <div>
-                    <FormLabel>Experience (Read-only)</FormLabel>
-                    <ul className="list-disc list-inside text-sm text-muted-foreground bg-secondary/30 p-3 rounded-md">
-                        {editableProfile.experience.map((exp, i) => <li key={i}>{exp}</li>)}
-                    </ul>
-                </div>
-                 <div>
-                    <FormLabel>Philosophy (Read-only)</FormLabel>
-                    <p className="text-sm text-muted-foreground bg-secondary/30 p-3 rounded-md italic">"{editableProfile.philosophy}"</p>
-                </div>
+              <FormField
+                control={form.control}
+                name="experience"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Key Experience & Achievements</FormLabel>
+                    <FormControl><Textarea rows={6} placeholder="Enter each point on a new line..." {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="philosophy"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mentorship Philosophy</FormLabel>
+                    <FormControl><Textarea rows={6} placeholder="Mentor's philosophy..." {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="quote"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quote</FormLabel>
+                    <FormControl><Input placeholder="A short, impactful quote..." {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </CardContent>
             <CardFooter>
-              <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">Save Changes</Button>
+              <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSaving}>
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                {isSaving ? 'Saving...' : 'Save Profile Changes'}
+              </Button>
             </CardFooter>
           </form>
         </Form>
