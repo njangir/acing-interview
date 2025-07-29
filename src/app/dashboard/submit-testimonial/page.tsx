@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, useWatch } from 'react-hook-form';
 import * as z from 'zod';
 import { useState, useEffect } from 'react';
-import Image from 'next/image'; // Import Image component
+import Image from 'next/image'; 
 
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from '@/components/ui/button';
@@ -17,15 +17,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { MOCK_SERVICES, MOCK_TESTIMONIALS, PREDEFINED_AVATARS } from '@/constants'; // PREDEFINED_AVATARS for default user image
-import type { Testimonial, Service } from '@/types'; // Added Service type
-import { Edit2Icon, Award, MapPin, ListChecks, Briefcase, Upload, Loader2 } from 'lucide-react'; // Added Loader2
+import { PREDEFINED_AVATARS } from '@/constants';
+import type { Testimonial, Service } from '@/types';
+import { Edit2Icon, Award, MapPin, ListChecks, Briefcase, Upload, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 
 // PRODUCTION TODO: Import Firebase and Firestore methods
-// import { db, storage } from '@/lib/firebase';
-// import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-// import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '@/lib/firebase';
+import { collection, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const testimonialFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -37,7 +37,7 @@ const testimonialFormSchema = z.object({
   selectedForce: z.enum(['Army', 'Navy', 'Air Force']).optional(),
   interviewLocation: z.string().optional(),
   numberOfAttempts: z.coerce.number().min(1, "Number of attempts must be at least 1.").optional(),
-  bodyImageUrl: z.string().url().optional().or(z.literal('')), // For the uploaded image URL (simulated)
+  bodyImageUrl: z.string().url().optional().or(z.literal('')), 
   bodyImageDataAiHint: z.string().max(50, "AI hint should be concise").optional(),
   isNotRobot: z.boolean().refine(val => val === true, { message: "Please confirm you're not a robot." }),
 }).superRefine((data, ctx) => {
@@ -96,23 +96,26 @@ export default function SubmitTestimonialPage() {
   });
 
    useEffect(() => {
-    // PRODUCTION TODO: Fetch services from Firestore instead of MOCK_SERVICES
-    // const fetchServices = async () => {
-    //   const servicesCol = collection(db, 'services');
-    //   const servicesSnap = await getDocs(servicesCol);
-    //   setAvailableServices(servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
-    // };
-    // fetchServices();
-    setAvailableServices(MOCK_SERVICES); // Using mock for now
+    const fetchServices = async () => {
+      try {
+        const servicesCol = collection(db, 'services');
+        const servicesSnap = await getDocs(servicesCol);
+        setAvailableServices(servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
+      } catch (error) {
+        console.error("Error fetching services for testimonial form:", error);
+        toast({ title: "Error", description: "Could not load available services.", variant: "destructive" });
+      }
+    };
+    fetchServices();
 
     if (currentUser) {
         form.reset({
-            ...form.getValues(), // Preserve other potentially filled fields
+            ...form.getValues(), 
             name: currentUser.name || "",
             email: currentUser.email || "",
         });
     }
-  }, [currentUser, form]);
+  }, [currentUser, form, toast]);
 
   const submissionStatus = useWatch({
     control: form.control,
@@ -143,20 +146,14 @@ export default function SubmitTestimonialPage() {
     setIsSubmitting(true);
 
     const selectedService = availableServices.find(s => s.id === data.serviceId);
-    let finalBodyImageUrl = data.bodyImageUrl; // Use if a URL was manually entered
+    let finalBodyImageUrl = data.bodyImageUrl;
 
-    // PRODUCTION TODO: Handle Image Upload to Firebase Storage
     if (bodyImageFile) {
       try {
-        // const imageFileName = `${currentUser.uid}_testimonial_${Date.now()}_${bodyImageFile.name.replace(/\s+/g, '_')}`;
-        // const imageRef = storageRef(storage, `testimonials_body_images/${imageFileName}`);
-        // const uploadResult = await uploadBytes(imageRef, bodyImageFile);
-        // finalBodyImageUrl = await getDownloadURL(uploadResult.ref);
-        // console.log("Body image uploaded to Firebase Storage:", finalBodyImageUrl);
-
-        // MOCK: Simulate upload and URL generation
-        finalBodyImageUrl = `https://placehold.co/400x300.png?text=${encodeURIComponent(bodyImageFile.name.substring(0,15))}`;
-        console.log("Simulating upload of body image:", bodyImageFile.name, "URL:", finalBodyImageUrl);
+        const imageFileName = `${currentUser.uid}_testimonial_${Date.now()}_${bodyImageFile.name.replace(/\s+/g, '_')}`;
+        const imageRef = storageRef(storage, `testimonials_body_images/${imageFileName}`);
+        const uploadResult = await uploadBytes(imageRef, bodyImageFile);
+        finalBodyImageUrl = await getDownloadURL(uploadResult.ref);
       } catch (uploadError) {
         console.error("Error uploading body image:", uploadError);
         toast({ title: "Image Upload Failed", description: "Could not upload your image. Please try again or submit without it.", variant: "destructive" });
@@ -166,13 +163,13 @@ export default function SubmitTestimonialPage() {
     }
 
     const newTestimonialData: Omit<Testimonial, 'id' | 'createdAt' | 'updatedAt'> = {
-      uid: currentUser.uid, // Link testimonial to the authenticated user
+      uid: currentUser.uid,
       name: data.name,
       userEmail: data.email,
       batch: data.batch || undefined,
       story: data.story,
-      imageUrl: currentUser.imageUrl || PREDEFINED_AVATARS[0].url, // User's profile avatar
-      dataAiHint: 'person avatar', // AI hint for profile avatar
+      imageUrl: currentUser.imageUrl || PREDEFINED_AVATARS[0].url,
+      dataAiHint: 'person avatar',
       serviceTaken: selectedService?.name || 'Unknown Service',
       serviceId: data.serviceId,
       submissionStatus: data.submissionStatus,
@@ -181,27 +178,16 @@ export default function SubmitTestimonialPage() {
       numberOfAttempts: data.submissionStatus === 'selected_cleared' ? data.numberOfAttempts : undefined,
       bodyImageUrl: finalBodyImageUrl || undefined,
       bodyImageDataAiHint: data.bodyImageDataAiHint || undefined,
-      status: 'pending' as const, // Testimonials are pending approval by default
+      status: 'pending' as const,
     };
 
     try {
-      // PRODUCTION TODO: Add new testimonial document to Firestore
-      // const testimonialsColRef = collection(db, "testimonials");
-      // await addDoc(testimonialsColRef, {
-      //   ...newTestimonialData,
-      //   createdAt: serverTimestamp(),
-      //   updatedAt: serverTimestamp(),
-      // });
-
-      // MOCK: Add to MOCK_TESTIMONIALS array
-      MOCK_TESTIMONIALS.push({
+      const testimonialsColRef = collection(db, "testimonials");
+      await addDoc(testimonialsColRef, {
         ...newTestimonialData,
-        id: `testimonial-${Date.now()}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      } as Testimonial);
-      console.log("Testimonial submitted (simulated backend send):", newTestimonialData);
-      // END MOCK
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
 
       toast({
         title: "Testimonial Submitted!",
@@ -244,7 +230,6 @@ export default function SubmitTestimonialPage() {
     return (
       <div className="container py-12">
         <PageHeader title="Submit Testimonial" description="Please log in to share your success story."/>
-        {/* Optionally, add a login button or redirect */}
       </div>
     );
   }
@@ -498,3 +483,4 @@ export default function SubmitTestimonialPage() {
   );
 }
 
+    
