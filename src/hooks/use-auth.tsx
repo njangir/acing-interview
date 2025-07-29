@@ -3,63 +3,209 @@
 
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import type { UserProfile } from '@/types';
+import { auth, db, googleProvider, RecaptchaVerifier, signInWithPhoneNumber } from '@/lib/firebase';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser, signInWithPopup, type ConfirmationResult, sendEmailVerification } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
-interface AuthUser {
+
+interface AuthContextUser {
+  uid: string;
   email: string;
   name: string;
   isAdmin: boolean;
+  imageUrl?: string;
+  emailVerified: boolean;
 }
 
 interface AuthContextType {
-  currentUser: AuthUser | null;
+  currentUser: AuthContextUser | null;
   isLoggedIn: boolean;
   isAdmin: boolean;
-  login: (user?: AuthUser) => void; // Made user optional to handle mock signup
-  logout: () => void;
+  login: (email: string, password: string) => Promise<{ user: AuthContextUser; isAdmin: boolean }>;
+  loginWithGoogle: () => Promise<{ user: AuthContextUser; isAdmin: boolean; isNewUser: boolean; }>;
+  logout: () => Promise<void>;
+  setupRecaptcha: (containerId: string) => Promise<RecaptchaVerifier>;
+  sendOtp: (phoneNumber: string, verifier: RecaptchaVerifier) => Promise<ConfirmationResult>;
+  verifyOtp: (confirmationResult: ConfirmationResult, otp: string) => Promise<void>;
+  resendVerificationEmail: () => Promise<void>;
+  loadingAuth: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<AuthContextUser | null>(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem('currentUserAFIA');
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setCurrentUser(parsedUser);
-      } catch (e) {
-        console.error("Error parsing stored user data", e);
-        localStorage.removeItem('currentUserAFIA');
-      }
-    }
-  }, []);
+  const fetchUserProfile = useCallback(async (firebaseUser: FirebaseUser): Promise<AuthContextUser> => {
+    const userDocRef = doc(db, "userProfiles", firebaseUser.uid);
+    const userDocSnap = await getDoc(userDocRef);
 
-  const login = useCallback((user?: AuthUser) => { // Updated to accept optional user
-    if (user) {
-      localStorage.setItem('currentUserAFIA', JSON.stringify(user));
-      setCurrentUser(user);
+    if (userDocSnap.exists()) {
+      const userProfileData = userDocSnap.data() as UserProfile;
+      return {
+        uid: firebaseUser.uid,
+        email: userProfileData.email,
+        name: userProfileData.name,
+        isAdmin: userProfileData.roles?.includes('admin') || false,
+        imageUrl: userProfileData.imageUrl,
+        emailVerified: firebaseUser.emailVerified,
+      };
     } else {
-      // Handle generic login for signup (no specific user data yet, or default)
-      const mockUser: AuthUser = { email: 'user@example.com', name: 'New User', isAdmin: false };
-      localStorage.setItem('currentUserAFIA', JSON.stringify(mockUser));
-      setCurrentUser(mockUser);
+      console.warn(`Profile not found for user ${firebaseUser.uid}. This might be a new Google sign-in. A profile will be created.`);
+      return {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email || 'no-email@example.com',
+        name: firebaseUser.displayName || 'New User',
+        isAdmin: false,
+        imageUrl: firebaseUser.photoURL || undefined,
+        emailVerified: firebaseUser.emailVerified,
+      };
     }
   }, []);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem('currentUserAFIA');
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // For email/password users, they can only be "current" if their email is verified.
+        // Google users are considered verified by default.
+        if (firebaseUser.providerData.some(p => p.providerId === 'password') && !firebaseUser.emailVerified) {
+          setCurrentUser(null);
+        } else {
+          const userProfile = await fetchUserProfile(firebaseUser);
+          setCurrentUser(userProfile);
+        }
+      } else {
+        setCurrentUser(null);
+      }
+      setLoadingAuth(false);
+    });
+
+    return () => unsubscribe();
+  }, [fetchUserProfile]);
+
+  const login = useCallback(async (email: string, password: string) => {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const firebaseUser = userCredential.user;
+
+    if (!firebaseUser.emailVerified) {
+      throw new Error('Email not verified');
+    }
+
+    const userProfile = await fetchUserProfile(firebaseUser);
+    setCurrentUser(userProfile);
+    return { user: userProfile, isAdmin: userProfile.isAdmin };
+  }, [fetchUserProfile]);
+
+  const loginWithGoogle = useCallback(async () => {
+    const userCredential = await signInWithPopup(auth, googleProvider);
+    const firebaseUser = userCredential.user;
+    const userDocRef = doc(db, "userProfiles", firebaseUser.uid);
+    const userDocSnap = await getDoc(userDocRef);
+
+    let userProfile: AuthContextUser;
+    let isNewUser = false;
+
+    if (!userDocSnap.exists()) {
+      isNewUser = true;
+      const newUserProfileData = {
+        name: firebaseUser.displayName || 'Google User',
+        email: firebaseUser.email,
+        phone: firebaseUser.phoneNumber || '',
+        imageUrl: firebaseUser.photoURL || undefined,
+        roles: ['user'],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      await setDoc(userDocRef, newUserProfileData);
+      userProfile = {
+        uid: firebaseUser.uid,
+        email: newUserProfileData.email!,
+        name: newUserProfileData.name,
+        isAdmin: false,
+        imageUrl: newUserProfileData.imageUrl,
+        emailVerified: firebaseUser.emailVerified,
+      };
+    } else {
+      const existingProfileData = userDocSnap.data() as UserProfile;
+      userProfile = {
+        uid: firebaseUser.uid,
+        email: existingProfileData.email,
+        name: existingProfileData.name,
+        isAdmin: existingProfileData.roles?.includes('admin') || false,
+        imageUrl: existingProfileData.imageUrl,
+        emailVerified: firebaseUser.emailVerified,
+      };
+    }
+    
+    setCurrentUser(userProfile);
+    return { user: userProfile, isAdmin: userProfile.isAdmin, isNewUser };
+  }, []);
+
+  const logout = useCallback(async () => {
+    await signOut(auth);
     setCurrentUser(null);
-    router.push('/'); 
+    router.push('/');
   }, [router]);
+
+  const resendVerificationEmail = useCallback(async () => {
+    const firebaseUser = auth.currentUser;
+    if (firebaseUser) {
+      await sendEmailVerification(firebaseUser);
+    } else {
+      throw new Error("No user is currently signed in to resend verification email.");
+    }
+  }, []);
+  
+  // PRODUCTION TODO: Implement the full multi-step UI flow for OTP.
+  // These functions provide the Firebase logic.
+  const setupRecaptcha = useCallback(async (containerId: string) => {
+    // Ensure the reCAPTCHA container is visible and empty.
+    // window.recaptchaVerifier would be an instance variable if you need to access it across calls.
+    const recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+      'size': 'invisible',
+      'callback': (response: any) => {
+        // reCAPTCHA solved, allow signInWithPhoneNumber.
+        console.log("reCAPTCHA solved");
+      },
+       'expired-callback': () => {
+        // Response expired. Ask user to solve reCAPTCHA again.
+        console.log("reCAPTCHA expired");
+      }
+    });
+    return recaptchaVerifier;
+  }, []);
+
+  const sendOtp = useCallback(async (phoneNumber: string, verifier: RecaptchaVerifier) => {
+    // Phone number must be in E.164 format (e.g., +11234567890)
+    return await signInWithPhoneNumber(auth, phoneNumber, verifier);
+  }, []);
+
+  const verifyOtp = useCallback(async (confirmationResult: ConfirmationResult, otp: string) => {
+    await confirmationResult.confirm(otp);
+  }, []);
 
   const isLoggedIn = !!currentUser;
   const isAdmin = !!currentUser && currentUser.isAdmin;
 
+  const value = {
+      currentUser,
+      isLoggedIn,
+      isAdmin,
+      login,
+      loginWithGoogle,
+      logout,
+      setupRecaptcha,
+      sendOtp,
+      verifyOtp,
+      resendVerificationEmail,
+      loadingAuth,
+  };
+
   return (
-    <AuthContext.Provider value={{ currentUser, isLoggedIn, isAdmin, login, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
