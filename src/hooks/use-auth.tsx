@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, createContext, useContext, type React
 import { useRouter } from 'next/navigation';
 import type { UserProfile, Booking } from '@/types';
 import { auth, db, googleProvider, RecaptchaVerifier, signInWithPhoneNumber } from '@/lib/firebase';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser, signInWithPopup, type ConfirmationResult, sendEmailVerification } from 'firebase/auth';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser, signInWithPopup, type ConfirmationResult, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { useToast } from './use-toast';
 
@@ -30,6 +30,7 @@ interface AuthContextType {
   sendOtp: (phoneNumber: string, verifier: RecaptchaVerifier) => Promise<ConfirmationResult>;
   verifyOtp: (confirmationResult: ConfirmationResult, otp: string) => Promise<void>;
   resendVerificationEmail: () => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
   loadingAuth: boolean;
 }
 
@@ -212,6 +213,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
   
+  const sendPasswordReset = useCallback(async (email: string) => {
+    await sendPasswordResetEmail(auth, email);
+  }, []);
+
   const setupRecaptcha = useCallback(async (containerId: string) => {
     const recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
       'size': 'invisible',
@@ -247,6 +252,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sendOtp,
       verifyOtp,
       resendVerificationEmail,
+      sendPasswordReset,
       loadingAuth,
   };
 

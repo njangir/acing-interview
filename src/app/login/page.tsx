@@ -51,7 +51,7 @@ export default function LoginPage() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login: authContextLogin, loginWithGoogle, resendVerificationEmail } = useAuth();
+  const { login: authContextLogin, loginWithGoogle, resendVerificationEmail, sendPasswordReset } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
@@ -160,6 +160,34 @@ export default function LoginPage() {
     }
   }
 
+  const handleForgotPassword = async () => {
+    const email = form.getValues('email');
+    if (!email) {
+      form.setError('email', { type: 'manual', message: 'Please enter your email to reset the password.' });
+      return;
+    }
+    // Clear any previous errors on the email field
+    form.clearErrors('email');
+
+    setIsLoading(true);
+    try {
+      await sendPasswordReset(email);
+      toast({
+        title: "Password Reset Email Sent",
+        description: `If an account exists for ${email}, a password reset link has been sent.`,
+      });
+    } catch (error: any) {
+      console.error("Forgot password error:", error);
+      toast({
+        title: "Error",
+        description: "Could not send password reset email. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 p-4">
@@ -194,7 +222,20 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <div className="flex items-center justify-between">
+                        <FormLabel>Password</FormLabel>
+                        <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 font-normal"
+                            onClick={handleForgotPassword}
+                            disabled={isLoading || isGoogleLoading}
+                            tabIndex={-1}
+                        >
+                            Forgot Password?
+                        </Button>
+                    </div>
                     <FormControl>
                       <Input type="password" placeholder="••••••••" {...field} disabled={isLoading || isGoogleLoading} />
                     </FormControl>
