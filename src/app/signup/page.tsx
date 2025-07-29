@@ -91,9 +91,14 @@ export default function SignupPage() {
   async function handleGoogleSignup() {
     setIsGoogleLoading(true);
     try {
-      await loginWithGoogle();
-      toast({ title: 'Sign Up Successful!', description: 'Welcome! Your profile has been created. Redirecting...' });
-      router.push('/dashboard');
+      const { isAdmin, isNewUser } = await loginWithGoogle();
+      if (isNewUser) {
+        toast({ title: 'Welcome!', description: 'Please complete your profile to continue.' });
+        router.push('/dashboard/profile?new-user=true');
+      } else {
+        toast({ title: 'Login Successful!', description: 'Welcome back! Redirecting...' });
+        router.push(isAdmin ? '/admin' : '/dashboard');
+      }
     } catch (error: any) {
       console.error("Google signup error:", error);
       if (error.code === 'auth/popup-closed-by-user') {

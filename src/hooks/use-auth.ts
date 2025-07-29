@@ -22,7 +22,7 @@ interface AuthContextType {
   isLoggedIn: boolean;
   isAdmin: boolean;
   login: (email: string, password: string) => Promise<{ user: AuthContextUser; isAdmin: boolean }>;
-  loginWithGoogle: () => Promise<{ user: AuthContextUser; isAdmin: boolean }>;
+  loginWithGoogle: () => Promise<{ user: AuthContextUser; isAdmin: boolean; isNewUser: boolean; }>;
   logout: () => Promise<void>;
   loadingAuth: boolean;
 }
@@ -90,8 +90,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userDocSnap = await getDoc(userDocRef);
 
     let userProfile: AuthContextUser;
+    let isNewUser = false;
 
     if (!userDocSnap.exists()) {
+      isNewUser = true;
       // If profile doesn't exist, create it. This is the "onUserCreate" logic for Google Sign-In.
       const newUserProfileData = {
         name: firebaseUser.displayName || 'Google User',
@@ -123,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     setCurrentUser(userProfile);
-    return { user: userProfile, isAdmin: userProfile.isAdmin };
+    return { user: userProfile, isAdmin: userProfile.isAdmin, isNewUser };
   }, []);
 
 

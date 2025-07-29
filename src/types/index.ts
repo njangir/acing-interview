@@ -16,6 +16,7 @@ export interface Service {
 
 export interface Testimonial {
   id: string;
+  uid: string; // Link to user's auth UID
   name: string;
   userEmail?: string;
   batch?: string; // Existing field
@@ -31,10 +32,13 @@ export interface Testimonial {
   numberOfAttempts?: number;
   bodyImageUrl?: string; // New field for image within the testimonial body
   bodyImageDataAiHint?: string; // New field for AI hint for body image
+  createdAt?: string; // ISO string for dates
+  updatedAt?: string; // ISO string for dates
 }
 
 export interface Booking {
   id:string;
+  uid: string; // Link to user's auth UID
   serviceName: string;
   serviceId: string;
   date: string; // YYYY-MM-DD
@@ -50,6 +54,8 @@ export interface Booking {
   refundReason?: string;
   transactionId?: string | null;
   detailedFeedback?: { skill: string; rating: string; comments?: string }[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Resource {
@@ -60,6 +66,8 @@ export interface Resource {
   description?: string;
   serviceCategory: string;
   icon?: LucideIcon;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface MentorProfileData {
@@ -77,14 +85,17 @@ export interface MentorProfileData {
 
 export interface UserMessage {
   id: string;
+  uid: string; // Link to user's auth UID
   userName: string; // Name of the user who initiated or is part of the conversation
   userEmail: string; // Email of the user, used as a conversation key
   subject: string;
   messageBody: string;
-  timestamp: string; // Changed from Date to string
+  timestamp: Date; // Keep as Date object for sorting
   status: 'new' | 'read' | 'replied' | 'closed'; // Status can apply to individual message or conversation
   senderType: 'user' | 'admin'; // Who sent THIS specific message
   adminName?: string; // Name of admin if senderType is 'admin'
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Badge {
@@ -100,13 +111,18 @@ export interface Badge {
 }
 
 export interface UserProfile {
+  uid: string;
   name: string;
   email: string;
   phone: string;
-  imageUrl?: string; // This is the user's chosen avatar
-  awardedBadges: Badge[];
+  imageUrl?: string;
+  roles?: ('user' | 'admin')[];
+  awardedBadgeIds?: string[];
+  awardedBadges?: Badge[]; // For frontend display, may be populated after fetching details from awardedBadgeIds
   gender?: 'Male' | 'Female' | 'Other' | 'Prefer not to say';
   targetOrganization?: 'Army' | 'Navy' | 'Air Force' | 'Other';
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface FeedbackSubmissionHistoryEntry {
@@ -117,5 +133,4 @@ export interface FeedbackSubmissionHistoryEntry {
   serviceName: string;
   reportFileName?: string;
   badgeAssignedName?: string;
-  // Optionally, a summary of skill ratings or comments
 }

@@ -107,9 +107,14 @@ export default function LoginPage() {
   async function handleGoogleLogin() {
     setIsGoogleLoading(true);
     try {
-      const { isAdmin } = await loginWithGoogle();
-      toast({ title: 'Login Successful!', description: 'Welcome! Redirecting...' });
-      handleRedirect(isAdmin);
+      const { isAdmin, isNewUser } = await loginWithGoogle();
+      if (isNewUser) {
+        toast({ title: 'Welcome!', description: 'Please complete your profile to continue.' });
+        router.push('/dashboard/profile?new-user=true');
+      } else {
+        toast({ title: 'Login Successful!', description: 'Welcome back! Redirecting...' });
+        handleRedirect(isAdmin);
+      }
     } catch (error: any) {
       console.error("Google login error:", error);
       // Handle specific Google sign-in errors if necessary
