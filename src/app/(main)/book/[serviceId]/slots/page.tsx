@@ -8,30 +8,33 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { MOCK_SERVICES, AVAILABLE_SLOTS } from "@/constants"; // AVAILABLE_SLOTS for mock
-import type { Service } from '@/types';
+import type { Service, Booking } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { CheckCircle, XCircle, Loader2, Ban } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
 
 // PRODUCTION TODO: Import Firebase and Firestore methods:
-// import { db } from '@/lib/firebase';
-// import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-// import { format } from 'date-fns'; // For formatting dates for Firestore queries
+import { db } from '@/lib/firebase';
+import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { format } from 'date-fns';
 
 export default function SlotSelectionPage() {
   const params = useParams();
   const router = useRouter();
   const serviceId = params.serviceId as string;
-  const { currentUser, loadingAuth } = useAuth(); // Added loadingAuth
+  const { currentUser, loadingAuth } = useAuth();
+  const { toast } = useToast();
 
   const [service, setService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Used for initial service load and slot fetching
+  const [isLoading, setIsLoading] = useState(true);
   const [isServiceBookable, setIsServiceBookable] = useState(true);
   const [isFetchingSlots, setIsFetchingSlots] = useState(false);
+  const [isProceeding, setIsProceeding] = useState(false);
 
   useEffect(() => {
     if (loadingAuth) {
@@ -47,23 +50,12 @@ export default function SlotSelectionPage() {
       setIsLoading(true);
       setError(null);
       try {
-        // PRODUCTION TODO: Fetch service details from Firestore
-        // const serviceDocRef = doc(db, "services", serviceId);
-        // const serviceSnap = await getDoc(serviceDocRef);
-        // if (serviceSnap.exists()) {
-        //   const serviceData = serviceSnap.data() as Service;
-        //   setService(serviceData);
-        //   setIsServiceBookable(serviceData.isBookable === undefined ? true : serviceData.isBookable);
-        // } else {
-        //   setError("Service not found.");
-        //   setIsServiceBookable(false);
-        // }
-
-        // MOCK IMPLEMENTATION:
-        const currentService = MOCK_SERVICES.find(s => s.id === serviceId);
-        if (currentService) {
-          setService(currentService);
-          setIsServiceBookable(currentService.isBookable === undefined ? true : currentService.isBookable);
+        const serviceDocRef = doc(db, "services", serviceId);
+        const serviceSnap = await getDoc(serviceDocRef);
+        if (serviceSnap.exists()) {
+          const serviceData = serviceSnap.data() as Service;
+          setService({ id: serviceSnap.id, ...serviceData });
+          setIsServiceBookable(serviceData.isBookable === undefined ? true : serviceData.isBookable);
         } else {
           setError("Service not found.");
           setIsServiceBookable(false);
@@ -80,50 +72,25 @@ export default function SlotSelectionPage() {
     fetchServiceDetails();
   }, [serviceId, currentUser, router, loadingAuth]);
 
-  // Memoize the stringified version of slots for the selected date to use as a dependency
-  // For production, this logic will depend on how slots are fetched and stored in state.
-  const stringifiedSlotsForSelectedDate = useMemo(() => {
-    if (!selectedDate) return '[]';
-    const dateString = selectedDate.toISOString().split('T')[0];
-    // MOCK: Directly access AVAILABLE_SLOTS
-    return JSON.stringify(AVAILABLE_SLOTS[dateString] || []);
-  }, [selectedDate]);
-
-
   useEffect(() => {
-    if (selectedDate && serviceId) { // Ensure serviceId is available
+    if (selectedDate && serviceId) { 
       setIsFetchingSlots(true);
-      setError(null); // Clear previous slot errors
+      setError(null);
 
       const fetchSlotsForDate = async () => {
         try {
-          const dateString = selectedDate.toISOString().split('T')[0];
-          // PRODUCTION TODO: Fetch available slots from Firestore for the given serviceId and dateString
-          // Example:
-          // const slotsQuery = query(
-          //   collection(db, "serviceAvailability"),
-          //   where("serviceId", "==", serviceId),
-          //   where("date", "==", dateString)
-          // );
-          // const slotsSnapshot = await getDocs(slotsQuery);
-          // if (!slotsSnapshot.empty) {
-          //   const slotsData = slotsSnapshot.docs[0].data(); // Assuming one doc per service per day
-          //   setAvailableTimes(slotsData.timeSlots || []);
-          // } else {
-          //   setAvailableTimes([]);
-          // }
-
-          // MOCK IMPLEMENTATION:
-          await new Promise(resolve => setTimeout(resolve, 300)); // Simulate API delay
+          const dateString = format(selectedDate, 'yyyy-MM-dd');
+          // PRODUCTION: Fetch available slots from Firestore for the given dateString.
+          // This example uses a mock `AVAILABLE_SLOTS` for simplicity.
+          await new Promise(resolve => setTimeout(resolve, 300)); 
           setAvailableTimes(AVAILABLE_SLOTS[dateString] || []);
-
         } catch (err) {
           console.error("Error fetching slots for date:", err);
           setError("Failed to load available slots for this date. Please try another date.");
           setAvailableTimes([]);
         } finally {
           setIsFetchingSlots(false);
-          setSelectedTime(null); // Reset time when date changes or its slots change
+          setSelectedTime(null);
         }
       };
       fetchSlotsForDate();
@@ -132,15 +99,14 @@ export default function SlotSelectionPage() {
       setSelectedTime(null);
       setIsFetchingSlots(false);
     }
-    // stringifiedSlotsForSelectedDate can be removed if directly fetching from Firestore
-  }, [selectedDate, serviceId]); // Removed stringifiedSlotsForSelectedDate if direct fetch
+  }, [selectedDate, serviceId]); 
 
-  const handleProceed = () => {
+  const handleProceed = async () => {
     if (!selectedDate || !selectedTime) {
       setError("Please select a date and time slot.");
       return;
     }
-    if (!currentUser) {
+    if (!currentUser || !service) {
         router.push(`/login?redirect=/book/${serviceId}/slots`);
         return;
     }
@@ -149,25 +115,42 @@ export default function SlotSelectionPage() {
         return;
     }
 
-    // PRODUCTION TODO:
-    // The data stored in localStorage is for passing to the next page (payment/confirmation).
-    // In a production scenario:
-    // 1. This data might be used to create an initial "pending" booking document in Firestore
-    //    before redirecting to payment. This can reserve the slot temporarily.
-    // 2. OR, this data is passed to the payment page, and the booking document in Firestore
-    //    is created *after* successful payment or when "Pay Later" is chosen on the payment page.
-    //    This avoids orphaned "pending" bookings if the user abandons the payment process.
-    // For now, localStorage is used for simplicity in the prototype flow.
+    setIsProceeding(true);
+    try {
+      // Create a pending booking document in Firestore
+      const newBookingData: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'> = {
+        uid: currentUser.uid,
+        serviceId: service.id,
+        serviceName: service.name,
+        date: format(selectedDate, 'yyyy-MM-dd'),
+        time: selectedTime,
+        userName: currentUser.name,
+        userEmail: currentUser.email,
+        meetingLink: '',
+        status: 'pending_payment', // Initial status before payment/confirmation
+        paymentStatus: 'pay_later_pending', // Assume pay later until confirmed
+        transactionId: null,
+        requestedRefund: false,
+      };
 
-    localStorage.setItem('bookingDetails', JSON.stringify({
-        serviceId,
-        serviceName: service?.name, // Include service name for display on next page
-        servicePrice: service?.price, // Include price for display
-        date: selectedDate.toISOString().split('T')[0],
-        time: selectedTime
-    }));
+      const docRef = await addDoc(collection(db, "bookings"), {
+        ...newBookingData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      
+      // Redirect to payment page with the new booking ID
+      router.push(`/book/${serviceId}/payment?bookingId=${docRef.id}`);
 
-    router.push(`/book/${serviceId}/payment`);
+    } catch (err) {
+        console.error("Error creating pending booking:", err);
+        toast({
+            title: "Booking Error",
+            description: "Could not initiate your booking. Please try again.",
+            variant: "destructive"
+        });
+        setIsProceeding(false);
+    }
   };
 
   if (isLoading || loadingAuth) {
@@ -248,10 +231,6 @@ export default function SlotSelectionPage() {
                   const dateString = date.toISOString().split('T')[0];
                   const currentDayStart = new Date();
                   currentDayStart.setHours(0,0,0,0);
-                  // PRODUCTION: The disabled logic will depend on how slots are fetched.
-                  // If AVAILABLE_SLOTS is replaced by a dynamic fetch, this needs to check
-                  // the fetched data or rely on the server to not send unbookable dates/slots.
-                  // For mock, it still uses AVAILABLE_SLOTS.
                   return date < currentDayStart || (!isFetchingSlots && (!AVAILABLE_SLOTS[dateString] || AVAILABLE_SLOTS[dateString]?.length === 0));
                 }}
               />
@@ -292,11 +271,11 @@ export default function SlotSelectionPage() {
           <Button
             size="lg"
             onClick={handleProceed}
-            disabled={!selectedDate || !selectedTime || isLoading || isFetchingSlots}
+            disabled={!selectedDate || !selectedTime || isLoading || isFetchingSlots || isProceeding}
             className="bg-accent hover:bg-accent/90 text-accent-foreground"
           >
-            {(isLoading || isFetchingSlots) ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-            Proceed to Payment
+            {(isLoading || isFetchingSlots || isProceeding) ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+            {isProceeding ? 'Reserving Slot...' : 'Proceed to Payment'}
           </Button>
         </div>
       </div>

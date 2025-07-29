@@ -2,63 +2,94 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, Calendar, Link as LinkIcon, AlertTriangle, Info } from 'lucide-react';
+import { CheckCircle, Calendar, Link as LinkIcon, AlertTriangle, Info, Loader2, XCircle } from 'lucide-react';
 import Link from 'next/link';
-import type { Booking } from '@/types'; // Import Booking type
-
-interface ConfirmationDetails {
-  serviceName: string;
-  date: string;
-  time: string;
-  userName: string;
-  meetingLink: string; // Can be empty
-  transactionId: string | null;
-  paymentStatus: Booking['paymentStatus']; // Actual payment status
-  status: Booking['status']; // Actual booking status
-}
+import type { Booking } from '@/types';
+import { useAuth } from '@/hooks/use-auth';
+import { db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default function BookingConfirmationPage() {
   const router = useRouter();
-  const [details, setDetails] = useState<ConfirmationDetails | null>(null);
+  const searchParams = useSearchParams();
+  const bookingId = searchParams.get('bookingId');
+  const { currentUser, loadingAuth } = useAuth();
+  
+  const [booking, setBooking] = useState<Booking | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
 
   useEffect(() => {
-    // This effect runs once on component mount to retrieve details
-    // and clean up localStorage to prevent re-using old confirmation data.
-    const storedDetails = localStorage.getItem('confirmationDetails');
-    if (storedDetails) {
-      try {
-        const parsedDetails = JSON.parse(storedDetails) as ConfirmationDetails;
-        setDetails(parsedDetails);
-        localStorage.removeItem('bookingDetails');
-        localStorage.removeItem('userDetails');
-        localStorage.removeItem('confirmationDetails');
-      } catch (error) {
-        console.error("Error parsing confirmation details from localStorage:", error);
-        router.push('/services'); 
-      }
-    } else {
-      console.warn("No confirmationDetails found in localStorage on page load. Redirecting to services.");
-      // If there are no details, redirect away to prevent a blank page.
-      router.push('/services');
+    if (loadingAuth) {
+        setIsLoading(true);
+        return;
     }
-  }, [router]); 
+    if (!currentUser) {
+        router.push(`/login?redirect=/book/confirmation${bookingId ? `?bookingId=${bookingId}`:''}`);
+        return;
+    }
+    if (!bookingId) {
+      setError("No booking ID provided.");
+      setIsLoading(false);
+      return;
+    }
 
-  if (!details) {
-    return <div className="container py-12">Loading confirmation...</div>;
+    const fetchBookingDetails = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const bookingDocRef = doc(db, 'bookings', bookingId);
+            const docSnap = await getDoc(bookingDocRef);
+
+            if (docSnap.exists() && docSnap.data().uid === currentUser.uid) {
+                setBooking({ id: docSnap.id, ...docSnap.data() } as Booking);
+            } else {
+                setError("Booking not found or you do not have permission to view it.");
+            }
+        } catch (err) {
+            console.error("Error fetching booking confirmation details:", err);
+            setError("Failed to load booking details. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    fetchBookingDetails();
+  }, [bookingId, currentUser, loadingAuth, router]); 
+
+  if (isLoading || loadingAuth) {
+    return <div className="container py-12 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div>;
   }
 
-  // Derive states from details.status and details.paymentStatus
-  const isPaymentPaid = details.paymentStatus === 'paid';
-  const isBookingPendingApproval = details.status === 'pending_approval'; // Typically Pay Later
-  const isBookingAccepted = details.status === 'accepted'; // Paid, but admin needs to schedule (add link)
-  const isBookingScheduled = details.status === 'scheduled'; // Paid/Approved and link provided by admin
+  if (error) {
+    return (
+        <div className="container py-12">
+            <Alert variant="destructive">
+                <XCircle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+                <Button onClick={() => router.push('/dashboard/bookings')} className="mt-4">Go to My Bookings</Button>
+            </Alert>
+        </div>
+    );
+  }
+
+  if (!booking) {
+    return <div className="container py-12">No booking details found.</div>;
+  }
+
+  const isPaymentPaid = booking.paymentStatus === 'paid';
+  const isBookingPendingApproval = booking.status === 'pending_approval';
+  const isBookingAccepted = booking.status === 'accepted';
+  const isBookingScheduled = booking.status === 'scheduled';
 
   let pageTitle = "Booking Confirmed!";
-  let pageDescription = `Thank you, ${details.userName}, your session for ${details.serviceName} is confirmed.`;
+  let pageDescription = `Thank you, ${booking.userName}, your session for ${booking.serviceName} is confirmed.`;
   let cardTitle = "Booking Successful";
   let cardDescription = "An email with your booking details has been sent. The meeting link will be provided by the admin if not already available.";
   let cardIcon = <CheckCircle className="h-16 w-16 text-green-500" />;
@@ -66,20 +97,20 @@ export default function BookingConfirmationPage() {
 
   if (isBookingPendingApproval) {
     pageTitle = "Booking Request Received!";
-    pageDescription = `Thank you, ${details.userName}. Your request for ${details.serviceName} is pending approval.`;
+    pageDescription = `Thank you, ${booking.userName}. Your request for ${booking.serviceName} is pending approval.`;
     cardTitle = "Slot Tentatively Reserved";
     cardDescription = "Your slot request has been received and is pending admin approval. You'll be notified once it's confirmed, and payment will be due before the session.";
     cardIcon = <Info className="h-16 w-16 text-blue-500" />;
     cardBgClass = 'bg-blue-50 border-blue-300';
   } else if (isBookingAccepted) {
     pageTitle = "Booking Payment Confirmed!";
-    pageDescription = `Thank you, ${details.userName}! Your payment for ${details.serviceName} is confirmed.`;
+    pageDescription = `Thank you, ${booking.userName}! Your payment for ${booking.serviceName} is confirmed.`;
     cardTitle = "Payment Successful, Awaiting Schedule";
     cardDescription = "Your payment is confirmed. The admin will schedule your session and provide the meeting link soon. You'll receive an email update.";
     cardIcon = <CheckCircle className="h-16 w-16 text-green-500" />;
   } else if (isBookingScheduled) {
      pageTitle = "Booking Scheduled!";
-     pageDescription = `Thank you, ${details.userName}! Your session for ${details.serviceName} is scheduled.`;
+     pageDescription = `Thank you, ${booking.userName}! Your session for ${booking.serviceName} is scheduled.`;
      cardTitle = "Session Scheduled & Confirmed";
      cardDescription = "Your session is confirmed and scheduled. An email with your booking details and meeting link has been sent to you (or is available below).";
      cardIcon = <CheckCircle className="h-16 w-16 text-green-500" />;
@@ -107,24 +138,23 @@ export default function BookingConfirmationPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className={`p-4 border rounded-md ${cardBgClass}`}>
-              <p><strong>Service:</strong> {details.serviceName}</p>
-              <p><strong>Date:</strong> {new Date(details.date).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-              <p><strong>Time:</strong> {details.time}</p>
-              {details.transactionId && <p><strong>Transaction ID:</strong> {details.transactionId}</p>}
-              <p><strong>Payment Status:</strong> <span className={`font-semibold ${isPaymentPaid ? 'text-green-600' : (details.paymentStatus === 'pay_later_pending' ? 'text-yellow-700' : 'text-red-600')}`}>{details.paymentStatus.replace('_', ' ').toUpperCase()}</span></p>
-              <p><strong>Booking Status:</strong> <span className={`font-semibold ${isBookingScheduled ? 'text-green-600' : (isBookingAccepted ? 'text-blue-600' : (isBookingPendingApproval ? 'text-yellow-700' : 'text-gray-600')) }`}>{details.status.replace('_', ' ').toUpperCase()}</span></p>
+              <p><strong>Service:</strong> {booking.serviceName}</p>
+              <p><strong>Date:</strong> {new Date(booking.date).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+              <p><strong>Time:</strong> {booking.time}</p>
+              {booking.transactionId && <p><strong>Transaction ID:</strong> {booking.transactionId}</p>}
+              <p><strong>Payment Status:</strong> <span className={`font-semibold ${isPaymentPaid ? 'text-green-600' : (booking.paymentStatus === 'pay_later_pending' ? 'text-yellow-700' : 'text-red-600')}`}>{booking.paymentStatus.replace(/_/g, ' ').toUpperCase()}</span></p>
+              <p><strong>Booking Status:</strong> <span className={`font-semibold ${isBookingScheduled ? 'text-green-600' : (isBookingAccepted ? 'text-blue-600' : (isBookingPendingApproval ? 'text-yellow-700' : 'text-gray-600')) }`}>{booking.status.replace(/_/g, ' ').toUpperCase()}</span></p>
             </div>
             
             {isBookingPendingApproval && (
                 <Button asChild variant="default" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                    {/* This would ideally link to a page to pay for this specific pending booking IF it gets approved */}
                     <Link href="/dashboard/bookings">Check Booking Status</Link>
                 </Button>
             )}
 
-            {isBookingScheduled && details.meetingLink && (
+            {isBookingScheduled && booking.meetingLink && (
                 <Button asChild variant="outline" className="w-full border-primary text-primary hover:bg-primary/10">
-                <a href={details.meetingLink} target="_blank" rel="noopener noreferrer">
+                <a href={booking.meetingLink} target="_blank" rel="noopener noreferrer">
                     <LinkIcon className="mr-2 h-4 w-4" /> Join Meeting
                 </a>
                 </Button>
