@@ -24,6 +24,22 @@ initializeApp();
 const RAZORPAY_KEY_ID = defineString("RAZORPAY_KEY_ID");
 const RAZORPAY_KEY_SECRET = defineString("RAZORPAY_KEY_SECRET");
 
+// Helper function to check for admin role
+const ensureAdmin = async (uid: string | undefined) => {
+    if (!uid) {
+        throw new HttpsError("unauthenticated", "The function must be called while authenticated.");
+    }
+    const firestore = getFirestore();
+    const userProfileDoc = await firestore.collection("userProfiles").doc(uid).get();
+    if (!userProfileDoc.exists) {
+        throw new HttpsError("permission-denied", "User profile not found.");
+    }
+    const roles = userProfileDoc.data()?.roles || [];
+    if (!roles.includes("admin")) {
+        throw new HttpsError("permission-denied", "You must be an admin to perform this action.");
+    }
+};
+
 // This function triggers whenever a new user is created in Firebase Auth.
 exports.oncreateuser = onUserCreate(async (event) => {
   logger.info("New user created:", event.data.uid);
@@ -231,4 +247,30 @@ exports.onAdminMessage = onDocumentCreated("userMessages/{messageId}", async (ev
       '/dashboard/contact'
     );
   }
+});
+
+
+// Export functions for reports
+exports.exportBookingsReport = onCall(async (request) => {
+    await ensureAdmin(request.auth?.uid);
+    const firestore = getFirestore();
+    const bookingsSnap = await firestore.collection("bookings").get();
+    const bookingsData = bookingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return { data: bookingsData };
+});
+
+exports.exportUsersReport = onCall(async (request) => {
+    await ensureAdmin(request.auth?.uid);
+    const firestore = getFirestore();
+    const usersSnap = await firestore.collection("userProfiles").get();
+    const usersData = usersSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+    return { data: usersData };
+});
+
+exports.exportServicesReport = onCall(async (request) => {
+    await ensureAdmin(request.auth?.uid);
+    const firestore = getFirestore();
+    const servicesSnap = await firestore.collection("services").get();
+    const servicesData = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return { data: servicesData };
 });

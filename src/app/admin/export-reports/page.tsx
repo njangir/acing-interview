@@ -1,50 +1,39 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { Booking, Service, UserProfile } from '@/types';
 import { DownloadCloud, Loader2, AlertTriangle } from 'lucide-react';
-import { db } from '@/lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
+const exportBookingsReport = httpsCallable(functions, 'exportBookingsReport');
+const exportUsersReport = httpsCallable(functions, 'exportUsersReport');
+const exportServicesReport = httpsCallable(functions, 'exportServicesReport');
+
+
 export default function AdminExportReportsPage() {
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+  const [loadingStates, setLoadingStates] = useState({
+    bookings: false,
+    sales: false, // Sales report uses bookings data
+    users: false,
+    services: false,
+  });
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchAllData = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const [bookingsSnap, servicesSnap, profilesSnap] = await Promise.all([
-          getDocs(collection(db, 'bookings')),
-          getDocs(collection(db, 'services')),
-          getDocs(collection(db, 'userProfiles'))
-        ]);
-        
-        setBookings(bookingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking)));
-        setServices(servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
-        setUserProfiles(profilesSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile)));
-
-      } catch (err) {
-        console.error("Error fetching data for reports:", err);
-        setError("Could not load data required for reports. Please check your connection and Firestore security rules.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchAllData();
-  }, []);
-
   const downloadJSON = (data: any, filename: string) => {
-    const jsonStr = JSON.stringify(data, null, 2);
+    const jsonStr = JSON.stringify(data, (key, value) => {
+      // Handle Firestore Timestamps if they appear
+      if (value && typeof value === 'object' && value.hasOwnProperty('seconds') && value.hasOwnProperty('nanoseconds')) {
+        return new Date(value.seconds * 1000 + value.nanoseconds / 1000000).toISOString();
+      }
+      return value;
+    }, 2);
     const blob = new Blob([jsonStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -56,69 +45,24 @@ export default function AdminExportReportsPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleExportSessionSchedules = () => {
-    const reportData = bookings.map(booking => ({
-      bookingId: booking.id,
-      serviceName: booking.serviceName,
-      date: booking.date,
-      time: booking.time,
-      userName: booking.userName,
-      userEmail: booking.userEmail,
-      meetingLink: booking.meetingLink,
-      status: booking.status,
-      userFeedback: booking.userFeedback || null,
-      detailedMentorFeedback: booking.detailedFeedback || null,
-    }));
-    downloadJSON(reportData, 'session_schedules_with_feedback_report.json');
+  const handleExport = async (reportType: keyof typeof loadingStates, exportFunction: any, filename: string) => {
+    setLoadingStates(prev => ({ ...prev, [reportType]: true }));
+    setError(null);
+    try {
+      const result: any = await exportFunction();
+      downloadJSON(result.data.data, filename); // data is nested under result.data
+    } catch (err: any) {
+      console.error(`Error exporting ${reportType}:`, err);
+      setError(`Could not generate ${reportType} report. You might not have the required admin permissions or there was a server error.`);
+      toast({
+        title: "Export Failed",
+        description: `Failed to generate the ${reportType} report.`,
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingStates(prev => ({ ...prev, [reportType]: false }));
+    }
   };
-
-  const handleExportSalesReport = () => {
-    const reportData = bookings.map(booking => {
-      const service = services.find(s => s.id === booking.serviceId);
-      return {
-        bookingId: booking.id,
-        serviceName: booking.serviceName,
-        userName: booking.userName,
-        userEmail: booking.userEmail,
-        date: booking.date,
-        time: booking.time,
-        pricePaid: booking.paymentStatus === 'paid' ? service?.price || 0 : 0,
-        paymentStatus: booking.paymentStatus,
-        transactionId: booking.transactionId || 'N/A',
-        status: booking.status,
-      };
-    });
-    downloadJSON(reportData, 'sales_report.json');
-  };
-
-  const handleExportUserData = () => {
-    downloadJSON(userProfiles, 'user_data_report.json');
-  };
-  
-  if (isLoading) {
-    return (
-      <>
-        <PageHeader title="Export Reports" description="Download various reports in JSON format for analysis and record-keeping." />
-        <div className="flex justify-center items-center h-48">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
-            <p>Loading report data...</p>
-        </div>
-      </>
-    );
-  }
-  
-  if (error) {
-     return (
-       <>
-        <PageHeader title="Export Reports" description="Download various reports in JSON format for analysis and record-keeping." />
-        <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Error Loading Data</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-        </Alert>
-       </>
-    );
-  }
 
 
   return (
@@ -127,36 +71,67 @@ export default function AdminExportReportsPage() {
         title="Export Reports"
         description="Download various reports in JSON format for analysis and record-keeping."
       />
+
+      {error && (
+        <Alert variant="destructive" className="mb-6">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Export Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
       <div className="grid md:grid-cols-1 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center"><DownloadCloud className="mr-2 h-5 w-5 text-primary" /> Session Schedules</CardTitle>
-            <CardDescription>Export a list of all booked sessions with their details and any submitted feedback.</CardDescription>
+            <CardTitle className="flex items-center"><DownloadCloud className="mr-2 h-5 w-5 text-primary" /> Bookings Report</CardTitle>
+            <CardDescription>Export a complete list of all bookings with their full details.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={handleExportSessionSchedules} className="w-full">Export Session Schedules (JSON)</Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center"><DownloadCloud className="mr-2 h-5 w-5 text-primary" /> Sales Report</CardTitle>
-            <CardDescription>Export a detailed report of sales, including payment status and transaction IDs.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={handleExportSalesReport} className="w-full">Export Sales Report (JSON)</Button>
+            <Button 
+                onClick={() => handleExport('bookings', exportBookingsReport, 'bookings_report.json')} 
+                className="w-full"
+                disabled={loadingStates.bookings}
+            >
+              {loadingStates.bookings ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+              Export Bookings (JSON)
+            </Button>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center"><DownloadCloud className="mr-2 h-5 w-5 text-primary" /> User Data Report</CardTitle>
-            <CardDescription>Export a list of all user profiles created in the system.</CardDescription>
+            <CardDescription>Export a list of all user profiles registered in the system.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={handleExportUserData} className="w-full">Export User Profiles (JSON)</Button>
+             <Button 
+                onClick={() => handleExport('users', exportUsersReport, 'user_profiles_report.json')} 
+                className="w-full"
+                disabled={loadingStates.users}
+            >
+              {loadingStates.users ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+              Export User Profiles (JSON)
+            </Button>
           </CardContent>
         </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center"><DownloadCloud className="mr-2 h-5 w-5 text-primary" /> Services Report</CardTitle>
+            <CardDescription>Export a list of all services configured on the platform.</CardDescription>
+          </CardHeader>
+          <CardContent>
+             <Button 
+                onClick={() => handleExport('services', exportServicesReport, 'services_report.json')} 
+                className="w-full"
+                disabled={loadingStates.services}
+            >
+              {loadingStates.services ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+              Export Services (JSON)
+            </Button>
+          </CardContent>
+        </Card>
+
       </div>
     </>
   );
