@@ -2,36 +2,37 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MOCK_SERVICES } from '@/constants';
 import { ServiceCard } from '@/components/core/service-card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import type { Service } from '@/types';
-import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { collection, getDocs, limit, query, where, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Skeleton } from '../ui/skeleton';
 
 export function HomePageServiceList() {
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchServices = async () => {
       setIsLoading(true);
+      setError(null);
       try {
         const servicesCol = collection(db, 'services');
-        const q = query(servicesCol, where('isBookable', '==', true), limit(3));
+        const q = query(servicesCol, where('isBookable', '==', true), orderBy('name', 'asc'), limit(3));
         const servicesSnap = await getDocs(q);
         if (servicesSnap.empty) {
-          setServices(MOCK_SERVICES.slice(0, 3));
-        } else {
-          setServices(servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
+          console.log("No bookable services found in Firestore for homepage.");
         }
-      } catch (error) {
-        console.error("Failed to fetch services for homepage, using fallback.", error);
-        setServices(MOCK_SERVICES.slice(0, 3));
+        setServices(servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
+      } catch (err) {
+        console.error("Failed to fetch services for homepage.", err);
+        setError("Could not load services at this time.");
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
     fetchServices();
   }, []);
@@ -45,10 +46,14 @@ export function HomePageServiceList() {
             Array.from({ length: 3 }).map((_, index) => (
               <CardSkeleton key={index} />
             ))
-          ) : (
+          ) : services.length > 0 ? (
             services.map((service) => (
               <ServiceCard key={service.id} service={service} />
             ))
+          ) : (
+            <p className="col-span-full text-center text-muted-foreground">
+              {error ? error : "No services are currently available for booking. Please check back soon."}
+            </p>
           )}
         </div>
         <div className="text-center mt-12">
@@ -65,8 +70,8 @@ const CardSkeleton = () => (
   <div className="flex flex-col space-y-3">
     <Skeleton className="h-[225px] w-full rounded-xl" />
     <div className="space-y-2">
-      <Skeleton className="h-4 w-[250px]" />
-      <Skeleton className="h-4 w-[200px]" />
+      <Skeleton className="h-4 w-3/4" />
+      <Skeleton className="h-4 w-1/2" />
     </div>
   </div>
 );

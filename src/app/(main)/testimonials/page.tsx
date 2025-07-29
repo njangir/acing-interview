@@ -4,18 +4,15 @@
 import { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from "@/components/core/page-header";
 import { TestimonialCard } from "@/components/core/testimonial-card";
-import { MOCK_TESTIMONIALS } from "@/constants";
-import type { Testimonial } from '@/types'; // Import Testimonial type
+import type { Testimonial } from '@/types';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-// PRODUCTION TODO:
-// - Import Firebase and Firestore methods:
-import { db } from '@/lib/firebase'; // Assuming firebase.ts setup
-import { collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 
-const ITEMS_PER_PAGE = 6; // 2 rows of 3 cards
+const ITEMS_PER_PAGE = 6;
 
 export default function TestimonialsPage() {
   const [allTestimonials, setAllTestimonials] = useState<Testimonial[]>([]);
@@ -28,7 +25,6 @@ export default function TestimonialsPage() {
       setIsLoading(true);
       setError(null);
       try {
-        // PRODUCTION TODO: Replace with actual Firestore data fetching
         const testimonialsCol = collection(db, 'testimonials');
         const q = query(testimonialsCol, where('status', '==', 'approved'), orderBy('createdAt', 'desc'));
         const testimonialSnapshot = await getDocs(q);
@@ -37,7 +33,6 @@ export default function TestimonialsPage() {
           return {
             id: doc.id,
             ...data,
-            // Ensure timestamp fields are handled correctly (e.g., toDate().toISOString() if stored as Firestore Timestamps)
             createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
             updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : new Date().toISOString(),
           } as Testimonial;
@@ -47,7 +42,6 @@ export default function TestimonialsPage() {
       } catch (err) {
         console.error("Error fetching testimonials:", err);
         setError("Failed to load testimonials. Please try again later.");
-        setAllTestimonials(MOCK_TESTIMONIALS.filter(t => t.status === 'approved')); // Fallback to mock on error for demo
       } finally {
         setIsLoading(false);
       }
@@ -55,7 +49,6 @@ export default function TestimonialsPage() {
 
     fetchTestimonials();
   }, []);
-
 
   const totalPages = Math.ceil(allTestimonials.length / ITEMS_PER_PAGE);
 
@@ -104,7 +97,6 @@ export default function TestimonialsPage() {
       </>
     );
   }
-
 
   return (
     <>

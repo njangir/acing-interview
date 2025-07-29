@@ -1,52 +1,47 @@
 
 import { getDoc, doc } from 'firebase/firestore';
-import { db } from '@/lib/firebase'; // Assuming you have a firebase.ts config file
+import { db } from '@/lib/firebase';
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MENTOR_PROFILE } from "@/constants"; // Keep for now for UI rendering during transition
 import type { MentorProfileData } from '@/types';
-import { CheckCircle, Award, MessageSquareHeart } from "lucide-react";
+import { CheckCircle, Award, MessageSquareHeart, AlertTriangle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // This is a Server Component, so data fetching can be done directly.
 export default async function MentorProfilePage() {
   let mentorProfile: MentorProfileData | null = null;
+  let error: string | null = null;
 
-  // PRODUCTION TODO: Replace MENTOR_PROFILE with actual Firestore data fetching.
   try {
-    // Example: Fetching from a document named 'mainMentor' in a 'siteProfiles' collection
     const mentorDocRef = doc(db, 'siteProfiles', 'mainMentor'); 
     const mentorDocSnap = await getDoc(mentorDocRef);
 
     if (mentorDocSnap.exists()) {
       mentorProfile = mentorDocSnap.data() as MentorProfileData;
-      // Ensure timestamp fields are handled correctly if they exist (e.g., toDate().toISOString())
     } else {
-      console.warn("Mentor profile document not found in Firestore.");
-      // Fallback to mock data if not found, or handle error appropriately
+      error = "The mentor profile could not be found. It may not have been configured yet.";
+      console.warn("Mentor profile document not found in Firestore at 'siteProfiles/mainMentor'.");
     }
-  } catch (error) {
-    console.error("Error fetching mentor profile:", error);
-    // Optionally, render an error message or fallback UI
-    // For now, it will fall back to MOCK_SERVICES if fetching fails or is commented out.
-  }
-
-  // Fallback to mock data if mentorProfile is null (e.g., Firestore fetch failed or is commented out)
-  if (!mentorProfile) {
-    mentorProfile = MENTOR_PROFILE; // Using mock data for UI consistency during refactor
+  } catch (err) {
+    console.error("Error fetching mentor profile:", err);
+    error = "There was an error fetching the mentor's profile. Please try again later.";
   }
   
-  if (!mentorProfile) {
+  if (error || !mentorProfile) {
     return (
       <div className="container py-12">
-        <PageHeader title="Meet Your Mentor" description="Mentor profile loading or not available." />
-        <p className="text-center text-muted-foreground">Could not load mentor profile. Please try again later.</p>
+        <PageHeader title="Meet Your Mentor" description="Learn about the expertise and experience of our mentor." />
+         <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Profile Not Available</AlertTitle>
+            <AlertDescription>{error || "Could not load mentor profile."}</AlertDescription>
+        </Alert>
       </div>
     );
   }
-
 
   return (
     <>
@@ -74,7 +69,7 @@ export default async function MentorProfilePage() {
                 <CardTitle className="text-2xl font-headline text-primary">About {mentorProfile.name.split(' ')[0]}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <p className="text-foreground/80 leading-relaxed">
+                <p className="text-foreground/80 leading-relaxed whitespace-pre-wrap">
                   {mentorProfile.bio}
                 </p>
 
@@ -98,7 +93,7 @@ export default async function MentorProfilePage() {
                      <MessageSquareHeart className="mr-2 h-5 w-5 text-accent" />
                     Mentorship Philosophy
                   </h3>
-                  <p className="text-sm text-muted-foreground italic">
+                  <p className="text-sm text-muted-foreground italic whitespace-pre-wrap">
                     "{mentorProfile.philosophy}"
                   </p>
                 </div>
