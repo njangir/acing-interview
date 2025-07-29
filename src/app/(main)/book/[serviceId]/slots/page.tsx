@@ -7,14 +7,12 @@ import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
-import { MOCK_SERVICES, AVAILABLE_SLOTS } from "@/constants"; // AVAILABLE_SLOTS for mock
 import type { Service, Booking } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { CheckCircle, XCircle, Loader2, Ban } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 
-// PRODUCTION TODO: Import Firebase and Firestore methods:
 import { db } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { format } from 'date-fns';
@@ -35,6 +33,7 @@ export default function SlotSelectionPage() {
   const [isServiceBookable, setIsServiceBookable] = useState(true);
   const [isFetchingSlots, setIsFetchingSlots] = useState(false);
   const [isProceeding, setIsProceeding] = useState(false);
+  const [firestoreSlots, setFirestoreSlots] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     if (loadingAuth) {
@@ -46,10 +45,11 @@ export default function SlotSelectionPage() {
       return;
     }
 
-    const fetchServiceDetails = async () => {
+    const fetchInitialData = async () => {
       setIsLoading(true);
       setError(null);
       try {
+        // Fetch service details
         const serviceDocRef = doc(db, "services", serviceId);
         const serviceSnap = await getDoc(serviceDocRef);
         if (serviceSnap.exists()) {
@@ -59,47 +59,44 @@ export default function SlotSelectionPage() {
         } else {
           setError("Service not found.");
           setIsServiceBookable(false);
+          setIsLoading(false);
+          return;
         }
+
+        // Fetch all availability data
+        const availabilityColRef = collection(db, 'globalAvailability');
+        const availabilitySnapshot = await getDocs(availabilityColRef);
+        const fetchedSlots: Record<string, string[]> = {};
+        availabilitySnapshot.forEach(doc => {
+          fetchedSlots[doc.id] = doc.data().timeSlots || [];
+        });
+        setFirestoreSlots(fetchedSlots);
+
       } catch (err) {
-        console.error("Error fetching service details:", err);
-        setError("Failed to load service details. Please try again.");
+        console.error("Error fetching initial data:", err);
+        setError("Failed to load service details or availability. Please try again.");
         setIsServiceBookable(false);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchServiceDetails();
+    fetchInitialData();
   }, [serviceId, currentUser, router, loadingAuth]);
 
   useEffect(() => {
     if (selectedDate && serviceId) { 
       setIsFetchingSlots(true);
       setError(null);
-
-      const fetchSlotsForDate = async () => {
-        try {
-          const dateString = format(selectedDate, 'yyyy-MM-dd');
-          // PRODUCTION: Fetch available slots from Firestore for the given dateString.
-          // This example uses a mock `AVAILABLE_SLOTS` for simplicity.
-          await new Promise(resolve => setTimeout(resolve, 300)); 
-          setAvailableTimes(AVAILABLE_SLOTS[dateString] || []);
-        } catch (err) {
-          console.error("Error fetching slots for date:", err);
-          setError("Failed to load available slots for this date. Please try another date.");
-          setAvailableTimes([]);
-        } finally {
-          setIsFetchingSlots(false);
-          setSelectedTime(null);
-        }
-      };
-      fetchSlotsForDate();
+      const dateString = format(selectedDate, 'yyyy-MM-dd');
+      setAvailableTimes(firestoreSlots[dateString] || []);
+      setSelectedTime(null);
+      setIsFetchingSlots(false);
     } else {
       setAvailableTimes([]);
       setSelectedTime(null);
-      setIsFetchingSlots(false);
     }
-  }, [selectedDate, serviceId]); 
+  }, [selectedDate, serviceId, firestoreSlots]); 
 
   const handleProceed = async () => {
     if (!selectedDate || !selectedTime) {
@@ -117,7 +114,6 @@ export default function SlotSelectionPage() {
 
     setIsProceeding(true);
     try {
-      // Create a pending booking document in Firestore
       const newBookingData: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'> = {
         uid: currentUser.uid,
         serviceId: service.id,
@@ -127,8 +123,8 @@ export default function SlotSelectionPage() {
         userName: currentUser.name,
         userEmail: currentUser.email,
         meetingLink: '',
-        status: 'pending_payment', // Initial status before payment/confirmation
-        paymentStatus: 'pay_later_pending', // Assume pay later until confirmed
+        status: 'pending_payment',
+        paymentStatus: 'pay_later_pending', 
         transactionId: null,
         requestedRefund: false,
       };
@@ -139,7 +135,6 @@ export default function SlotSelectionPage() {
         updatedAt: serverTimestamp(),
       });
       
-      // Redirect to payment page with the new booking ID
       router.push(`/book/${serviceId}/payment?bookingId=${docRef.id}`);
 
     } catch (err) {
@@ -162,7 +157,7 @@ export default function SlotSelectionPage() {
     );
   }
 
-  if (error && !service) { // Critical error if service details couldn't load
+  if (error && !service) {
     return (
       <div className="container py-12">
         <Alert variant="destructive">
@@ -174,7 +169,7 @@ export default function SlotSelectionPage() {
     );
   }
 
-  if (!service) { // Should be caught by isLoading, but as a fallback
+  if (!service) {
     return <div className="container py-12">Loading service details...</div>;
   }
 
@@ -208,7 +203,7 @@ export default function SlotSelectionPage() {
         description="Select an available date and time slot for your session."
       />
       <div className="container py-12">
-        {error && !selectedDate && !selectedTime && ( // General error display
+        {error && !selectedDate && !selectedTime && (
           <Alert variant="destructive" className="mb-6">
             <XCircle className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
@@ -228,10 +223,10 @@ export default function SlotSelectionPage() {
                 onSelect={setSelectedDate}
                 className="rounded-md border"
                 disabled={(date) => {
-                  const dateString = date.toISOString().split('T')[0];
+                  const dateString = format(date, 'yyyy-MM-dd');
                   const currentDayStart = new Date();
                   currentDayStart.setHours(0,0,0,0);
-                  return date < currentDayStart || (!isFetchingSlots && (!AVAILABLE_SLOTS[dateString] || AVAILABLE_SLOTS[dateString]?.length === 0));
+                  return date < currentDayStart || (!isFetchingSlots && (!firestoreSlots[dateString] || firestoreSlots[dateString]?.length === 0));
                 }}
               />
             </div>
@@ -248,7 +243,7 @@ export default function SlotSelectionPage() {
                     <Button
                       key={time}
                       variant={selectedTime === time ? "default" : "outline"}
-                      onClick={() => {setSelectedTime(time); setError(null);}} // Clear general errors when a time is selected
+                      onClick={() => {setSelectedTime(time); setError(null);}}
                       className={selectedTime === time ? "bg-primary text-primary-foreground" : ""}
                     >
                       {time}
@@ -258,7 +253,7 @@ export default function SlotSelectionPage() {
               ) : (
                 <p className="text-muted-foreground">{selectedDate ? "No slots available for this date." : "Please select a date to see available times."}</p>
               )}
-               {error && (selectedDate || selectedTime) && ( // Display slot-specific errors here
+               {error && (selectedDate || selectedTime) && (
                 <Alert variant="destructive" className="mt-4">
                   <XCircle className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>

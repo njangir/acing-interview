@@ -7,6 +7,7 @@ import type { UserProfile, Booking } from '@/types';
 import { auth, db, googleProvider, RecaptchaVerifier, signInWithPhoneNumber } from '@/lib/firebase';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser, signInWithPopup, type ConfirmationResult, sendEmailVerification } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { useToast } from './use-toast';
 
 
 interface AuthContextUser {
@@ -34,7 +35,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper function to check and cancel expired unpaid bookings
 const checkAndCancelExpiredBookings = async (userId: string) => {
     try {
         const now = new Date();
@@ -48,7 +48,7 @@ const checkAndCancelExpiredBookings = async (userId: string) => {
 
         const querySnapshot = await getDocs(q);
         if (querySnapshot.empty) {
-            return; // No bookings to check for this user
+            return;
         }
         
         const batch = writeBatch(db);
@@ -63,7 +63,6 @@ const checkAndCancelExpiredBookings = async (userId: string) => {
             if (ampm === 'AM' && hours === 12) hours = 0;
             bookingDateTime.setHours(hours, minutes, 0, 0);
 
-            // If the booking time is in the past, cancel it
             if (bookingDateTime < now) {
                 const bookingDocRef = doc(db, "bookings", doc.id);
                 batch.update(bookingDocRef, {
@@ -81,7 +80,6 @@ const checkAndCancelExpiredBookings = async (userId: string) => {
         }
     } catch (error) {
         console.error("Error auto-cancelling expired bookings:", error);
-        // We don't need to inform the user about this background task failing.
     }
 };
 
@@ -90,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<AuthContextUser | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const router = useRouter();
+  const { toast } = useToast();
 
   const fetchUserProfile = useCallback(async (firebaseUser: FirebaseUser): Promise<AuthContextUser> => {
     const userDocRef = doc(db, "userProfiles", firebaseUser.uid);
@@ -121,14 +120,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // For email/password users, they can only be "current" if their email is verified.
-        // Google users are considered verified by default.
         if (firebaseUser.providerData.some(p => p.providerId === 'password') && !firebaseUser.emailVerified) {
-          setCurrentUser(null);
+            setCurrentUser(null);
         } else {
           const userProfile = await fetchUserProfile(firebaseUser);
           setCurrentUser(userProfile);
-          // Run the expired booking check in the background after setting the user
           checkAndCancelExpiredBookings(firebaseUser.uid);
         }
       } else {
@@ -145,12 +141,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const firebaseUser = userCredential.user;
 
     if (!firebaseUser.emailVerified) {
+      await signOut(auth); // Sign out the user immediately if email is not verified
       throw new Error('Email not verified');
     }
 
     const userProfile = await fetchUserProfile(firebaseUser);
     setCurrentUser(userProfile);
-    // Also run the check on manual login
     checkAndCancelExpiredBookings(firebaseUser.uid);
     return { user: userProfile, isAdmin: userProfile.isAdmin };
   }, [fetchUserProfile]);
@@ -197,7 +193,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     setCurrentUser(userProfile);
-    // Also run the check on Google login
     checkAndCancelExpiredBookings(firebaseUser.uid);
     return { user: userProfile, isAdmin: userProfile.isAdmin, isNewUser };
   }, []);
@@ -217,19 +212,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
   
-  // PRODUCTION TODO: Implement the full multi-step UI flow for OTP.
-  // These functions provide the Firebase logic.
   const setupRecaptcha = useCallback(async (containerId: string) => {
-    // Ensure the reCAPTCHA container is visible and empty.
-    // window.recaptchaVerifier would be an instance variable if you need to access it across calls.
     const recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
       'size': 'invisible',
       'callback': (response: any) => {
-        // reCAPTCHA solved, allow signInWithPhoneNumber.
         console.log("reCAPTCHA solved");
       },
        'expired-callback': () => {
-        // Response expired. Ask user to solve reCAPTCHA again.
         console.log("reCAPTCHA expired");
       }
     });
@@ -237,7 +226,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const sendOtp = useCallback(async (phoneNumber: string, verifier: RecaptchaVerifier) => {
-    // Phone number must be in E.164 format (e.g., +11234567890)
     return await signInWithPhoneNumber(auth, phoneNumber, verifier);
   }, []);
 
@@ -269,10 +257,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
+};

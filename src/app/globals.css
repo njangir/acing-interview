@@ -123,17 +123,20 @@ body {
 }
 
 /* Custom Calendar Day Styles for Admin Slots Page */
-.rdp-button.day-available {
-  @apply !bg-green-100 dark:!bg-green-800/50 !text-green-700 dark:!text-green-300;
+.day-available:not([aria-selected]) {
+  @apply bg-green-100 font-bold text-green-700;
+  @apply dark:bg-green-900/40 dark:text-green-300;
 }
-.rdp-button.day-unavailable:not(.rdp-day_disabled):not(.rdp-day_outside) {
-  @apply !bg-red-100 dark:!bg-red-800/50 !text-red-700 dark:!text-red-300 opacity-75;
+
+.day-unavailable:not([aria-selected]) {
+  @apply bg-red-100 text-red-600 line-through;
+  @apply dark:bg-red-900/40 dark:text-red-400;
 }
 
 /* Ensure selected and today styles take precedence over custom availability styles */
 .rdp-button:is(.rdp-day_selected, [aria-selected="true"]):is(.day-available, .day-unavailable) {
-  @apply !bg-primary !text-primary-foreground !opacity-100;
+  @apply !bg-primary !text-primary-foreground !opacity-100 !no-underline;
 }
 .rdp-button.rdp-day_today:not(:is(.rdp-day_selected, [aria-selected="true"])):is(.day-available, .day-unavailable) {
-  @apply !bg-accent !text-accent-foreground !opacity-100;
+  @apply !bg-accent !text-accent-foreground !opacity-100 !no-underline;
 }
