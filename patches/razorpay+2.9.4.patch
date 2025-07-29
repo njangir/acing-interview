@@ -1,0 +1,21 @@
+diff --git a/node_modules/razorpay/dist/utils/razorpay-utils.js b/node_modules/razorpay/dist/utils/razorpay-utils.js
+index b81b7e6..65ff6c8 100644
+--- a/node_modules/razorpay/dist/utils/razorpay-utils.js
++++ b/node_modules/razorpay/dist/utils/razorpay-utils.js
+@@ -1,5 +1,6 @@
+ 'use strict';
+ 
++var _require = require('util');
+ var crypto = require('crypto');
+ var path = require('path');
+ var https = require('https');
+@@ -10,7 +11,7 @@
+   isNumber,
+   isString,
+   isObject
+-} = require('util');
++} = _require;
+ 
+ function validateWebhookSignature(body, signature, secret) {
+ 
+

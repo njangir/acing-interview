@@ -15,13 +15,20 @@ import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 
-// PRODUCTION TODO: Import Firebase and Firestore methods:
-import { db } from '@/lib/firebase';
+import { db, functions } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-// import { functions } from '@/lib/firebase'; // If using Firebase Functions for backend logic
-// import { httpsCallable } from 'firebase/functions';
+import { httpsCallable } from 'firebase/functions';
+
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 type PaymentOption = 'payNow' | 'payLater';
+
+const createPaymentOrder = httpsCallable(functions, 'createPaymentOrder');
+const verifyPayment = httpsCallable(functions, 'verifyPayment');
 
 export default function PaymentPage() {
   const params = useParams();
@@ -30,12 +37,12 @@ export default function PaymentPage() {
   const serviceId = params.serviceId as string;
   const bookingId = searchParamsHook.get('bookingId');
   const { toast } = useToast();
-  const { currentUser, loadingAuth } = useAuth(); // Added loadingAuth
+  const { currentUser, loadingAuth } = useAuth();
   
   const [service, setService] = useState<Service | null>(null);
   const [booking, setBooking] = useState<Booking | null>(null);
-  const [isLoading, setIsLoading] = useState(false); // General loading for page actions
-  const [isDataLoading, setIsDataLoading] = useState(true); // Specific for initial data load
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDataLoading, setIsDataLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [paymentOption, setPaymentOption] = useState<PaymentOption>('payNow');
 
@@ -106,53 +113,72 @@ export default function PaymentPage() {
       return;
     }
     
-    let paymentSuccess = true;
-    let newBookingStatus: Booking['status'] = 'pending_approval';
-    let newPaymentStatus: Booking['paymentStatus'] = 'pay_later_pending';
-    let transactionId: string | null = null;
-    const bookingDocRef = doc(db, "bookings", bookingId);
-
     if (paymentOption === 'payNow') {
-      // PRODUCTION TODO: Payment Gateway Integration
-      // 1. Call backend API to create a payment order, e.g. using `httpsCallable`
-      // 2. Initialize Payment Gateway SDK on client-side with orderId & key
-      // 3. In the success handler, call another backend API to verify payment and update booking.
-      // 4. On failure, update UI with error.
-      // For this prototype, we simulate this process.
+      try {
+        const orderResponse: any = await createPaymentOrder({
+          bookingId: bookingId,
+          amount: service.price,
+        });
 
-      // MOCK PAYMENT SIMULATION
-      await new Promise(resolve => setTimeout(resolve, 1500)); 
-      paymentSuccess = Math.random() > 0.1; // 90% success rate
+        const { orderId, keyId } = orderResponse.data;
 
-      if (paymentSuccess) {
-        transactionId = "mock_txn_" + Date.now();
-        newPaymentStatus = 'paid';
-        newBookingStatus = 'accepted'; // Admin needs to provide link
-        
-        try {
-            await updateDoc(bookingDocRef, {
-              paymentStatus: newPaymentStatus,
-              status: newBookingStatus,
-              transactionId: transactionId,
-              updatedAt: serverTimestamp()
-            });
+        const options = {
+          key: keyId,
+          amount: service.price * 100,
+          currency: "INR",
+          name: "Armed Forces Interview Ace",
+          description: `Payment for ${service.name}`,
+          image: "/logo.svg", // Add your logo here
+          order_id: orderId,
+          handler: async function (response: any) {
+            try {
+              await verifyPayment({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                bookingId: bookingId,
+              });
+              
+              toast({
+                title: "Payment Successful!",
+                description: "Your booking is confirmed. Admin will provide the meeting link.",
+              });
+              router.push(`/book/confirmation?bookingId=${bookingId}`);
+            } catch (verificationError) {
+              console.error("Payment verification failed:", verificationError);
+              toast({
+                title: "Payment Verification Failed",
+                description: "Your payment was processed, but we couldn't verify it. Please contact support with your booking ID.",
+                variant: "destructive",
+              });
+              setError("Payment verification failed. Please contact support.");
+            }
+          },
+          prefill: {
+            name: currentUser.name,
+            email: currentUser.email,
+          },
+          theme: {
+            color: "#0d47a1", // Your primary color
+          },
+        };
 
+        const rzp = new window.Razorpay(options);
+        rzp.on('payment.failed', function (response: any) {
+            console.error("Razorpay payment failed:", response.error);
             toast({
-              title: "Payment Successful!",
-              description: "Your booking is paid. Admin will schedule and provide meeting link.",
+              title: "Payment Failed",
+              description: `Reason: ${response.error.description}`,
+              variant: "destructive",
             });
-        } catch (dbError) {
-             console.error("Error updating booking after payment:", dbError);
-             setError("Payment was successful, but we failed to update your booking record. Please contact support.");
-             setIsLoading(false);
-             return;
-        }
-
-      } else {
-        setError("Payment failed. Please try again or choose 'Pay Later'.");
-        toast({ title: "Payment Failed", description: "There was an issue processing your payment.", variant: "destructive" });
-        setIsLoading(false);
-        return;
+            setError(`Payment failed: ${response.error.reason}. Please try again or choose 'Pay Later'.`);
+        });
+        rzp.open();
+        
+      } catch (orderError) {
+        console.error("Error creating payment order:", orderError);
+        toast({ title: "Could not initiate payment", description: "Failed to create a payment order. Please try again.", variant: "destructive" });
+        setError("Could not connect to the payment gateway.");
       }
     } else { // Pay Later
       if(booking.status !== 'pending_payment') {
@@ -161,29 +187,24 @@ export default function PaymentPage() {
           return;
       }
       await new Promise(resolve => setTimeout(resolve, 500)); // Simulate short processing
-      newPaymentStatus = 'pay_later_pending';
-      newBookingStatus = 'pending_approval';
       
       try {
+          const bookingDocRef = doc(db, "bookings", bookingId);
           await updateDoc(bookingDocRef, {
-            paymentStatus: newPaymentStatus,
-            status: newBookingStatus,
+            paymentStatus: 'pay_later_pending',
+            status: 'pending_approval',
             updatedAt: serverTimestamp(),
           });
           toast({
             title: "Booking Tentatively Confirmed!",
             description: "Your slot is reserved. Payment will be due before the session if approved. Redirecting...",
           });
+          router.push(`/book/confirmation?bookingId=${bookingId}`);
       } catch (dbError) {
           console.error("Error updating booking for Pay Later:", dbError);
           setError("Failed to reserve your slot. Please try again.");
-          setIsLoading(false);
-          return;
       }
     }
-    
-    // Redirect to confirmation page
-    router.push(`/book/confirmation?bookingId=${bookingId}`);
     
     setIsLoading(false);
   };
@@ -238,7 +259,6 @@ export default function PaymentPage() {
             <RadioGroup 
                 onValueChange={(value: PaymentOption) => setPaymentOption(value)} 
                 className="space-y-2"
-                // If it's an existing booking being paid for, default and lock to 'Pay Now'
                 value={isExistingBooking ? 'payNow' : paymentOption}
             >
               <Label className="font-semibold text-md">Payment Options:</Label>
@@ -250,7 +270,7 @@ export default function PaymentPage() {
                 />
                 <Label htmlFor="payNow" className="flex-1 cursor-pointer">Pay Now & Confirm Slot</Label>
               </div>
-              {!isExistingBooking && ( // 'Pay Later' only for brand new bookings
+              {!isExistingBooking && (
                 <div className="flex items-center space-x-2 p-3 border rounded-md hover:border-primary transition-colors">
                     <RadioGroupItem value="payLater" id="payLater" />
                     <Label htmlFor="payLater" className="flex-1 cursor-pointer">Pay Later (Tentative, Requires Approval)</Label>
@@ -270,12 +290,11 @@ export default function PaymentPage() {
             
             {paymentOption === 'payNow' && (
                 <div className="text-center pt-4">
-                {/* PRODUCTION TODO: Replace with actual payment gateway button/integration (e.g., Razorpay button) */}
-                <Image src="https://placehold.co/300x80.png?text=Mock+Payment+Gateway" alt="Mock Payment Gateway" width={300} height={80} className="mx-auto rounded border" data-ai-hint="payment gateway logo"/>
+                <Image src="https://placehold.co/300x80.png?text=Secure+Payment+via+Razorpay" alt="Pay with Razorpay" width={300} height={80} className="mx-auto rounded border" data-ai-hint="payment gateway razorpay"/>
                 </div>
             )}
 
-             {error && ( // General error display if not critical
+             {error && (
               <Alert variant="destructive" className="mt-4">
                 <XCircle className="h-4 w-4" />
                 <AlertTitle>Error</AlertTitle>

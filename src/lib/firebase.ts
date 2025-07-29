@@ -12,12 +12,12 @@ import { getFunctions } from "firebase/functions";
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  projectId: "armed-forces-interview-ace",
-  appId: "1:742450909840:web:bc667d403885a3c75c7e15",
-  storageBucket: "armed-forces-interview-ace.firebasestorage.app",
-  apiKey: "AIzaSyCJy25IhMVNfNvAcIfr05ccgohGjp9zV0w",
-  authDomain: "armed-forces-interview-ace.firebaseapp.com",
-  messagingSenderId: "742450909840",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
 
