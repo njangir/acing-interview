@@ -18,10 +18,12 @@ import type { MentorProfileData } from '@/types';
 import { UserCog, Loader2, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-// PRODUCTION TODO: Import Firebase and Firestore methods
-import { db } from '@/lib/firebase';
+import { db, functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
+const getMentorProfile = httpsCallable(functions, 'getMentorProfile');
+const saveMentorProfile = httpsCallable(functions, 'saveMentorProfile');
 
 const mentorProfileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -54,10 +56,9 @@ export default function AdminMentorProfilePage() {
       setIsLoading(true);
       setError(null);
       try {
-        const profileDocRef = doc(db, 'siteProfiles', 'mainMentor');
-        const docSnap = await getDoc(profileDocRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data() as MentorProfileData;
+        const result: any = await getMentorProfile();
+        const data = result.data.profile;
+        if (data) {
           setEditableProfile(data);
           form.reset({
             ...data,
@@ -82,10 +83,8 @@ export default function AdminMentorProfilePage() {
           ...data,
       };
       
-      const profileDocRef = doc(db, 'siteProfiles', 'mainMentor');
-      await setDoc(profileDocRef, { ...profileToSave, updatedAt: serverTimestamp() }, { merge: true });
-
-      setEditableProfile(profileToSave); // Update local state to reflect changes
+      await saveMentorProfile({ profile: profileToSave });
+      setEditableProfile(profileToSave);
       
       toast({
         title: "Mentor Profile Updated",
@@ -272,3 +271,5 @@ export default function AdminMentorProfilePage() {
     </>
   );
 }
+
+    

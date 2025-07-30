@@ -17,8 +17,12 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth'; 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-import { db } from '@/lib/firebase';
-import { collection, query, orderBy, addDoc, updateDoc, doc, serverTimestamp, where, writeBatch, getDocs } from 'firebase/firestore';
+import { functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
+
+const getMessages = httpsCallable(functions, 'getMessages');
+const sendAdminReply = httpsCallable(functions, 'sendAdminReply');
+const markMessagesAsRead = httpsCallable(functions, 'markMessagesAsRead');
 
 const ITEMS_PER_PAGE = 5;
 
@@ -50,19 +54,13 @@ export default function AdminMessagesPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const messagesColRef = collection(db, 'userMessages');
-      const q = query(messagesColRef, orderBy('timestamp', 'desc'));
-      const querySnapshot = await getDocs(q);
-      const fetchedMessages = querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp),
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
-          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : new Date().toISOString(),
-        } as UserMessage;
-      });
+      const result: any = await getMessages();
+      const fetchedMessages = result.data.messages.map((msg: any) => ({
+        ...msg,
+        timestamp: new Date(msg.timestamp),
+        createdAt: new Date(msg.createdAt),
+        updatedAt: new Date(msg.updatedAt),
+      }));
       setAllMessagesData(fetchedMessages);
     } catch (err) {
       console.error("Error fetching messages:", err);
@@ -148,18 +146,13 @@ export default function AdminMessagesPage() {
     setReplyText('');
     setIsModalOpen(true);
 
-    const batch = writeBatch(db);
-    let messagesToUpdate = false;
-    conversation.messages.forEach(msg => {
-        if (msg.senderType === 'user' && msg.status === 'new') {
-            const msgRef = doc(db, "userMessages", msg.id);
-            batch.update(msgRef, { status: 'read', updatedAt: serverTimestamp() });
-            messagesToUpdate = true;
-        }
-    });
-    if (messagesToUpdate) {
+    const messageIdsToUpdate = conversation.messages
+        .filter(msg => msg.senderType === 'user' && msg.status === 'new')
+        .map(msg => msg.id);
+
+    if (messageIdsToUpdate.length > 0) {
         try {
-            await batch.commit();
+            await markMessagesAsRead({ messageIds: messageIdsToUpdate });
             await fetchMessages(); // Refresh data
             toast({ title: "Conversation Updated", description: "Messages marked as read."});
         } catch (err) {
@@ -179,38 +172,15 @@ export default function AdminMessagesPage() {
       return;
     }
 
-    const newAdminMessageData: Omit<UserMessage, 'id' | 'createdAt' | 'updatedAt' | 'timestamp'> = {
-      uid: adminUser.uid,
-      userName: selectedConversation.userName,
-      userEmail: selectedConversation.userEmail,
-      subject: `Re: ${selectedConversation.subject}`,
-      messageBody: replyText,
-      status: 'replied',
-      senderType: 'admin',
-      adminName: adminUser.name || 'Admin Support',
-    };
-
     try {
-        await addDoc(collection(db, "userMessages"), { 
-          ...newAdminMessageData, 
-          timestamp: serverTimestamp(),
-          createdAt: serverTimestamp(), 
-          updatedAt: serverTimestamp() 
+        await sendAdminReply({
+            userUid: selectedConversation.messages.find(m => m.senderType === 'user')?.uid || '',
+            userName: selectedConversation.userName,
+            userEmail: selectedConversation.userEmail,
+            subject: selectedConversation.subject,
+            messageBody: replyText,
+            adminName: adminUser.name || 'Admin Support',
         });
-        
-        const userMessagesToUpdateQuery = query(
-          collection(db, "userMessages"),
-          where("userEmail", "==", selectedConversation.userEmail),
-          where("subject", "in", [selectedConversation.subject, `Re: ${selectedConversation.subject}`]),
-          where("senderType", "==", "user"),
-          where("status", "in", ["new", "read"])
-        );
-        const userMessagesSnapshot = await getDocs(userMessagesToUpdateQuery);
-        const batch = writeBatch(db);
-        userMessagesSnapshot.forEach(docToUpdate => {
-          batch.update(docToUpdate.ref, { status: 'replied', updatedAt: serverTimestamp() });
-        });
-        await batch.commit();
         
         toast({
           title: "Reply Sent",
@@ -403,3 +373,5 @@ export default function AdminMessagesPage() {
     </>
   );
 }
+
+    

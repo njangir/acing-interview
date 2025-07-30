@@ -19,9 +19,16 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import Image from 'next/image';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-import { db, storage } from '@/lib/firebase'; 
-import { collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, query, orderBy, getDocs } from 'firebase/firestore';
+import { db, storage, functions } from '@/lib/firebase'; 
+import { httpsCallable } from 'firebase/functions';
+import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+
+const getServices = httpsCallable(functions, 'getServices');
+const saveService = httpsCallable(functions, 'saveService');
+const deleteService = httpsCallable(functions, 'deleteService');
+const toggleServiceBookable = httpsCallable(functions, 'toggleServiceBookable');
+
 
 const initialServiceFormState: Omit<Service, 'id' | 'features'> & { features: string } = {
   name: '',
@@ -53,17 +60,8 @@ export default function AdminServicesPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const servicesColRef = collection(db, 'services');
-      const q = query(servicesColRef, orderBy('name', 'asc'));
-      const querySnapshot = await getDocs(q);
-      const fetchedServices = querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        return { 
-            id: doc.id, 
-            ...data,
-        } as Service;
-      });
-      setServicesData(fetchedServices);
+      const result: any = await getServices();
+      setServicesData(result.data.services);
     } catch (err) {
       console.error("Error fetching services:", err);
       setError("Failed to load services. Please check your connection or security rules.");
@@ -144,28 +142,23 @@ export default function AdminServicesPage() {
       }
     }
 
-    const serviceToSave: Omit<Service, 'id'> & { id?: string; createdAt?: any; updatedAt?: any } = {
+    const serviceToSave: Omit<Service, 'id'> & { id?: string } = {
       ...formData,
       features: formData.features.split(',').map(f => f.trim()).filter(f => f),
       image: finalImageUrl || 'https://placehold.co/600x400.png',
       dataAiHint: formData.dataAiHint || 'service related',
       price: Number(formData.price),
       isBookable: formData.isBookable,
+      id: currentService?.id
     };
 
     try {
-      if (currentService) {
-        const serviceDocRef = doc(db, "services", currentService.id);
-        await updateDoc(serviceDocRef, { ...serviceToSave, updatedAt: serverTimestamp() });
-        toast({ title: "Service Updated", description: `${serviceToSave.name} has been updated.` });
-      } else {
-        await addDoc(collection(db, "services"), { ...serviceToSave, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-        toast({ title: "Service Added", description: `${serviceToSave.name} has been added.` });
-      }
+      await saveService({ service: serviceToSave });
+      toast({ title: currentService ? "Service Updated" : "Service Added", description: `${serviceToSave.name} has been saved.` });
       setIsModalOpen(false);
       await fetchServices();
     } catch (dbError) {
-      console.error("Error saving service to Firestore:", dbError);
+      console.error("Error saving service:", dbError);
       toast({ title: "Database Error", description: "Could not save the service. Please try again.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
@@ -174,8 +167,7 @@ export default function AdminServicesPage() {
 
   const handleDelete = async (serviceId: string, serviceName: string) => {
     try {
-      const serviceDocRef = doc(db, "services", serviceId);
-      await deleteDoc(serviceDocRef);
+      await deleteService({ serviceId });
       toast({ title: "Service Deleted", description: `Service "${serviceName}" has been deleted.`});
       await fetchServices();
     } catch (dbError) {
@@ -187,8 +179,7 @@ export default function AdminServicesPage() {
   const handleBookingToggle = async (serviceId: string, serviceName: string, currentIsBookable?: boolean) => {
     const newIsBookable = !(currentIsBookable === undefined ? true : currentIsBookable);
     try {
-      const serviceDocRef = doc(db, "services", serviceId);
-      await updateDoc(serviceDocRef, { isBookable: newIsBookable, updatedAt: serverTimestamp() });
+      await toggleServiceBookable({ serviceId, isBookable: newIsBookable });
       toast({
         title: "Booking Status Updated",
         description: `Bookings for "${serviceName}" are now ${newIsBookable ? 'ENABLED' : 'DISABLED'}.`,
@@ -378,3 +369,5 @@ export default function AdminServicesPage() {
     </>
   );
 }
+
+    

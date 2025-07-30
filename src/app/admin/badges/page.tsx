@@ -22,8 +22,13 @@ import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Edit, Trash2, Award as AwardIcon, ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-import { db } from '@/lib/firebase';
-import { collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, query, orderBy, getDocs } from 'firebase/firestore';
+import { db, functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { collection, query, orderBy, getDocs } from 'firebase/firestore';
+
+const getBadges = httpsCallable(functions, 'getBadges');
+const saveBadge = httpsCallable(functions, 'saveBadge');
+const deleteBadge = httpsCallable(functions, 'deleteBadge');
 
 const ITEMS_PER_PAGE = 7;
 
@@ -67,14 +72,8 @@ export default function AdminBadgesPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const badgesColRef = collection(db, 'badges');
-      const q = query(badgesColRef, orderBy('name', 'asc'));
-      const querySnapshot = await getDocs(q);
-      const fetchedBadges = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Badge));
-      setAllBadgesData(fetchedBadges);
+      const result: any = await getBadges();
+      setAllBadgesData(result.data.badges);
     } catch (err) {
       console.error("Error fetching badges:", err);
       setError("Failed to load badges. Please check your connection and Firestore rules.");
@@ -132,12 +131,9 @@ export default function AdminBadgesPage() {
 
   const handleDelete = async (badgeId: string, badgeName: string) => {
     try {
-      const badgeDocRef = doc(db, "badges", badgeId);
-      await deleteDoc(badgeDocRef);
+      await deleteBadge({ badgeId });
       toast({ title: "Badge Deleted", description: `Badge "${badgeName}" has been removed.` });
-      // Refresh data
       await fetchBadges();
-      // Pagination adjustment logic
       const newTotalPages = Math.ceil((allBadgesData.length - 1) / ITEMS_PER_PAGE);
       if (currentPage > newTotalPages) {
         setCurrentPage(newTotalPages > 0 ? newTotalPages : 1);
@@ -150,21 +146,16 @@ export default function AdminBadgesPage() {
 
   async function onSubmit(data: BadgeFormValues) {
     setIsSubmitting(true);
-    const badgeDataToSave: Omit<Badge, 'id' | 'createdAt' | 'updatedAt'> = {
+    const badgeDataToSave: Omit<Badge, 'id' | 'createdAt' | 'updatedAt'> & { id?: string } = {
       ...data,
       imageUrl: data.imageUrl || defaultPlaceholderImage,
       dataAiHint: data.dataAiHint || 'badge icon',
+      id: currentBadge?.id
     };
 
     try {
-      if (currentBadge) {
-        const badgeDocRef = doc(db, "badges", currentBadge.id);
-        await updateDoc(badgeDocRef, { ...badgeDataToSave, updatedAt: serverTimestamp() });
-        toast({ title: "Badge Updated", description: `${data.name} has been updated.` });
-      } else {
-        await addDoc(collection(db, "badges"), { ...badgeDataToSave, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-        toast({ title: "Badge Added", description: `${data.name} has been created.` });
-      }
+      await saveBadge({ badge: badgeDataToSave });
+      toast({ title: currentBadge ? "Badge Updated" : "Badge Added", description: `${data.name} has been saved.` });
       setIsModalOpen(false);
       await fetchBadges();
     } catch (err) {
@@ -402,4 +393,5 @@ export default function AdminBadgesPage() {
       </Dialog>
     </>
   );
+
     

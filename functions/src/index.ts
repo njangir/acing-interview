@@ -5,7 +5,9 @@ import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import Razorpay from "razorpay";
 import crypto from "crypto";
-import type { Booking, UserMessage } from "./types";
+import type { Booking, UserMessage, Service, Resource, Badge, UserProfile, MentorProfileData, Testimonial, FeedbackSubmissionHistoryEntry } from "./types";
+import { getStorage } from "firebase-admin/storage";
+
 
 initializeApp();
 
@@ -327,4 +329,232 @@ exports.getAdminDashboardData = functions.https.onCall(async (data, context) => 
         throw new functions.https.HttpsError("internal", "Failed to fetch dashboard data.");
     }
 });
+    
+
+// New Admin Write Functions
+
+// Services
+exports.getServices = functions.https.onCall(async(data, context) => {
+    await ensureAdmin(context);
+    const firestore = getFirestore();
+    const servicesSnap = await firestore.collection("services").orderBy('name', 'asc').get();
+    const servicesData = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return { services: servicesData };
+});
+
+exports.saveService = functions.https.onCall(async (data, context) => {
+  await ensureAdmin(context);
+  const { service } = data;
+  const firestore = getFirestore();
+  if (service.id) {
+    const serviceRef = firestore.collection('services').doc(service.id);
+    delete service.id;
+    await serviceRef.update({ ...service, updatedAt: FieldValue.serverTimestamp() });
+  } else {
+    await firestore.collection('services').add({ ...service, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+  }
+  return { success: true };
+});
+
+exports.deleteService = functions.https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const { serviceId } = data;
+    const firestore = getFirestore();
+    await firestore.collection('services').doc(serviceId).delete();
+    return { success: true };
+});
+
+exports.toggleServiceBookable = functions.https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const { serviceId, isBookable } = data;
+    const firestore = getFirestore();
+    await firestore.collection('services').doc(serviceId).update({ isBookable, updatedAt: FieldValue.serverTimestamp() });
+    return { success: true };
+});
+
+// Resources
+exports.getResourcesAndServices = functions.https.onCall(async(data, context) => {
+    await ensureAdmin(context);
+    const firestore = getFirestore();
+    const resourcesSnap = await firestore.collection("resources").orderBy('title', 'asc').get();
+    const servicesSnap = await firestore.collection("services").orderBy('name', 'asc').get();
+    const resourcesData = resourcesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const servicesData = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return { resources: resourcesData, services: servicesData };
+});
+
+exports.saveResource = functions.https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const { resource } = data;
+    const firestore = getFirestore();
+    if (resource.id) {
+        const resourceRef = firestore.collection('resources').doc(resource.id);
+        delete resource.id;
+        await resourceRef.update({ ...resource, updatedAt: FieldValue.serverTimestamp() });
+    } else {
+        await firestore.collection('resources').add({ ...resource, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    }
+    return { success: true };
+});
+
+exports.deleteResource = functions.https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const { resourceId, resourceType, resourceUrl } = data;
+    const firestore = getFirestore();
+    if (resourceType === 'document' && resourceUrl.includes('firebasestorage.googleapis.com')) {
+        const storage = getStorage();
+        try {
+            const fileRef = storage.refFromURL(resourceUrl);
+            await fileRef.delete();
+        } catch (storageError) {
+            logger.error(`Could not delete file ${resourceUrl} from storage, but proceeding with Firestore deletion.`, storageError);
+        }
+    }
+    await firestore.collection('resources').doc(resourceId).delete();
+    return { success: true };
+});
+
+// Badges
+exports.getBadges = functions.https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const firestore = getFirestore();
+    const badgesSnap = await firestore.collection('badges').orderBy('name', 'asc').get();
+    const badgesData = badgesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return { badges: badgesData };
+});
+
+exports.saveBadge = functions.https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const { badge } = data;
+    const firestore = getFirestore();
+    if (badge.id) {
+        const badgeRef = firestore.collection('badges').doc(badge.id);
+        delete badge.id;
+        await badgeRef.update({ ...badge, updatedAt: FieldValue.serverTimestamp() });
+    } else {
+        await firestore.collection('badges').add({ ...badge, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    }
+    return { success: true };
+});
+
+exports.deleteBadge = functions.https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const { badgeId } = data;
+    const firestore = getFirestore();
+    await firestore.collection('badges').doc(badgeId).delete();
+    return { success: true };
+});
+
+// Availability
+exports.getAvailability = functions.https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const firestore = getFirestore();
+    const snapshot = await firestore.collection('globalAvailability').get();
+    const availabilityData: Record<string, string[]> = {};
+    snapshot.forEach(doc => {
+        availabilityData[doc.id] = doc.data().timeSlots || [];
+    });
+    return { availability: availabilityData };
+});
+
+exports.saveAvailability = functions.https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const { updates } = data as { updates: Record<string, string[]> };
+    const firestore = getFirestore();
+    const batch = firestore.batch();
+    for (const dateString in updates) {
+        const docRef = firestore.collection('globalAvailability').doc(dateString);
+        batch.set(docRef, { timeSlots: updates[dateString] });
+    }
+    await batch.commit();
+    return { success: true };
+});
+
+
+// Mentor Profile
+exports.getMentorProfile = functions.https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const firestore = getFirestore();
+    const profileSnap = await firestore.collection('siteProfiles').doc('mainMentor').get();
+    if (!profileSnap.exists) {
+        throw new functions.https.HttpsError('not-found', 'Mentor profile does not exist.');
+    }
+    return { profile: profileSnap.data() };
+});
+
+exports.saveMentorProfile = functions.https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const { profile } = data;
+    const firestore = getFirestore();
+    const profileRef = firestore.collection('siteProfiles').doc('mainMentor');
+    await profileRef.set({ ...profile, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    return { success: true };
+});
+
+
+// Messages
+exports.getMessages = functions.https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const firestore = getFirestore();
+    const messagesSnap = await firestore.collection('userMessages').orderBy('timestamp', 'desc').get();
+    const messagesData = messagesSnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: (doc.data().timestamp as FirebaseFirestore.Timestamp).toDate().toISOString(),
+        createdAt: (doc.data().createdAt as FirebaseFirestore.Timestamp).toDate().toISOString(),
+        updatedAt: (doc.data().updatedAt as FirebaseFirestore.Timestamp).toDate().toISOString()
+    }));
+    return { messages: messagesData };
+});
+
+exports.sendAdminReply = functions.https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const { userUid, userName, userEmail, subject, messageBody, adminName } = data;
+    const firestore = getFirestore();
+    const newAdminMessage = {
+      uid: userUid,
+      userName: userName,
+      userEmail: userEmail,
+      subject: `Re: ${subject}`,
+      messageBody: messageBody,
+      status: 'replied',
+      senderType: 'admin',
+      adminName: adminName,
+      timestamp: FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
+    };
+    await firestore.collection("userMessages").add(newAdminMessage);
+    const userMessagesToUpdateQuery = firestore.collection("userMessages")
+        .where("userEmail", "==", userEmail)
+        .where("subject", "in", [subject, `Re: ${subject}`])
+        .where("senderType", "==", "user")
+        .where("status", "in", ["new", "read"]);
+    const userMessagesSnapshot = await userMessagesToUpdateQuery.get();
+    const batch = firestore.batch();
+    userMessagesSnapshot.forEach(docToUpdate => {
+        batch.update(docToUpdate.ref, { status: 'replied', updatedAt: FieldValue.serverTimestamp() });
+    });
+    await batch.commit();
+    return { success: true };
+});
+
+exports.markMessagesAsRead = functions.https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const { messageIds } = data;
+    if (!messageIds || !Array.isArray(messageIds)) {
+        throw new functions.https.HttpsError('invalid-argument', 'messageIds must be an array.');
+    }
+    const firestore = getFirestore();
+    const batch = firestore.batch();
+    messageIds.forEach(id => {
+        const msgRef = firestore.collection("userMessages").doc(id);
+        batch.update(msgRef, { status: 'read', updatedAt: FieldValue.serverTimestamp() });
+    });
+    await batch.commit();
+    return { success: true };
+});
+
+// Add more admin write functions below as needed
+
     

@@ -13,10 +13,11 @@ import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info, CalendarCheck, CalendarX, Loader2, AlertTriangle } from 'lucide-react';
 
-// PRODUCTION TODO: Import Firebase and Firestore methods
-import { db } from '@/lib/firebase';
-import { collection, doc, getDoc, setDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
 
+const getAvailability = httpsCallable(functions, 'getAvailability');
+const saveAvailability = httpsCallable(functions, 'saveAvailability');
 
 type FirestoreSlotsData = Record<string, string[]>;
 
@@ -36,13 +37,8 @@ export default function AdminSlotsPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const availabilityColRef = collection(db, 'globalAvailability');
-        const snapshot = await getDocs(availabilityColRef);
-        const fetchedData: FirestoreSlotsData = {};
-        snapshot.forEach(doc => {
-          fetchedData[doc.id] = doc.data().timeSlots || [];
-        });
-        setFirestoreSlotsData(fetchedData);
+        const result: any = await getAvailability();
+        setFirestoreSlotsData(result.data.availability || {});
       } catch (err) {
         console.error("Error fetching availability data:", err);
         setError("Failed to load availability data. Please try again.");
@@ -85,23 +81,20 @@ export default function AdminSlotsPage() {
       }
     }
 
-    const updatedFirestoreSlots: FirestoreSlotsData = { ...firestoreSlotsData };
-    
-    try {
-      const batch = writeBatch(db);
-      for (const date of dates) {
-        const dateString = format(date, 'yyyy-MM-dd');
-        const docRef = doc(db, 'globalAvailability', dateString);
-        batch.set(docRef, { timeSlots: slotsToApply });
-        updatedFirestoreSlots[dateString] = slotsToApply;
-      }
-      await batch.commit();
+    const updates: Record<string, string[]> = {};
+    dates.forEach(date => {
+        updates[format(date, 'yyyy-MM-dd')] = slotsToApply;
+    });
 
+    try {
+      await saveAvailability({ updates });
+      
+      const updatedFirestoreSlots = { ...firestoreSlotsData, ...updates };
       setFirestoreSlotsData(updatedFirestoreSlots);
 
       toast({
         title: `Availability ${actionType === 'set' ? 'Updated' : 'Cleared'}`,
-        description: `Slots for ${dates.length} date(s) have been successfully ${actionType === 'set' ? 'set' : 'cleared'} in Firestore.`,
+        description: `Slots for ${dates.length} date(s) have been successfully ${actionType === 'set' ? 'set' : 'cleared'}.`,
       });
       setSelectedDate(new Date(selectedDate || Date.now()));
 
@@ -218,7 +211,7 @@ export default function AdminSlotsPage() {
         <Info className="h-4 w-4 !text-primary" />
         <AlertTitle>Availability Management Notice</AlertTitle>
         <AlertDescription>
-          You are now editing live availability data from Firestore.
+          You are now editing live availability data.
           Date colors: <span className="font-semibold text-green-600">Green</span> for available, <span className="font-semibold text-red-600">Red</span> for unavailable (future dates).
         </AlertDescription>
       </Alert>
@@ -296,3 +289,5 @@ export default function AdminSlotsPage() {
     </>
   );
 }
+
+    
