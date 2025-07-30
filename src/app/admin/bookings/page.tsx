@@ -33,10 +33,11 @@ import { useAuth } from '@/hooks/use-auth';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 import { db, functions } from '@/lib/firebase';
-import { collection, doc, addDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, where, writeBatch, getDocs, getDoc } from 'firebase/firestore';
+import { doc, addDoc, updateDoc, serverTimestamp, writeBatch, collection, getDocs } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 
 const processRefund = httpsCallable(functions, 'processRefund');
+const getAdminBookingsPageData = httpsCallable(functions, 'getAdminBookingsPageData');
 
 const ITEMS_PER_PAGE = 7;
 
@@ -92,31 +93,18 @@ export default function AdminBookingsPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const servicesQuery = query(collection(db, 'services'), orderBy('name', 'asc'));
-      const bookingsQuery = query(collection(db, 'bookings'), orderBy('date', 'desc'));
-      const usersQuery = query(collection(db, 'userProfiles'), orderBy('name', 'asc'));
-
-      const [servicesSnapshot, bookingsSnapshot, usersSnapshot] = await Promise.all([
-        getDocs(servicesQuery),
-        getDocs(bookingsQuery),
-        getDocs(usersQuery),
-      ]);
-
-      const fetchedServices = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
-      setAllServicesData(fetchedServices);
-
-      const fetchedBookings = bookingsSnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
-          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : new Date().toISOString(),
-        } as Booking;
-      });
-      setAllBookingsData(fetchedBookings);
+      const result: any = await getAdminBookingsPageData();
+      const data = result.data;
       
-      setAllUsersData(usersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile)));
+      const fetchedBookings = data.bookings.map((b: any) => ({
+        ...b,
+        createdAt: b.createdAt?._seconds ? new Date(b.createdAt._seconds * 1000).toISOString() : new Date().toISOString(),
+        updatedAt: b.updatedAt?._seconds ? new Date(b.updatedAt._seconds * 1000).toISOString() : new Date().toISOString(),
+      }));
+
+      setAllServicesData(data.services || []);
+      setAllBookingsData(fetchedBookings || []);
+      setAllUsersData(data.users || []);
 
     } catch (err) {
       console.error("Error fetching admin data:", err);

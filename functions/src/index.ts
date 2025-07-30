@@ -4,7 +4,7 @@ import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import Razorpay from "razorpay";
 import crypto from "crypto";
-import type { Booking, UserMessage, Service, Resource, Badge, UserProfile, MentorProfileData } from "./types";
+import type { Booking, UserMessage, Service, Resource, Badge, UserProfile, MentorProfileData, Testimonial, FeedbackSubmissionHistoryEntry } from "./types";
 import { getStorage } from "firebase-admin/storage";
 
 initializeApp();
@@ -88,8 +88,8 @@ exports.createPaymentOrder = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "R
   }
 
   const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
+    key_id: RAZORPAY_KEY_ID,
+    key_secret: RAZORPAY_KEY_SECRET,
   });
 
   const options = {
@@ -107,7 +107,7 @@ exports.createPaymentOrder = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "R
     logger.info("Razorpay order created:", { orderId: order.id, bookingId });
     return {
       orderId: order.id,
-      keyId: process.env.RAZORPAY_KEY_ID,
+      keyId: RAZORPAY_KEY_ID,
     };
   } catch (error) {
     logger.error("Error creating Razorpay order:", error);
@@ -142,7 +142,7 @@ exports.verifyPayment = functions.runWith({ secrets: ["RAZORPAY_KEY_SECRET"] }).
     );
   }
 
-  const shasum = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!);
+  const shasum = crypto.createHmac("sha256", RAZORPAY_KEY_SECRET!);
   shasum.update(`${razorpay_order_id}|${razorpay_payment_id}`);
   const digest = shasum.digest("hex");
 
@@ -197,8 +197,8 @@ exports.processRefund = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORP
   }
 
   const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
+    key_id: RAZORPAY_KEY_ID,
+    key_secret: RAZORPAY_KEY_SECRET,
   });
 
   try {
@@ -341,17 +341,17 @@ exports.getServices = functions.https.onCall(async(data: any, context: functions
 });
 
 exports.saveService = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
-  await ensureAdmin(context);
-  const { service } = data as { service: Service };
-  const firestore = getFirestore();
-  if (service.id) {
-    const serviceRef = firestore.collection('services').doc(service.id);
-    const { id, ...serviceWithoutId } = service;
-    await serviceRef.update({ ...serviceWithoutId, updatedAt: FieldValue.serverTimestamp() });
-  } else {
-    await firestore.collection('services').add({ ...service, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
-  }
-  return { success: true };
+    await ensureAdmin(context);
+    const { service } = data as { service: Service };
+    const firestore = getFirestore();
+    if (service.id) {
+        const serviceRef = firestore.collection('services').doc(service.id);
+        const { id, ...serviceWithoutId } = service;
+        await serviceRef.update({ ...serviceWithoutId, updatedAt: FieldValue.serverTimestamp() });
+    } else {
+        await firestore.collection('services').add({ ...service, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    }
+    return { success: true };
 });
 
 exports.deleteService = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
@@ -562,6 +562,83 @@ exports.markMessagesAsRead = functions.https.onCall(async (data: any, context: f
     });
     await batch.commit();
     return { success: true };
+});
+
+// Admin Page Data Fetching Functions
+
+exports.getAdminBookingsPageData = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+    await ensureAdmin(context);
+    const firestore = getFirestore();
+    try {
+        const servicesQuery = firestore.collection('services').orderBy('name', 'asc');
+        const bookingsQuery = firestore.collection('bookings').orderBy('date', 'desc');
+        const usersQuery = firestore.collection('userProfiles').orderBy('name', 'asc');
+
+        const [servicesSnapshot, bookingsSnapshot, usersSnapshot] = await Promise.all([
+            getDocs(servicesQuery),
+            getDocs(bookingsQuery),
+            getDocs(usersQuery),
+        ]);
+
+        const services = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
+        const bookings = bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
+        const users = usersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile));
+        
+        return { services, bookings, users };
+    } catch (error) {
+        logger.error("Error fetching admin bookings page data:", error);
+        throw new functions.https.HttpsError("internal", "Failed to fetch admin bookings page data.");
+    }
+});
+
+exports.getAdminReportsPageData = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+    await ensureAdmin(context);
+    const firestore = getFirestore();
+    try {
+        const bookingsQuery = firestore.collection("bookings").where("status", "==", "completed").orderBy("date", "desc");
+        const badgesQuery = firestore.collection("badges");
+        const historyQuery = firestore.collection("feedbackSubmissions").orderBy("submissionDate", "desc");
+
+        const [bookingsSnapshot, badgesSnapshot, historySnapshot] = await Promise.all([
+            getDocs(bookingsQuery),
+            getDocs(badgesSnapshot),
+            getDocs(historyQuery),
+        ]);
+
+        const completedBookings = bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
+        const badges = badgesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Badge));
+        const history = historySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeedbackSubmissionHistoryEntry));
+
+        return { completedBookings, badges, history };
+    } catch (error) {
+        logger.error("Error fetching admin reports page data:", error);
+        throw new functions.https.HttpsError("internal", "Failed to fetch admin reports page data.");
+    }
+});
+
+exports.getAdminTestimonialsPageData = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+    await ensureAdmin(context);
+    const firestore = getFirestore();
+    try {
+        const testimonialsQuery = firestore.collection('testimonials').orderBy('createdAt', 'desc');
+        const servicesQuery = firestore.collection('services').orderBy('name', 'asc');
+        const bookingsQuery = firestore.collection('bookings');
+
+        const [testimonialsSnapshot, servicesSnapshot, bookingsSnapshot] = await Promise.all([
+            getDocs(testimonialsQuery),
+            getDocs(servicesQuery),
+            getDocs(bookingsQuery),
+        ]);
+
+        const testimonials = testimonialsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Testimonial));
+        const services = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
+        const bookings = bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
+        
+        return { testimonials, services, bookings };
+    } catch (error) {
+        logger.error("Error fetching admin testimonials page data:", error);
+        throw new functions.https.HttpsError("internal", "Failed to fetch admin testimonials page data.");
+    }
 });
 
 // Add more admin write functions below as needed

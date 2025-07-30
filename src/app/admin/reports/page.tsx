@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge as UiBadge } from '@/components/ui/badge';
 import { PREDEFINED_SKILLS, SKILL_RATINGS, SKILL_RATING_VALUES, MAX_SKILL_RATING_VALUE, TARGET_SKILL_RATING_VALUE } from "@/constants";
-import type { Booking, Badge as BadgeType, Service, FeedbackSubmissionHistoryEntry, UserProfile } from '@/types';
+import type { Booking, Badge as BadgeType, FeedbackSubmissionHistoryEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { UploadCloud, AwardIcon, Star, History, ChevronLeft, ChevronRight, FileSpreadsheet, Loader2, AlertTriangle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -20,10 +20,13 @@ import { format } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-// PRODUCTION TODO: Import Firebase and Firestore methods
 import { db, storage } from '@/lib/firebase';
-import { collection, doc, addDoc, updateDoc, getDoc, getDocs, query, where, orderBy, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, query, orderBy, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '@/lib/firebase';
+
+const getAdminReportsPageData = httpsCallable(functions, 'getAdminReportsPageData');
 
 const ITEMS_PER_PAGE_HISTORY = 5;
 
@@ -54,26 +57,17 @@ export default function AdminReportsPage() {
       setIsLoadingData(true);
       setError(null);
       try {
-        const bookingsQuery = query(collection(db, "bookings"), where("status", "==", "completed"), orderBy("date", "desc"));
-        const bookingsSnapshot = await getDocs(bookingsQuery);
-        const completedBookings = bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
-        setFetchedCompletedBookings(completedBookings);
-
-        const badgesSnapshot = await getDocs(collection(db, "badges"));
-        const badges = badgesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BadgeType));
-        setFetchedBadges(badges);
+        const result: any = await getAdminReportsPageData();
+        const data = result.data;
         
-        const historyQuery = query(collection(db, "feedbackSubmissions"), orderBy("submissionDate", "desc"));
-        const historySnapshot = await getDocs(historyQuery);
-        const history = historySnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-                submissionDate: data.submissionDate?.toDate ? data.submissionDate.toDate().toISOString() : new Date().toISOString()
-            } as FeedbackSubmissionHistoryEntry;
-        });
-        setFullSubmissionHistory(history);
+        const history = data.history.map((h: any) => ({
+            ...h,
+            submissionDate: h.submissionDate?._seconds ? new Date(h.submissionDate._seconds * 1000).toISOString() : new Date().toISOString()
+        }));
+
+        setFetchedCompletedBookings(data.completedBookings || []);
+        setFetchedBadges(data.badges || []);
+        setFullSubmissionHistory(history || []);
 
       } catch (err) {
         console.error("Error loading initial data:", err);
@@ -493,4 +487,3 @@ export default function AdminReportsPage() {
     </>
   );
 }
-

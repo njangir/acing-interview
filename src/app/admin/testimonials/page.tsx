@@ -27,8 +27,11 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-import { db } from '@/lib/firebase';
+import { db, functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
 import { collection, doc, addDoc, updateDoc, getDocs, query, orderBy, where, serverTimestamp } from 'firebase/firestore';
+
+const getAdminTestimonialsPageData = httpsCallable(functions, 'getAdminTestimonialsPageData');
 
 const ITEMS_PER_PAGE = 7;
 
@@ -87,25 +90,17 @@ export default function AdminTestimonialsPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const testimonialsQuery = query(collection(db, 'testimonials'), orderBy('createdAt', 'desc'));
-      const servicesQuery = query(collection(db, 'services'), orderBy('name', 'asc'));
-      const bookingsQuery = query(collection(db, 'bookings'));
+      const result: any = await getAdminTestimonialsPageData();
+      const data = result.data;
       
-      const [testimonialsSnapshot, servicesSnapshot, bookingsSnapshot] = await Promise.all([
-        getDocs(testimonialsQuery),
-        getDocs(servicesQuery),
-        getDocs(bookingsQuery),
-      ]);
-      
-      const fetchedTestimonials = testimonialsSnapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate().toISOString() : new Date().toISOString()
-      } as Testimonial));
-      setAllTestimonialsData(fetchedTestimonials);
+      const fetchedTestimonials = data.testimonials.map((t: any) => ({ 
+        ...t, 
+        createdAt: t.createdAt?._seconds ? new Date(t.createdAt._seconds * 1000).toISOString() : new Date().toISOString()
+      }));
 
-      setAllServicesData(servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
-      setAllBookingsData(bookingsSnapshot.docs.map(doc => doc.data() as Booking));
+      setAllTestimonialsData(fetchedTestimonials || []);
+      setAllServicesData(data.services || []);
+      setAllBookingsData(data.bookings || []);
 
     } catch (err) {
       console.error("Error fetching testimonials data:", err);
@@ -601,4 +596,3 @@ export default function AdminTestimonialsPage() {
     </>
   );
 }
-
