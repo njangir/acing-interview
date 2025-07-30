@@ -1,11 +1,10 @@
-
 import * as functions from "firebase-functions";
 import * as logger from "firebase-functions/logger";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import Razorpay from "razorpay";
 import crypto from "crypto";
-import type { Booking, UserMessage, Service, Resource, Badge, UserProfile, MentorProfileData, Testimonial, FeedbackSubmissionHistoryEntry } from "./types";
+import type { Booking, UserMessage, Service, Resource, Badge, UserProfile, MentorProfileData } from "./types";
 import { getStorage } from "firebase-admin/storage";
 
 initializeApp();
@@ -72,7 +71,7 @@ exports.oncreateuser = functions.auth.user().onCreate(async (user) => {
   }
 });
 
-exports.createPaymentOrder = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+exports.createPaymentOrder = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data: any, context: functions.https.CallableContext) => {
   if (!context.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
@@ -89,8 +88,8 @@ exports.createPaymentOrder = functions.https.onCall(async (data: any, context: f
   }
 
   const razorpay = new Razorpay({
-    key_id: RAZORPAY_KEY_ID,
-    key_secret: RAZORPAY_KEY_SECRET,
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
   });
 
   const options = {
@@ -108,7 +107,7 @@ exports.createPaymentOrder = functions.https.onCall(async (data: any, context: f
     logger.info("Razorpay order created:", { orderId: order.id, bookingId });
     return {
       orderId: order.id,
-      keyId: RAZORPAY_KEY_ID,
+      keyId: process.env.RAZORPAY_KEY_ID,
     };
   } catch (error) {
     logger.error("Error creating Razorpay order:", error);
@@ -116,7 +115,7 @@ exports.createPaymentOrder = functions.https.onCall(async (data: any, context: f
   }
 });
 
-exports.verifyPayment = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+exports.verifyPayment = functions.runWith({ secrets: ["RAZORPAY_KEY_SECRET"] }).https.onCall(async (data: any, context: functions.https.CallableContext) => {
   if (!context.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
@@ -143,7 +142,7 @@ exports.verifyPayment = functions.https.onCall(async (data: any, context: functi
     );
   }
 
-  const shasum = crypto.createHmac("sha256", RAZORPAY_KEY_SECRET);
+  const shasum = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!);
   shasum.update(`${razorpay_order_id}|${razorpay_payment_id}`);
   const digest = shasum.digest("hex");
 
@@ -177,7 +176,7 @@ exports.verifyPayment = functions.https.onCall(async (data: any, context: functi
   }
 });
 
-exports.processRefund = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+exports.processRefund = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data: any, context: functions.https.CallableContext) => {
   await ensureAdmin(context);
   const { bookingId } = data as { bookingId: string };
   if (!bookingId) {
@@ -198,8 +197,8 @@ exports.processRefund = functions.https.onCall(async (data: any, context: functi
   }
 
   const razorpay = new Razorpay({
-    key_id: RAZORPAY_KEY_ID,
-    key_secret: RAZORPAY_KEY_SECRET,
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
   });
 
   try {
@@ -347,8 +346,8 @@ exports.saveService = functions.https.onCall(async (data: any, context: function
   const firestore = getFirestore();
   if (service.id) {
     const serviceRef = firestore.collection('services').doc(service.id);
-    delete service.id;
-    await serviceRef.update({ ...service, updatedAt: FieldValue.serverTimestamp() });
+    const { id, ...serviceWithoutId } = service;
+    await serviceRef.update({ ...serviceWithoutId, updatedAt: FieldValue.serverTimestamp() });
   } else {
     await firestore.collection('services').add({ ...service, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
   }
@@ -388,8 +387,8 @@ exports.saveResource = functions.https.onCall(async (data: any, context: functio
     const firestore = getFirestore();
     if (resource.id) {
         const resourceRef = firestore.collection('resources').doc(resource.id);
-        delete resource.id;
-        await resourceRef.update({ ...resource, updatedAt: FieldValue.serverTimestamp() });
+        const { id, ...resourceWithoutId } = resource;
+        await resourceRef.update({ ...resourceWithoutId, updatedAt: FieldValue.serverTimestamp() });
     } else {
         await firestore.collection('resources').add({ ...resource, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
     }
@@ -403,8 +402,18 @@ exports.deleteResource = functions.https.onCall(async (data: any, context: funct
     if (resourceType === 'document' && resourceUrl.includes('firebasestorage.googleapis.com')) {
         const storage = getStorage();
         try {
-            const fileRef = storage.refFromURL(resourceUrl);
-            await fileRef.delete();
+            // Extract the file path from the URL
+            const url = new URL(resourceUrl);
+            const pathMatch = url.pathname.match(/\/b\/[^\/]+\/o\/(.+)$/);
+            if (pathMatch) {
+                const filePath = decodeURIComponent(pathMatch[1]);
+                const bucket = storage.bucket();
+                const file = bucket.file(filePath);
+                await file.delete();
+                logger.info(`Successfully deleted file from storage: ${filePath}`);
+            } else {
+                logger.warn(`Could not extract file path from URL: ${resourceUrl}`);
+            }
         } catch (storageError) {
             logger.error(`Could not delete file ${resourceUrl} from storage, but proceeding with Firestore deletion.`, storageError);
         }
@@ -428,8 +437,8 @@ exports.saveBadge = functions.https.onCall(async (data: any, context: functions.
     const firestore = getFirestore();
     if (badge.id) {
         const badgeRef = firestore.collection('badges').doc(badge.id);
-        delete badge.id;
-        await badgeRef.update({ ...badge, updatedAt: FieldValue.serverTimestamp() });
+        const { id, ...badgeWithoutId } = badge;
+        await badgeRef.update({ ...badgeWithoutId, updatedAt: FieldValue.serverTimestamp() });
     } else {
         await firestore.collection('badges').add({ ...badge, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
     }
@@ -469,7 +478,6 @@ exports.saveAvailability = functions.https.onCall(async (data: any, context: fun
     return { success: true };
 });
 
-
 // Mentor Profile
 exports.getMentorProfile = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
@@ -489,7 +497,6 @@ exports.saveMentorProfile = functions.https.onCall(async (data: any, context: fu
     await profileRef.set({ ...profile, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     return { success: true };
 });
-
 
 // Messages
 exports.getMessages = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
