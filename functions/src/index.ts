@@ -1,3 +1,4 @@
+
 import * as functions from "firebase-functions";
 import * as logger from "firebase-functions/logger";
 import { initializeApp } from "firebase-admin/app";
@@ -575,9 +576,9 @@ exports.getAdminBookingsPageData = functions.https.onCall(async (data: any, cont
         const usersQuery = firestore.collection('userProfiles').orderBy('name', 'asc');
 
         const [servicesSnapshot, bookingsSnapshot, usersSnapshot] = await Promise.all([
-            getDocs(servicesQuery),
-            getDocs(bookingsQuery),
-            getDocs(usersQuery),
+            servicesQuery.get(),
+            bookingsQuery.get(),
+            usersQuery.get(),
         ]);
 
         const services = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
@@ -600,9 +601,9 @@ exports.getAdminReportsPageData = functions.https.onCall(async (data: any, conte
         const historyQuery = firestore.collection("feedbackSubmissions").orderBy("submissionDate", "desc");
 
         const [bookingsSnapshot, badgesSnapshot, historySnapshot] = await Promise.all([
-            getDocs(bookingsQuery),
-            getDocs(badgesSnapshot),
-            getDocs(historyQuery),
+            bookingsQuery.get(),
+            badgesQuery.get(),
+            historyQuery.get(),
         ]);
 
         const completedBookings = bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
@@ -625,9 +626,9 @@ exports.getAdminTestimonialsPageData = functions.https.onCall(async (data: any, 
         const bookingsQuery = firestore.collection('bookings');
 
         const [testimonialsSnapshot, servicesSnapshot, bookingsSnapshot] = await Promise.all([
-            getDocs(testimonialsQuery),
-            getDocs(servicesQuery),
-            getDocs(bookingsQuery),
+            testimonialsQuery.get(),
+            servicesQuery.get(),
+            bookingsQuery.get(),
         ]);
 
         const testimonials = testimonialsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Testimonial));
@@ -642,3 +643,6 @@ exports.getAdminTestimonialsPageData = functions.https.onCall(async (data: any, 
 });
 
 // Add more admin write functions below as needed
+
+
+    
