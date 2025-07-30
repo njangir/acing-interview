@@ -8,7 +8,7 @@ import { BellRing, TrendingUp, MessagesSquare, Star, Loader2, AlertTriangle } fr
 import { WeeklyScheduleView } from '@/components/core/weekly-schedule-view';
 import type { Booking, Service, UserMessage } from '@/types';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function AdminOverviewPage() {
@@ -19,48 +19,33 @@ export default function AdminOverviewPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setIsLoading(true);
-    const queries = [
-      { collectionName: 'bookings', setter: setBookings },
-      { collectionName: 'services', setter: setServices },
-      { collectionName: 'userMessages', setter: setMessages },
-    ];
-    const unsubs: (() => void)[] = [];
-    let active = true;
+    const fetchDashboardData = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const bookingsQuery = query(collection(db, 'bookings'));
+            const servicesQuery = query(collection(db, 'services'));
+            const messagesQuery = query(collection(db, 'userMessages'));
 
-    Promise.all(queries.map(q => {
-      return new Promise<void>((resolve, reject) => {
-        const unsub = onSnapshot(
-          collection(db, q.collectionName),
-          (snapshot) => {
-            if (active) {
-              const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-              q.setter(data as any);
-            }
-            resolve();
-          },
-          (err) => {
-            console.error(`Error fetching ${q.collectionName}:`, err);
-            reject(err);
-          }
-        );
-        unsubs.push(unsub);
-      });
-    }))
-    .then(() => {
-      if (active) setIsLoading(false);
-    })
-    .catch(() => {
-      if (active) {
-        setError("Failed to load one or more data sources for the dashboard. Please check your connection and security rules.");
-        setIsLoading(false);
-      }
-    });
+            const [bookingsSnapshot, servicesSnapshot, messagesSnapshot] = await Promise.all([
+                getDocs(bookingsQuery),
+                getDocs(servicesQuery),
+                getDocs(messagesQuery)
+            ]);
 
-    return () => {
-      active = false;
-      unsubs.forEach(unsub => unsub());
+            setBookings(bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking)));
+            setServices(servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
+            setMessages(messagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserMessage)));
+
+        } catch (err) {
+            console.error("Error fetching dashboard data:", err);
+            setError("Failed to load dashboard data. Please check your connection and Firestore security rules.");
+        } finally {
+            setIsLoading(false);
+        }
     };
+
+    fetchDashboardData();
   }, []);
 
   const newBookingRequests = bookings.filter(b => b.status === 'pending_approval').length;
