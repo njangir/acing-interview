@@ -8,7 +8,6 @@ import crypto from "crypto";
 import type { Booking, UserMessage, Service, Resource, Badge, UserProfile, MentorProfileData, Testimonial, FeedbackSubmissionHistoryEntry } from "./types";
 import { getStorage } from "firebase-admin/storage";
 
-
 initializeApp();
 
 const RAZORPAY_KEY_ID = functions.config().razorpay.key_id;
@@ -73,7 +72,7 @@ exports.oncreateuser = functions.auth.user().onCreate(async (user) => {
   }
 });
 
-exports.createPaymentOrder = functions.https.onCall(async (data: { amount: number; bookingId: string; }, context: functions.https.CallableContext) => {
+exports.createPaymentOrder = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
   if (!context.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
@@ -81,7 +80,7 @@ exports.createPaymentOrder = functions.https.onCall(async (data: { amount: numbe
     );
   }
 
-  const { amount, bookingId } = data;
+  const { amount, bookingId } = data as { amount: number; bookingId: string; };
   if (!amount || !bookingId) {
     throw new functions.https.HttpsError(
       "invalid-argument",
@@ -117,7 +116,7 @@ exports.createPaymentOrder = functions.https.onCall(async (data: { amount: numbe
   }
 });
 
-exports.verifyPayment = functions.https.onCall(async (data: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string; bookingId: string; }, context: functions.https.CallableContext) => {
+exports.verifyPayment = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
   if (!context.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
@@ -130,7 +129,7 @@ exports.verifyPayment = functions.https.onCall(async (data: { razorpay_order_id:
     razorpay_payment_id,
     razorpay_signature,
     bookingId,
-  } = data;
+  } = data as { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string; bookingId: string; };
 
   if (
     !razorpay_order_id ||
@@ -178,9 +177,9 @@ exports.verifyPayment = functions.https.onCall(async (data: { razorpay_order_id:
   }
 });
 
-exports.processRefund = functions.https.onCall(async (data: { bookingId: string }, context: functions.https.CallableContext) => {
+exports.processRefund = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
   await ensureAdmin(context);
-  const { bookingId } = data;
+  const { bookingId } = data as { bookingId: string };
   if (!bookingId) {
     throw new functions.https.HttpsError("invalid-argument", "The function must be called with a 'bookingId'.");
   }
@@ -279,7 +278,7 @@ exports.onAdminMessage = functions.firestore.document("userMessages/{messageId}"
   return null;
 });
 
-exports.exportBookingsReport = functions.https.onCall(async (data, context: functions.https.CallableContext) => {
+exports.exportBookingsReport = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
     const firestore = getFirestore();
     const bookingsSnap = await firestore.collection("bookings").get();
@@ -287,7 +286,7 @@ exports.exportBookingsReport = functions.https.onCall(async (data, context: func
     return { data: bookingsData };
 });
 
-exports.exportUsersReport = functions.https.onCall(async (data, context: functions.https.CallableContext) => {
+exports.exportUsersReport = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
     const firestore = getFirestore();
     const usersSnap = await firestore.collection("userProfiles").get();
@@ -295,7 +294,7 @@ exports.exportUsersReport = functions.https.onCall(async (data, context: functio
     return { data: usersData };
 });
 
-exports.exportServicesReport = functions.https.onCall(async (data, context: functions.https.CallableContext) => {
+exports.exportServicesReport = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
     const firestore = getFirestore();
     const servicesSnap = await firestore.collection("services").get();
@@ -303,7 +302,7 @@ exports.exportServicesReport = functions.https.onCall(async (data, context: func
     return { data: servicesData };
 });
 
-exports.getAdminDashboardData = functions.https.onCall(async (data, context: functions.https.CallableContext) => {
+exports.getAdminDashboardData = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
     const firestore = getFirestore();
     
@@ -334,7 +333,7 @@ exports.getAdminDashboardData = functions.https.onCall(async (data, context: fun
 // New Admin Write Functions
 
 // Services
-exports.getServices = functions.https.onCall(async(data, context: functions.https.CallableContext) => {
+exports.getServices = functions.https.onCall(async(data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
     const firestore = getFirestore();
     const servicesSnap = await firestore.collection("services").orderBy('name', 'asc').get();
@@ -342,9 +341,9 @@ exports.getServices = functions.https.onCall(async(data, context: functions.http
     return { services: servicesData };
 });
 
-exports.saveService = functions.https.onCall(async (data: { service: Service }, context: functions.https.CallableContext) => {
+exports.saveService = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
   await ensureAdmin(context);
-  const { service } = data;
+  const { service } = data as { service: Service };
   const firestore = getFirestore();
   if (service.id) {
     const serviceRef = firestore.collection('services').doc(service.id);
@@ -356,24 +355,24 @@ exports.saveService = functions.https.onCall(async (data: { service: Service }, 
   return { success: true };
 });
 
-exports.deleteService = functions.https.onCall(async (data: { serviceId: string }, context: functions.https.CallableContext) => {
+exports.deleteService = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
-    const { serviceId } = data;
+    const { serviceId } = data as { serviceId: string };
     const firestore = getFirestore();
     await firestore.collection('services').doc(serviceId).delete();
     return { success: true };
 });
 
-exports.toggleServiceBookable = functions.https.onCall(async (data: { serviceId: string, isBookable: boolean }, context: functions.https.CallableContext) => {
+exports.toggleServiceBookable = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
-    const { serviceId, isBookable } = data;
+    const { serviceId, isBookable } = data as { serviceId: string, isBookable: boolean };
     const firestore = getFirestore();
     await firestore.collection('services').doc(serviceId).update({ isBookable, updatedAt: FieldValue.serverTimestamp() });
     return { success: true };
 });
 
 // Resources
-exports.getResourcesAndServices = functions.https.onCall(async(data, context: functions.https.CallableContext) => {
+exports.getResourcesAndServices = functions.https.onCall(async(data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
     const firestore = getFirestore();
     const resourcesSnap = await firestore.collection("resources").orderBy('title', 'asc').get();
@@ -383,9 +382,9 @@ exports.getResourcesAndServices = functions.https.onCall(async(data, context: fu
     return { resources: resourcesData, services: servicesData };
 });
 
-exports.saveResource = functions.https.onCall(async (data: { resource: Resource }, context: functions.https.CallableContext) => {
+exports.saveResource = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
-    const { resource } = data;
+    const { resource } = data as { resource: Resource };
     const firestore = getFirestore();
     if (resource.id) {
         const resourceRef = firestore.collection('resources').doc(resource.id);
@@ -397,9 +396,9 @@ exports.saveResource = functions.https.onCall(async (data: { resource: Resource 
     return { success: true };
 });
 
-exports.deleteResource = functions.https.onCall(async (data: { resourceId: string, resourceType: string, resourceUrl: string }, context: functions.https.CallableContext) => {
+exports.deleteResource = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
-    const { resourceId, resourceType, resourceUrl } = data;
+    const { resourceId, resourceType, resourceUrl } = data as { resourceId: string, resourceType: string, resourceUrl: string };
     const firestore = getFirestore();
     if (resourceType === 'document' && resourceUrl.includes('firebasestorage.googleapis.com')) {
         const storage = getStorage();
@@ -415,7 +414,7 @@ exports.deleteResource = functions.https.onCall(async (data: { resourceId: strin
 });
 
 // Badges
-exports.getBadges = functions.https.onCall(async (data, context: functions.https.CallableContext) => {
+exports.getBadges = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
     const firestore = getFirestore();
     const badgesSnap = await firestore.collection('badges').orderBy('name', 'asc').get();
@@ -423,9 +422,9 @@ exports.getBadges = functions.https.onCall(async (data, context: functions.https
     return { badges: badgesData };
 });
 
-exports.saveBadge = functions.https.onCall(async (data: { badge: Badge }, context: functions.https.CallableContext) => {
+exports.saveBadge = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
-    const { badge } = data;
+    const { badge } = data as { badge: Badge };
     const firestore = getFirestore();
     if (badge.id) {
         const badgeRef = firestore.collection('badges').doc(badge.id);
@@ -437,16 +436,16 @@ exports.saveBadge = functions.https.onCall(async (data: { badge: Badge }, contex
     return { success: true };
 });
 
-exports.deleteBadge = functions.https.onCall(async (data: { badgeId: string }, context: functions.https.CallableContext) => {
+exports.deleteBadge = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
-    const { badgeId } = data;
+    const { badgeId } = data as { badgeId: string };
     const firestore = getFirestore();
     await firestore.collection('badges').doc(badgeId).delete();
     return { success: true };
 });
 
 // Availability
-exports.getAvailability = functions.https.onCall(async (data, context: functions.https.CallableContext) => {
+exports.getAvailability = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
     const firestore = getFirestore();
     const snapshot = await firestore.collection('globalAvailability').get();
@@ -457,9 +456,9 @@ exports.getAvailability = functions.https.onCall(async (data, context: functions
     return { availability: availabilityData };
 });
 
-exports.saveAvailability = functions.https.onCall(async (data: { updates: Record<string, string[]> }, context: functions.https.CallableContext) => {
+exports.saveAvailability = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
-    const { updates } = data;
+    const { updates } = data as { updates: Record<string, string[]> };
     const firestore = getFirestore();
     const batch = firestore.batch();
     for (const dateString in updates) {
@@ -472,7 +471,7 @@ exports.saveAvailability = functions.https.onCall(async (data: { updates: Record
 
 
 // Mentor Profile
-exports.getMentorProfile = functions.https.onCall(async (data, context: functions.https.CallableContext) => {
+exports.getMentorProfile = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
     const firestore = getFirestore();
     const profileSnap = await firestore.collection('siteProfiles').doc('mainMentor').get();
@@ -482,9 +481,9 @@ exports.getMentorProfile = functions.https.onCall(async (data, context: function
     return { profile: profileSnap.data() };
 });
 
-exports.saveMentorProfile = functions.https.onCall(async (data: { profile: MentorProfileData }, context: functions.https.CallableContext) => {
+exports.saveMentorProfile = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
-    const { profile } = data;
+    const { profile } = data as { profile: MentorProfileData };
     const firestore = getFirestore();
     const profileRef = firestore.collection('siteProfiles').doc('mainMentor');
     await profileRef.set({ ...profile, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
@@ -493,7 +492,7 @@ exports.saveMentorProfile = functions.https.onCall(async (data: { profile: Mento
 
 
 // Messages
-exports.getMessages = functions.https.onCall(async (data, context: functions.https.CallableContext) => {
+exports.getMessages = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
     const firestore = getFirestore();
     const messagesSnap = await firestore.collection('userMessages').orderBy('timestamp', 'desc').get();
@@ -510,9 +509,9 @@ exports.getMessages = functions.https.onCall(async (data, context: functions.htt
     return { messages: messagesData };
 });
 
-exports.sendAdminReply = functions.https.onCall(async (data: { userUid: string, userName: string, userEmail: string, subject: string, messageBody: string, adminName: string }, context: functions.https.CallableContext) => {
+exports.sendAdminReply = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
-    const { userUid, userName, userEmail, subject, messageBody, adminName } = data;
+    const { userUid, userName, userEmail, subject, messageBody, adminName } = data as { userUid: string, userName: string, userEmail: string, subject: string, messageBody: string, adminName: string };
     const firestore = getFirestore();
     const newAdminMessage: Omit<UserMessage, 'id'> = {
       uid: userUid,
@@ -542,9 +541,9 @@ exports.sendAdminReply = functions.https.onCall(async (data: { userUid: string, 
     return { success: true };
 });
 
-exports.markMessagesAsRead = functions.https.onCall(async (data: { messageIds: string[] }, context: functions.https.CallableContext) => {
+exports.markMessagesAsRead = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
-    const { messageIds } = data;
+    const { messageIds } = data as { messageIds: string[] };
     if (!messageIds || !Array.isArray(messageIds)) {
         throw new functions.https.HttpsError('invalid-argument', 'messageIds must be an array.');
     }
