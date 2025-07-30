@@ -32,9 +32,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/hooks/use-auth';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-// PRODUCTION TODO: Import Firebase and Firestore methods
 import { db, functions } from '@/lib/firebase';
-import { collection, doc, addDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, onSnapshot, where, writeBatch, getDocs, getDoc } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, where, writeBatch, getDocs, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 
 const processRefund = httpsCallable(functions, 'processRefund');
@@ -89,25 +88,24 @@ export default function AdminBookingsPage() {
   const [createUserSearch, setCreateUserSearch] = useState('');
 
 
-  useEffect(() => {
+  const fetchData = async () => {
     setIsLoading(true);
     setError(null);
-    
-    const servicesColRef = collection(db, 'services');
-    const servicesQuery = query(servicesColRef, orderBy('name', 'asc'));
-    const unsubscribeServices = onSnapshot(servicesQuery, (snapshot) => {
-        const fetchedServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
-        setAllServicesData(fetchedServices);
-    }, (err) => {
-        console.error("Error fetching services:", err);
-        setError(prev => prev ? `${prev} Failed to load services.` : "Failed to load services.");
-    });
-    
-    const bookingsColRef = collection(db, 'bookings');
-    const bookingsQuery = query(bookingsColRef, orderBy('date', 'desc'));
+    try {
+      const servicesQuery = query(collection(db, 'services'), orderBy('name', 'asc'));
+      const bookingsQuery = query(collection(db, 'bookings'), orderBy('date', 'desc'));
+      const usersQuery = query(collection(db, 'userProfiles'), orderBy('name', 'asc'));
 
-    const unsubscribeBookings = onSnapshot(bookingsQuery, (querySnapshot) => {
-      const fetchedBookings = querySnapshot.docs.map(doc => {
+      const [servicesSnapshot, bookingsSnapshot, usersSnapshot] = await Promise.all([
+        getDocs(servicesQuery),
+        getDocs(bookingsQuery),
+        getDocs(usersQuery),
+      ]);
+
+      const fetchedServices = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
+      setAllServicesData(fetchedServices);
+
+      const fetchedBookings = bookingsSnapshot.docs.map(doc => {
         const data = doc.data();
         return {
           id: doc.id,
@@ -117,25 +115,19 @@ export default function AdminBookingsPage() {
         } as Booking;
       });
       setAllBookingsData(fetchedBookings);
-      setIsLoading(false);
-      setError(null);
-    }, (err) => {
-      console.error("Error with real-time bookings listener:", err);
-      setError("Failed to load bookings in real-time. Please check your connection and security rules.");
-      setIsLoading(false);
-    });
-    
-    const usersColRef = collection(db, 'userProfiles');
-    const usersQuery = query(usersColRef, orderBy('name', 'asc'));
-    const unsubscribeUsers = onSnapshot(usersQuery, (snapshot) => {
-      setAllUsersData(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile)));
-    });
+      
+      setAllUsersData(usersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile)));
 
-    return () => {
-        unsubscribeServices();
-        unsubscribeBookings();
-        unsubscribeUsers();
-    };
+    } catch (err) {
+      console.error("Error fetching admin data:", err);
+      setError("Failed to load admin data. Please check your connection and security rules.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
   }, []); 
 
 
@@ -184,6 +176,7 @@ export default function AdminBookingsPage() {
         toast({ title: "Refund Failed", description: err.message || "An unknown error occurred.", variant: "destructive" });
       } finally {
         setIsProcessingAction(null);
+        await fetchData(); // Refresh data
       }
       return;
     }
@@ -220,6 +213,7 @@ export default function AdminBookingsPage() {
         toast({ title: "Action Failed", description: `Could not perform action: ${action}. Please try again.`, variant: "destructive" });
     } finally {
         setIsProcessingAction(null);
+        await fetchData(); // Refresh data
     }
   };
 
@@ -289,6 +283,7 @@ export default function AdminBookingsPage() {
         setIsCreateBookingModalOpen(false);
         createBookingForm.reset();
         setCreateUserSearch('');
+        await fetchData(); // Refresh data
     } catch (err) {
         console.error("Error creating booking:", err);
         toast({ title: "Creation Failed", description: "Could not create the booking.", variant: "destructive" });
@@ -328,6 +323,7 @@ export default function AdminBookingsPage() {
         });
         setIsEditBookingModalOpen(false);
         setSelectedBookingForEdit(null);
+        await fetchData(); // Refresh data
     } catch (err) {
         console.error("Error updating booking:", selectedBookingForEdit.id, err);
         toast({ title: "Update Failed", description: "Could not update booking. Please try again.", variant: "destructive" });

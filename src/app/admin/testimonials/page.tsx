@@ -25,10 +25,10 @@ import { Check, X, Eye, EyeOff, Filter, ShieldAlert, CheckCircle2, PlusCircle, B
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-// PRODUCTION TODO: Import Firebase and Firestore methods
 import { db } from '@/lib/firebase';
-import { collection, doc, addDoc, updateDoc, getDocs, onSnapshot, query, orderBy, where, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, getDocs, query, orderBy, where, serverTimestamp } from 'firebase/firestore';
 
 const ITEMS_PER_PAGE = 7;
 
@@ -83,49 +83,45 @@ export default function AdminTestimonialsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
 
-  useEffect(() => {
+  const fetchData = async () => {
     setIsLoading(true);
     setError(null);
-    
-    // Testimonials listener
-    const testimonialsQuery = query(collection(db, 'testimonials'), orderBy('createdAt', 'desc'));
-    const unsubscribeTestimonials = onSnapshot(testimonialsQuery, (snapshot) => {
-      const fetchedTestimonials = snapshot.docs.map(doc => ({ 
+    try {
+      const testimonialsQuery = query(collection(db, 'testimonials'), orderBy('createdAt', 'desc'));
+      const servicesQuery = query(collection(db, 'services'), orderBy('name', 'asc'));
+      const bookingsQuery = query(collection(db, 'bookings'));
+      
+      const [testimonialsSnapshot, servicesSnapshot, bookingsSnapshot] = await Promise.all([
+        getDocs(testimonialsQuery),
+        getDocs(servicesQuery),
+        getDocs(bookingsQuery),
+      ]);
+      
+      const fetchedTestimonials = testimonialsSnapshot.docs.map(doc => ({ 
         id: doc.id, 
         ...doc.data(),
         createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate().toISOString() : new Date().toISOString()
       } as Testimonial));
       setAllTestimonialsData(fetchedTestimonials);
-      setIsLoading(false);
-    }, (err) => {
-      console.error("Error fetching testimonials:", err);
+
+      setAllServicesData(servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
+      setAllBookingsData(bookingsSnapshot.docs.map(doc => doc.data() as Booking));
+
+    } catch (err) {
+      console.error("Error fetching testimonials data:", err);
       setError("Failed to load testimonials data.");
+    } finally {
       setIsLoading(false);
-    });
+    }
+  };
 
-    // Services fetch (can be onSnapshot if they change often)
-    const servicesQuery = query(collection(db, 'services'), orderBy('name', 'asc'));
-    const unsubscribeServices = onSnapshot(servicesQuery, (snapshot) => {
-        setAllServicesData(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
-    });
-
-    // Bookings fetch (for user list derivation)
-    const bookingsQuery = query(collection(db, 'bookings'));
-    const unsubscribeBookings = onSnapshot(bookingsQuery, (snapshot) => {
-      setAllBookingsData(snapshot.docs.map(doc => doc.data() as Booking));
-    });
-
-    return () => {
-      unsubscribeTestimonials();
-      unsubscribeServices();
-      unsubscribeBookings();
-    };
+  useEffect(() => {
+    fetchData();
   }, []);
 
 
   const selectableUsers = useMemo((): SelectableUser[] => {
     const usersMap = new Map<string, SelectableUser>();
-    // Only include users who have at least one booking
     allBookingsData.forEach(booking => {
       if (booking.userEmail && booking.uid && !usersMap.has(booking.userEmail)) {
         usersMap.set(booking.userEmail, {
@@ -173,6 +169,7 @@ export default function AdminTestimonialsPage() {
         title: "Testimonial Status Updated",
         description: `Testimonial is now ${newStatus}.`,
       });
+      await fetchData();
     } catch (err) {
       console.error("Error updating testimonial status:", err);
       toast({ title: "Update Failed", description: "Could not update testimonial status.", variant: "destructive" });
@@ -188,6 +185,7 @@ export default function AdminTestimonialsPage() {
         title: "Testimonial Rejected",
         variant: "destructive"
       });
+      await fetchData();
     } catch (err) {
       console.error("Error rejecting testimonial:", err);
       toast({ title: "Rejection Failed", description: "Could not reject testimonial.", variant: "destructive" });
@@ -269,6 +267,7 @@ export default function AdminTestimonialsPage() {
         });
         setIsCreateModalOpen(false);
         adminForm.reset();
+        await fetchData();
     } catch (err) {
         console.error("Error adding testimonial:", err);
         toast({ title: "Creation Failed", description: "Could not add testimonial.", variant: "destructive" });

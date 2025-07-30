@@ -17,10 +17,10 @@ import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Edit, Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import Image from 'next/image';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-// PRODUCTION TODO: Import Firebase and Firestore methods
-import { db, storage } from '@/lib/firebase'; // Assuming firebase.ts setup
-import { collection, doc, addDoc, setDoc, updateDoc, deleteDoc, getDocs, onSnapshot, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { db, storage } from '@/lib/firebase'; 
+import { collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, query, orderBy, getDocs } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const initialServiceFormState: Omit<Service, 'id' | 'features'> & { features: string } = {
@@ -37,7 +37,7 @@ const initialServiceFormState: Omit<Service, 'id' | 'features'> & { features: st
 
 export default function AdminServicesPage() {
   const { toast } = useToast();
-  const [servicesData, setServicesData] = useState<Service[]>([]); // Holds fetched or mock services
+  const [servicesData, setServicesData] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,33 +49,31 @@ export default function AdminServicesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
 
-  useEffect(() => {
+  const fetchServices = async () => {
     setIsLoading(true);
     setError(null);
-
-    const servicesColRef = collection(db, 'services');
-    const q = query(servicesColRef, orderBy('name', 'asc'));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    try {
+      const servicesColRef = collection(db, 'services');
+      const q = query(servicesColRef, orderBy('name', 'asc'));
+      const querySnapshot = await getDocs(q);
       const fetchedServices = querySnapshot.docs.map(doc => {
         const data = doc.data();
         return { 
             id: doc.id, 
             ...data,
-            // Ensure timestamp fields are handled if needed, though not directly used in this component's UI
-            // createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : undefined,
-            // updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : undefined,
         } as Service;
       });
       setServicesData(fetchedServices);
+    } catch (err) {
+      console.error("Error fetching services:", err);
+      setError("Failed to load services. Please check your connection or security rules.");
+    } finally {
       setIsLoading(false);
-      setError(null);
-    }, (err) => {
-      console.error("Error with real-time services listener:", err);
-      setError("Failed to load services in real-time. Please check your connection or security rules.");
-      setIsLoading(false);
-    });
+    }
+  };
 
-    return () => unsubscribe(); // Cleanup listener on component unmount
+  useEffect(() => {
+    fetchServices();
   }, []);
 
 
@@ -97,7 +95,7 @@ export default function AdminServicesPage() {
       setFormData(initialServiceFormState);
       setImagePreview(null);
     }
-    setSelectedFile(null); // Reset file selection when modal opens/closes or currentService changes
+    setSelectedFile(null); 
   }, [currentService, isModalOpen]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -112,7 +110,6 @@ export default function AdminServicesPage() {
       setImagePreview(URL.createObjectURL(file));
     } else {
       setSelectedFile(null);
-      // If file is cleared, revert to currentService's image or null if new
       setImagePreview(currentService?.image || (isModalOpen && !currentService ? null : formData.image || null) );
     }
   };
@@ -166,6 +163,7 @@ export default function AdminServicesPage() {
         toast({ title: "Service Added", description: `${serviceToSave.name} has been added.` });
       }
       setIsModalOpen(false);
+      await fetchServices();
     } catch (dbError) {
       console.error("Error saving service to Firestore:", dbError);
       toast({ title: "Database Error", description: "Could not save the service. Please try again.", variant: "destructive" });
@@ -179,6 +177,7 @@ export default function AdminServicesPage() {
       const serviceDocRef = doc(db, "services", serviceId);
       await deleteDoc(serviceDocRef);
       toast({ title: "Service Deleted", description: `Service "${serviceName}" has been deleted.`});
+      await fetchServices();
     } catch (dbError) {
       console.error("Error deleting service:", dbError);
       toast({ title: "Delete Failed", description: `Could not delete service "${serviceName}". Please try again.`, variant: "destructive"});
@@ -194,6 +193,7 @@ export default function AdminServicesPage() {
         title: "Booking Status Updated",
         description: `Bookings for "${serviceName}" are now ${newIsBookable ? 'ENABLED' : 'DISABLED'}.`,
       });
+      await fetchServices();
     } catch (dbError) {
       console.error("Error toggling booking status:", dbError);
       toast({ title: "Update Failed", description: `Could not toggle booking status for "${serviceName}".`, variant: "destructive"});

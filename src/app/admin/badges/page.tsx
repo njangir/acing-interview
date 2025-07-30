@@ -20,10 +20,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Badge } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Edit, Trash2, Award as AwardIcon, ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-// PRODUCTION TODO: Import Firebase and Firestore methods
 import { db } from '@/lib/firebase';
-import { collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, query, orderBy, getDocs } from 'firebase/firestore';
 
 const ITEMS_PER_PAGE = 7;
 
@@ -63,25 +63,28 @@ export default function AdminBadgesPage() {
     },
   });
 
-  useEffect(() => {
+  const fetchBadges = async () => {
     setIsLoading(true);
-    const badgesColRef = collection(db, 'badges');
-    const q = query(badgesColRef, orderBy('name', 'asc'));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    setError(null);
+    try {
+      const badgesColRef = collection(db, 'badges');
+      const q = query(badgesColRef, orderBy('name', 'asc'));
+      const querySnapshot = await getDocs(q);
       const fetchedBadges = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as Badge));
       setAllBadgesData(fetchedBadges);
+    } catch (err) {
+      console.error("Error fetching badges:", err);
+      setError("Failed to load badges. Please check your connection and Firestore rules.");
+    } finally {
       setIsLoading(false);
-      setError(null);
-    }, (err) => {
-      console.error("Error with real-time badges listener:", err);
-      setError("Failed to load badges in real-time. Please check your connection and Firestore rules.");
-      setIsLoading(false);
-    });
+    }
+  };
 
-    return () => unsubscribe();
+  useEffect(() => {
+    fetchBadges();
   }, []);
 
   useEffect(() => {
@@ -132,6 +135,8 @@ export default function AdminBadgesPage() {
       const badgeDocRef = doc(db, "badges", badgeId);
       await deleteDoc(badgeDocRef);
       toast({ title: "Badge Deleted", description: `Badge "${badgeName}" has been removed.` });
+      // Refresh data
+      await fetchBadges();
       // Pagination adjustment logic
       const newTotalPages = Math.ceil((allBadgesData.length - 1) / ITEMS_PER_PAGE);
       if (currentPage > newTotalPages) {
@@ -161,6 +166,7 @@ export default function AdminBadgesPage() {
         toast({ title: "Badge Added", description: `${data.name} has been created.` });
       }
       setIsModalOpen(false);
+      await fetchBadges();
     } catch (err) {
       console.error("Error saving badge:", err);
       toast({ title: "Save Failed", description: "Could not save badge details.", variant: "destructive" });
@@ -396,5 +402,4 @@ export default function AdminBadgesPage() {
       </Dialog>
     </>
   );
-
     

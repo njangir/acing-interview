@@ -15,12 +15,13 @@ import type { Resource, Service } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Edit, Trash2, FileText, Video, Link as LinkIcon, Loader2, AlertTriangle } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { getIconForResourceType } from '@/lib/utils'; // Assuming this helper exists or is created
+import { getIconForResourceType } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-// PRODUCTION TODO: Import Firebase and Firestore methods
 import { db, storage } from '@/lib/firebase';
-import { collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, query, orderBy, getDocs } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import React from 'react';
 
 const initialResourceFormState: Omit<Resource, 'id' | 'createdAt' | 'updatedAt' | 'icon'> = {
   title: '',
@@ -43,30 +44,33 @@ export default function AdminResourcesPage() {
   const [resourceFile, setResourceFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
+  const fetchData = async () => {
     setIsLoading(true);
     setError(null);
-    
-    const resourcesQuery = query(collection(db, 'resources'), orderBy('title', 'asc'));
-    const unsubscribeResources = onSnapshot(resourcesQuery, (snapshot) => {
-      const fetchedResources = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Resource));
+    try {
+      const resourcesQuery = query(collection(db, 'resources'), orderBy('title', 'asc'));
+      const servicesQuery = query(collection(db, 'services'), orderBy('name', 'asc'));
+      
+      const [resourcesSnapshot, servicesSnapshot] = await Promise.all([
+        getDocs(resourcesQuery),
+        getDocs(servicesQuery),
+      ]);
+
+      const fetchedResources = resourcesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Resource));
       setResources(fetchedResources);
-      setIsLoading(false);
-    }, (err) => {
-      console.error("Error fetching resources:", err);
-      setError("Failed to load resources data.");
-      setIsLoading(false);
-    });
+      
+      setServices(servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
 
-    const servicesQuery = query(collection(db, 'services'), orderBy('name', 'asc'));
-    const unsubscribeServices = onSnapshot(servicesQuery, (snapshot) => {
-        setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
-    });
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      setError("Failed to load resources or services data.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    return () => {
-      unsubscribeResources();
-      unsubscribeServices();
-    };
+  useEffect(() => {
+    fetchData();
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -139,6 +143,7 @@ export default function AdminResourcesPage() {
           toast({ title: "Resource Added", description: `${resourceDataToSave.title} has been added.` });
         }
         setIsModalOpen(false);
+        await fetchData();
     } catch (dbError) {
         console.error("Error saving resource:", dbError);
         toast({ title: "Database Error", description: "Could not save the resource.", variant: "destructive" });
@@ -149,7 +154,6 @@ export default function AdminResourcesPage() {
   
   const handleDelete = async (resource: Resource) => {
     try {
-        // If it's a document, delete from storage first
         if (resource.type === 'document' && resource.url.includes('firebasestorage.googleapis.com')) {
             const fileRef = storageRef(storage, resource.url);
             await deleteObject(fileRef);
@@ -157,6 +161,7 @@ export default function AdminResourcesPage() {
         
         await deleteDoc(doc(db, "resources", resource.id));
         toast({ title: "Resource Deleted", description: `"${resource.title}" has been deleted.`});
+        await fetchData();
     } catch (err) {
         console.error("Error deleting resource:", err);
         toast({ title: "Delete Failed", description: "Could not delete the resource.", variant: "destructive" });

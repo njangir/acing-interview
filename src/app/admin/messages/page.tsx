@@ -11,14 +11,14 @@ import { Label } from '@/components/ui/label';
 import type { UserMessage } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Mail, Send, CornerDownRight, User, Shield, ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
-import { Badge as UiBadge } from '@/components/ui/badge'; // Renamed to avoid conflict if Badge type is also used
+import { Badge as UiBadge } from '@/components/ui/badge'; 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/hooks/use-auth'; // For admin user details
+import { useAuth } from '@/hooks/use-auth'; 
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-// PRODUCTION TODO: Import Firebase and Firestore methods
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, where, writeBatch, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, addDoc, updateDoc, doc, serverTimestamp, where, writeBatch, getDocs } from 'firebase/firestore';
 
 const ITEMS_PER_PAGE = 5;
 
@@ -46,14 +46,13 @@ export default function AdminMessagesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
-  useEffect(() => {
+  const fetchMessages = async () => {
     setIsLoading(true);
     setError(null);
-
-    const messagesColRef = collection(db, 'userMessages');
-    const q = query(messagesColRef, orderBy('timestamp', 'desc'));
-
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    try {
+      const messagesColRef = collection(db, 'userMessages');
+      const q = query(messagesColRef, orderBy('timestamp', 'desc'));
+      const querySnapshot = await getDocs(q);
       const fetchedMessages = querySnapshot.docs.map(doc => {
         const data = doc.data();
         return {
@@ -65,15 +64,16 @@ export default function AdminMessagesPage() {
         } as UserMessage;
       });
       setAllMessagesData(fetchedMessages);
+    } catch (err) {
+      console.error("Error fetching messages:", err);
+      setError("Failed to load messages. Please check your connection and Firestore rules.");
+    } finally {
       setIsLoading(false);
-      setError(null);
-    }, (err) => {
-      console.error("Error with real-time messages listener:", err);
-      setError("Failed to load messages in real-time. Please check your connection and Firestore rules.");
-      setIsLoading(false);
-    });
+    }
+  };
 
-    return () => unsubscribe();
+  useEffect(() => {
+    fetchMessages();
   }, []);
 
   const groupedMessages = useMemo(() => {
@@ -160,6 +160,7 @@ export default function AdminMessagesPage() {
     if (messagesToUpdate) {
         try {
             await batch.commit();
+            await fetchMessages(); // Refresh data
             toast({ title: "Conversation Updated", description: "Messages marked as read."});
         } catch (err) {
             console.error("Error marking messages as read:", err);
@@ -217,6 +218,7 @@ export default function AdminMessagesPage() {
         });
         
         setReplyText('');
+        await fetchMessages(); // Refresh data
     } catch (err) {
         console.error("Error sending reply:", err);
         toast({ title: "Send Failed", description: "Could not send reply.", variant: "destructive" });
