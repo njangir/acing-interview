@@ -301,4 +301,30 @@ exports.exportServicesReport = functions.https.onCall(async (data, context) => {
     return { data: servicesData };
 });
 
+exports.getAdminDashboardData = functions.https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const firestore = getFirestore();
+    
+    try {
+        const bookingsQuery = firestore.collection('bookings');
+        const servicesQuery = firestore.collection('services');
+        const messagesQuery = firestore.collection('userMessages');
+
+        const [bookingsSnapshot, servicesSnapshot, messagesSnapshot] = await Promise.all([
+            bookingsQuery.get(),
+            servicesQuery.get(),
+            messagesQuery.get()
+        ]);
+
+        const bookings = bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const services = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const messages = messagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        return { bookings, services, messages };
+
+    } catch (error) {
+        logger.error("Error fetching admin dashboard data:", error);
+        throw new functions.https.HttpsError("internal", "Failed to fetch dashboard data.");
+    }
+});
     

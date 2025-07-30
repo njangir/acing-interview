@@ -7,9 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { BellRing, TrendingUp, MessagesSquare, Star, Loader2, AlertTriangle } from "lucide-react";
 import { WeeklyScheduleView } from '@/components/core/weekly-schedule-view';
 import type { Booking, Service, UserMessage } from '@/types';
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '@/lib/firebase';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+
+const getAdminDashboardData = httpsCallable(functions, 'getAdminDashboardData');
 
 export default function AdminOverviewPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -23,23 +25,16 @@ export default function AdminOverviewPage() {
         setIsLoading(true);
         setError(null);
         try {
-            const bookingsQuery = query(collection(db, 'bookings'));
-            const servicesQuery = query(collection(db, 'services'));
-            const messagesQuery = query(collection(db, 'userMessages'));
+            const result: any = await getAdminDashboardData();
+            const data = result.data;
+            
+            setBookings(data.bookings || []);
+            setServices(data.services || []);
+            setMessages(data.messages || []);
 
-            const [bookingsSnapshot, servicesSnapshot, messagesSnapshot] = await Promise.all([
-                getDocs(bookingsQuery),
-                getDocs(servicesQuery),
-                getDocs(messagesQuery)
-            ]);
-
-            setBookings(bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking)));
-            setServices(servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
-            setMessages(messagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserMessage)));
-
-        } catch (err) {
+        } catch (err: any) {
             console.error("Error fetching dashboard data:", err);
-            setError("Failed to load dashboard data. Please check your connection and Firestore security rules.");
+            setError(err.message || "Failed to load dashboard data. You might not have the required admin permissions or there was a server error.");
         } finally {
             setIsLoading(false);
         }
