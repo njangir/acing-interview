@@ -33,9 +33,7 @@ import { collection, doc, addDoc, updateDoc, getDocs, onSnapshot, query, orderBy
 const ITEMS_PER_PAGE = 7;
 
 const adminTestimonialFormSchema = z.object({
-  selectedUserId: z.string().optional(),
-  name: z.string().min(2, { message: "Name must be at least 2 characters." }),
-  userEmail: z.string().email("Please enter a valid email.").optional().or(z.literal('')),
+  selectedUserId: z.string({ required_error: "You must select a user." }).min(1, "You must select a user."),
   serviceId: z.string({ required_error: "Please select the service." }),
   story: z.string().min(50, { message: "Testimonial must be at least 50 characters." }).max(1000, { message: "Testimonial cannot exceed 1000 characters." }),
   batch: z.string().optional(),
@@ -43,8 +41,6 @@ const adminTestimonialFormSchema = z.object({
   selectedForce: z.enum(['Army', 'Navy', 'Air Force']).optional(),
   interviewLocation: z.string().optional(),
   numberOfAttempts: z.coerce.number().min(1, "Number of attempts must be at least 1.").optional(),
-  profileImageUrl: z.string().url("Invalid URL for profile image.").optional().or(z.literal('')),
-  profileImageDataAiHint: z.string().max(50, "AI hint should be concise").optional(),
   bodyImageUrl: z.string().url("Invalid URL for body image.").optional().or(z.literal('')),
   bodyImageDataAiHint: z.string().max(50, "AI hint should be concise").optional(),
   approvalStatus: z.enum(['pending', 'approved', 'rejected'], { required_error: "Please select an approval status." }),
@@ -83,7 +79,6 @@ export default function AdminTestimonialsPage() {
 
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isNameEmailEditable, setIsNameEmailEditable] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -130,6 +125,7 @@ export default function AdminTestimonialsPage() {
 
   const selectableUsers = useMemo((): SelectableUser[] => {
     const usersMap = new Map<string, SelectableUser>();
+    // Only include users who have at least one booking
     allBookingsData.forEach(booking => {
       if (booking.userEmail && booking.uid && !usersMap.has(booking.userEmail)) {
         usersMap.set(booking.userEmail, {
@@ -147,9 +143,7 @@ export default function AdminTestimonialsPage() {
   const adminForm = useForm<AdminTestimonialFormValues>({
     resolver: zodResolver(adminTestimonialFormSchema),
     defaultValues: {
-      selectedUserId: "manual",
-      name: "",
-      userEmail: "",
+      selectedUserId: "",
       serviceId: "",
       story: "",
       batch: "",
@@ -157,8 +151,6 @@ export default function AdminTestimonialsPage() {
       selectedForce: undefined,
       interviewLocation: "",
       numberOfAttempts: undefined,
-      profileImageUrl: PREDEFINED_AVATARS[0].url,
-      profileImageDataAiHint: PREDEFINED_AVATARS[0].hint,
       bodyImageUrl: "",
       bodyImageDataAiHint: "",
       approvalStatus: 'approved',
@@ -169,31 +161,6 @@ export default function AdminTestimonialsPage() {
     control: adminForm.control,
     name: 'submissionStatus',
   });
-  
-  const watchedSelectedUserId = useWatch({
-    control: adminForm.control,
-    name: 'selectedUserId',
-  });
-
-  useEffect(() => {
-    if (watchedSelectedUserId && watchedSelectedUserId !== "manual") {
-      const selectedUser = selectableUsers.find(u => u.id === watchedSelectedUserId);
-      if (selectedUser) {
-        adminForm.setValue("name", selectedUser.name);
-        adminForm.setValue("userEmail", selectedUser.email);
-        adminForm.setValue("profileImageUrl", selectedUser.avatarUrl || PREDEFINED_AVATARS[0].url);
-        adminForm.setValue("profileImageDataAiHint", "person avatar");
-        setIsNameEmailEditable(false);
-      }
-    } else {
-      if (watchedSelectedUserId === "manual") { 
-        adminForm.setValue("name", "");
-        adminForm.setValue("userEmail", "");
-        adminForm.setValue("profileImageUrl", PREDEFINED_AVATARS[0].url);
-      }
-      setIsNameEmailEditable(true);
-    }
-  }, [watchedSelectedUserId, adminForm, selectableUsers]);
 
 
   const handleApprovalToggle = async (testimonialId: string, currentStatus: Testimonial['status']) => {
@@ -261,20 +228,23 @@ export default function AdminTestimonialsPage() {
   async function onAdminSubmit(data: AdminTestimonialFormValues) {
     setIsSubmitting(true);
     const selectedService = allServicesData.find(s => s.id === data.serviceId);
+    const selectedUser = selectableUsers.find(u => u.id === data.selectedUserId);
 
-    let userUid: string | undefined = undefined;
-    if (data.selectedUserId && data.selectedUserId !== "manual") {
-        userUid = data.selectedUserId;
+    if (!selectedUser) {
+        toast({ title: "Error", description: "Selected user could not be found.", variant: "destructive" });
+        setIsSubmitting(false);
+        return;
     }
 
-    const newTestimonialData: Omit<Testimonial, 'id' | 'createdAt' | 'updatedAt'> & { uid?: string } = {
-      uid: userUid, 
-      name: data.name,
-      userEmail: data.userEmail || undefined,
+
+    const newTestimonialData: Omit<Testimonial, 'id' | 'createdAt' | 'updatedAt'> = {
+      uid: selectedUser.id, 
+      name: selectedUser.name,
+      userEmail: selectedUser.email,
       batch: data.batch || undefined,
       story: data.story,
-      imageUrl: data.profileImageUrl || PREDEFINED_AVATARS[0].url,
-      dataAiHint: data.profileImageDataAiHint || 'person avatar',
+      imageUrl: selectedUser.avatarUrl || PREDEFINED_AVATARS[0].url,
+      dataAiHint: 'person avatar',
       serviceTaken: selectedService?.name || 'Unknown Service',
       serviceId: data.serviceId,
       submissionStatus: data.submissionStatus,
@@ -295,16 +265,10 @@ export default function AdminTestimonialsPage() {
 
         toast({
           title: "Testimonial Added!",
-          description: `Testimonial from ${data.name} has been successfully added.`,
+          description: `Testimonial from ${selectedUser.name} has been successfully added.`,
         });
         setIsCreateModalOpen(false);
-        adminForm.reset({
-            selectedUserId: "manual", name: "", userEmail: "", serviceId: "", story: "", batch: "",
-            submissionStatus: 'aspirant', selectedForce: undefined, interviewLocation: "", numberOfAttempts: undefined,
-            profileImageUrl: PREDEFINED_AVATARS[0].url, profileImageDataAiHint: PREDEFINED_AVATARS[0].hint,
-            bodyImageUrl: "", bodyImageDataAiHint: "", approvalStatus: 'approved',
-        });
-        setIsNameEmailEditable(true);
+        adminForm.reset();
     } catch (err) {
         console.error("Error adding testimonial:", err);
         toast({ title: "Creation Failed", description: "Could not add testimonial.", variant: "destructive" });
@@ -315,12 +279,10 @@ export default function AdminTestimonialsPage() {
 
   const handleOpenCreateModal = () => {
     adminForm.reset({ 
-        selectedUserId: "manual", name: "", userEmail: "", serviceId: "", story: "", batch: "",
+        selectedUserId: "", serviceId: "", story: "", batch: "",
         submissionStatus: 'aspirant', selectedForce: undefined, interviewLocation: "", numberOfAttempts: undefined,
-        profileImageUrl: PREDEFINED_AVATARS[0].url, profileImageDataAiHint: PREDEFINED_AVATARS[0].hint,
         bodyImageUrl: "", bodyImageDataAiHint: "", approvalStatus: 'approved',
     });
-    setIsNameEmailEditable(true);
     setIsCreateModalOpen(true);
   };
 
@@ -480,18 +442,7 @@ export default function AdminTestimonialsPage() {
         )}
       </Card>
 
-      <Dialog open={isCreateModalOpen} onOpenChange={(isOpen) => {
-        setIsCreateModalOpen(isOpen);
-        if (!isOpen) {
-          adminForm.reset({
-            selectedUserId: "manual", name: "", userEmail: "", serviceId: "", story: "", batch: "",
-            submissionStatus: 'aspirant', selectedForce: undefined, interviewLocation: "", numberOfAttempts: undefined,
-            profileImageUrl: PREDEFINED_AVATARS[0].url, profileImageDataAiHint: PREDEFINED_AVATARS[0].hint,
-            bodyImageUrl: "", bodyImageDataAiHint: "", approvalStatus: 'approved',
-          });
-          setIsNameEmailEditable(true);
-        }
-      }}>
+      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Add New Testimonial</DialogTitle>
@@ -504,15 +455,14 @@ export default function AdminTestimonialsPage() {
                 name="selectedUserId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="flex items-center gap-2"><Users className="h-4 w-4"/> Select User (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || "manual"}>
+                    <FormLabel className="flex items-center gap-2"><Users className="h-4 w-4"/> Select User</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select an existing user or enter manually" />
+                          <SelectValue placeholder="Select an existing user who has had a booking" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="manual">--- Enter Manually / New User ---</SelectItem>
                         {selectableUsers.map(user => (
                           <SelectItem key={user.id} value={user.id}>
                             <div className="flex items-center gap-2">
@@ -523,29 +473,6 @@ export default function AdminTestimonialsPage() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={adminForm.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>User's Full Name</FormLabel>
-                    <FormControl><Input placeholder="John Doe" {...field} disabled={!isNameEmailEditable} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={adminForm.control}
-                name="userEmail"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>User's Email (Optional)</FormLabel>
-                    <FormControl><Input type="email" placeholder="user@example.com" {...field} disabled={!isNameEmailEditable} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -586,27 +513,6 @@ export default function AdminTestimonialsPage() {
                     <FormControl><Input placeholder="e.g., NDA 151" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
-                )}
-              />
-              <FormField
-                control={adminForm.control}
-                name="profileImageUrl"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>User Profile Image URL (Optional)</FormLabel>
-                    <FormControl><Input type="url" placeholder="https://placehold.co/100x100.png" {...field} disabled={!isNameEmailEditable && !!watchedSelectedUserId && watchedSelectedUserId !== 'manual'} /></FormControl>
-                    {adminForm.getValues("profileImageUrl") && <Image src={adminForm.getValues("profileImageUrl") || PREDEFINED_AVATARS[0].url} alt="Profile preview" width={60} height={60} className="mt-2 rounded-full border" />}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-               <FormField
-                control={adminForm.control}
-                name="profileImageDataAiHint"
-                render={({ field }) => (
-                  <FormItem><FormLabel>Profile Image AI Hint</FormLabel>
-                  <FormControl><Input placeholder="e.g., person avatar" {...field} /></FormControl>
-                  <FormMessage /></FormItem>
                 )}
               />
               <FormField
@@ -696,5 +602,3 @@ export default function AdminTestimonialsPage() {
     </>
   );
 }
-
-    

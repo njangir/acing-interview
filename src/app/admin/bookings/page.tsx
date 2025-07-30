@@ -20,7 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import type { Booking, Service } from '@/types';
+import type { Booking, Service, UserProfile } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { MoreHorizontal, CheckCircle, XCircle, CalendarClock, ShieldCheck, PlusCircle, CalendarIcon, Edit, Filter, InfoIcon, Video, ChevronLeft, ChevronRight, Eye, Loader2, AlertTriangle, RotateCcw } from 'lucide-react';
 import { Badge as UiBadge } from '@/components/ui/badge';
@@ -41,8 +41,7 @@ const processRefund = httpsCallable(functions, 'processRefund');
 const ITEMS_PER_PAGE = 7;
 
 const createBookingFormSchema = z.object({
-  userEmails: z.string().min(1, { message: "At least one email address is required." }),
-  userName: z.string().min(2, { message: "User name must be at least 2 characters." }),
+  selectedUserId: z.string({ required_error: "You must select a user." }).min(1, "You must select a user."),
   serviceId: z.string({ required_error: "Please select a service." }),
   date: z.date({ required_error: "Please select a date." }),
   time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9] (AM|PM)$/i, { message: "Invalid time format (e.g., 10:00 AM)." }),
@@ -67,6 +66,7 @@ export default function AdminBookingsPage() {
 
   const [allBookingsData, setAllBookingsData] = useState<Booking[]>([]); // Holds fetched or mock bookings
   const [allServicesData, setAllServicesData] = useState<Service[]>([]); // Holds fetched or mock services
+  const [allUsersData, setAllUsersData] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessingAction, setIsProcessingAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +84,8 @@ export default function AdminBookingsPage() {
 
   const [isViewFeedbackModalOpen, setIsViewFeedbackModalOpen] = useState(false);
   const [selectedBookingForFeedback, setSelectedBookingForFeedback] = useState<Booking | null>(null);
+
+  const [createUserSearch, setCreateUserSearch] = useState('');
 
 
   useEffect(() => {
@@ -121,10 +123,17 @@ export default function AdminBookingsPage() {
       setError("Failed to load bookings in real-time. Please check your connection and security rules.");
       setIsLoading(false);
     });
+    
+    const usersColRef = collection(db, 'userProfiles');
+    const usersQuery = query(usersColRef, orderBy('name', 'asc'));
+    const unsubscribeUsers = onSnapshot(usersQuery, (snapshot) => {
+      setAllUsersData(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile)));
+    });
 
     return () => {
         unsubscribeServices();
         unsubscribeBookings();
+        unsubscribeUsers();
     };
   }, []); 
 
@@ -132,8 +141,7 @@ export default function AdminBookingsPage() {
   const createBookingForm = useForm<CreateBookingFormValues>({
     resolver: zodResolver(createBookingFormSchema),
     defaultValues: {
-      userEmails: '',
-      userName: '',
+      selectedUserId: undefined,
       serviceId: undefined,
       date: undefined,
       time: '',
@@ -240,68 +248,49 @@ export default function AdminBookingsPage() {
 
   async function onCreateBookingSubmit(data: CreateBookingFormValues) {
     const selectedService = allServicesData.find(s => s.id === data.serviceId);
-    if (!selectedService) {
-      toast({ title: "Error", description: "Selected service not found.", variant: "destructive" });
+    const selectedUser = allUsersData.find(u => u.uid === data.selectedUserId);
+
+    if (!selectedService || !selectedUser) {
+      toast({ title: "Error", description: "Selected user or service not found.", variant: "destructive" });
       return;
     }
 
-    const emails = data.userEmails.split(',').map(email => email.trim()).filter(email => email);
-    if (emails.length === 0) {
-        toast({ title: "Error", description: "Please enter at least one valid email.", variant: "destructive" });
-        return;
+    let initialStatus: Booking['status'];
+    if (data.paymentStatus === 'paid') {
+        initialStatus = data.meetingLink ? 'scheduled' : 'accepted';
+    } else {
+        initialStatus = 'pending_approval';
     }
 
-    const batch = writeBatch(db);
-    let bookingsCreatedCount = 0;
-
-    for (const email of emails) {
-        if (!/^\S+@\S+\.\S+$/.test(email)) {
-            toast({ title: "Skipped Invalid Email", description: `Skipped "${email}" as it's not a valid email format.`, variant: "destructive" });
-            continue;
-        }
-        
-        let initialStatus: Booking['status'];
-        if (data.paymentStatus === 'paid') {
-            initialStatus = data.meetingLink ? 'scheduled' : 'accepted';
-        } else {
-            initialStatus = 'pending_approval';
-        }
-
-        const newBookingData = {
-          uid: `admin-created-${email}`,
-          userName: data.userName,
-          userEmail: email,
-          serviceId: data.serviceId,
-          serviceName: selectedService.name,
-          date: format(data.date, 'yyyy-MM-dd'),
-          time: data.time,
-          paymentStatus: data.paymentStatus,
-          status: initialStatus,
-          meetingLink: data.meetingLink || '',
-          transactionId: data.paymentStatus === 'paid' ? `admin_txn_${Date.now()}` : null,
-          requestedRefund: false,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        };
-        
-        const newBookingRef = doc(collection(db, "bookings"));
-        batch.set(newBookingRef, newBookingData);
-        bookingsCreatedCount++;
-    }
+    const newBookingData = {
+      uid: selectedUser.uid,
+      userName: selectedUser.name,
+      userEmail: selectedUser.email,
+      serviceId: data.serviceId,
+      serviceName: selectedService.name,
+      date: format(data.date, 'yyyy-MM-dd'),
+      time: data.time,
+      paymentStatus: data.paymentStatus,
+      status: initialStatus,
+      meetingLink: data.meetingLink || '',
+      transactionId: data.paymentStatus === 'paid' ? `admin_txn_${Date.now()}` : null,
+      requestedRefund: false,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
 
     try {
-        await batch.commit();
-        if (bookingsCreatedCount > 0) {
-            toast({
-              title: `${bookingsCreatedCount > 1 ? 'Group Booking' : 'Booking'} Created`,
-              description: `${bookingsCreatedCount} booking(s) for ${data.userName} for ${selectedService.name} has been created.`,
-            });
-            setIsCreateBookingModalOpen(false);
-            createBookingForm.reset();
-        }
+        await addDoc(collection(db, "bookings"), newBookingData);
+        toast({
+          title: 'Booking Created',
+          description: `Booking for ${selectedUser.name} for ${selectedService.name} has been created.`,
+        });
+        setIsCreateBookingModalOpen(false);
+        createBookingForm.reset();
+        setCreateUserSearch('');
     } catch (err) {
-        console.error("Error creating booking(s):", err);
-        toast({ title: "Creation Failed", description: `Could not create bookings.`, variant: "destructive" });
+        console.error("Error creating booking:", err);
+        toast({ title: "Creation Failed", description: "Could not create the booking.", variant: "destructive" });
     }
   }
 
@@ -381,6 +370,14 @@ export default function AdminBookingsPage() {
   useEffect(() => {
     setCurrentPage(1); // Reset to first page when filter changes
   }, [filterServiceId]);
+  
+  const filteredUsersForCreation = useMemo(() => {
+    if (!createUserSearch) return allUsersData;
+    return allUsersData.filter(user => 
+        user.name.toLowerCase().includes(createUserSearch.toLowerCase()) || 
+        user.email.toLowerCase().includes(createUserSearch.toLowerCase())
+    );
+  }, [createUserSearch, allUsersData]);
 
 
   if (isLoading) {
@@ -814,7 +811,7 @@ export default function AdminBookingsPage() {
         <DialogContent className="sm:max-w-lg flex flex-col max-h-[calc(100vh-4rem)]">
           <DialogHeader className="p-6 pb-4 border-b flex-shrink-0">
             <DialogTitle>Create New Booking</DialogTitle>
-            <DialogDesc>Manually create a booking. For group bookings, enter comma-separated emails.</DialogDesc>
+            <DialogDesc>Manually create a booking for an existing registered user.</DialogDesc>
           </DialogHeader>
           <Form {...createBookingForm}>
             <form
@@ -825,26 +822,34 @@ export default function AdminBookingsPage() {
               <div className="p-6 space-y-4">
                   <FormField
                     control={createBookingForm.control}
-                    name="userName"
+                    name="selectedUserId"
                     render={({ field }) => (
-                      <FormItem className="mb-4">
-                        <FormLabel>User Name</FormLabel>
-                        <FormControl><Input placeholder="Full Name (will be same for all in group)" {...field} /></FormControl>
+                      <FormItem>
+                        <FormLabel>Select User</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a registered user..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <Input 
+                                className="m-2 w-[calc(100%-1rem)]" 
+                                placeholder="Search user..."
+                                value={createUserSearch}
+                                onChange={(e) => setCreateUserSearch(e.target.value)}
+                            />
+                            {filteredUsersForCreation.map((user) => (
+                              <SelectItem key={user.uid} value={user.uid}>{user.name} ({user.email})</SelectItem>
+                            ))}
+                            {filteredUsersForCreation.length === 0 && <p className="p-2 text-xs text-muted-foreground">No users found.</p>}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={createBookingForm.control}
-                    name="userEmails"
-                    render={({ field }) => (
-                      <FormItem className="mb-4">
-                        <FormLabel>User Email(s)</FormLabel>
-                        <FormControl><Textarea placeholder="user@example.com, another@example.com" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+
                   <FormField
                     control={createBookingForm.control}
                     name="serviceId"
@@ -950,7 +955,7 @@ export default function AdminBookingsPage() {
           </Form>
           <DialogFooter className="p-6 pt-4 border-t flex-shrink-0">
             <Button type="button" variant="outline" onClick={() => setIsCreateBookingModalOpen(false)}>Cancel</Button>
-            <Button type="submit" form="createBookingForm_id">Create Booking(s)</Button>
+            <Button type="submit" form="createBookingForm_id">Create Booking</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
