@@ -49,6 +49,8 @@ export default function AdminMessagesPage() {
   const [replyText, setReplyText] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
 
   const fetchMessages = async () => {
     setIsLoading(true);
@@ -116,9 +118,9 @@ export default function AdminMessagesPage() {
             status: convStatus,
         };
     }).sort((a,b) => {
-        const statusOrder = { new: 0, read: 1, replied: 2, closed: 3 };
+        const statusOrder: Record<string, number> = { new: 0, read: 1, replied: 2, closed: 3 };
         if (statusOrder[a.status] !== statusOrder[b.status]) {
-            return statusOrder[a.status] - statusOrder[b.status];
+            return (statusOrder[a.status] ?? 4) - (statusOrder[b.status] ?? 4);
         }
         return b.lastMessageTimestamp.getTime() - a.lastMessageTimestamp.getTime();
     });
@@ -171,7 +173,7 @@ export default function AdminMessagesPage() {
       });
       return;
     }
-
+    setIsSubmitting(true);
     try {
         await sendAdminReply({
             userUid: selectedConversation.messages.find(m => m.senderType === 'user')?.uid || '',
@@ -192,6 +194,8 @@ export default function AdminMessagesPage() {
     } catch (err) {
         console.error("Error sending reply:", err);
         toast({ title: "Send Failed", description: "Could not send reply.", variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
     }
   };
 
@@ -360,11 +364,13 @@ export default function AdminMessagesPage() {
               placeholder="Type your reply here..."
               rows={3}
               className="mb-2"
+              disabled={isSubmitting}
             />
              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Close</Button>
-                <Button type="button" onClick={handleSendReply} disabled={!replyText.trim()}>
-                    <Send className="mr-2 h-4 w-4" /> Send Reply
+                <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Close</Button>
+                <Button type="button" onClick={handleSendReply} disabled={!replyText.trim() || isSubmitting}>
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4" />}
+                    {isSubmitting ? 'Sending...' : 'Send Reply'}
                 </Button>
             </DialogFooter>
           </div>
@@ -374,4 +380,3 @@ export default function AdminMessagesPage() {
   );
 }
 
-    

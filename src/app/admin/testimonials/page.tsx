@@ -198,8 +198,8 @@ export default function AdminTestimonialsPage() {
       filtered = filtered.filter(t => t.status === filterStatus);
     }
     return filtered.sort((a,b) => {
-        const statusOrder = { pending: 0, approved: 1, rejected: 2 };
-        return statusOrder[a.status] - statusOrder[b.status];
+        const statusOrder: Record<string, number> = { pending: 0, approved: 1, rejected: 2 };
+        return (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3);
     });
   }, [allTestimonialsData, filterStatus]); 
 
@@ -601,3 +601,4 @@ export default function AdminTestimonialsPage() {
     </>
   );
 }
+

@@ -1,5 +1,7 @@
 
+
 // This file contains shared types between frontend and backend.
+import type { firestore } from 'firebase-admin';
 
 export interface Booking {
   id:string;
@@ -19,8 +21,8 @@ export interface Booking {
   refundReason?: string;
   transactionId?: string | null;
   detailedFeedback?: { skill: string; rating: string; comments?: string }[];
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: firestore.FieldValue;
+  updatedAt?: firestore.FieldValue;
 }
 
 export interface UserMessage {
@@ -30,10 +32,110 @@ export interface UserMessage {
   userEmail: string;
   subject: string;
   messageBody: string;
-  timestamp: any;
+  timestamp: firestore.FieldValue;
   status: 'new' | 'read' | 'replied' | 'closed';
   senderType: 'user' | 'admin';
   adminName?: string;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: firestore.FieldValue;
+  updatedAt?: firestore.FieldValue;
+}
+
+export interface Service {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  duration: string;
+  features: string[];
+  image?: string;
+  dataAiHint?: string;
+  defaultForce?: 'Air Force' | 'Army' | 'Navy' | 'General';
+  isBookable?: boolean;
+  createdAt?: firestore.FieldValue;
+  updatedAt?: firestore.FieldValue;
+}
+
+export interface Resource {
+  id: string;
+  title: string;
+  type: 'video' | 'document' | 'link';
+  url: string;
+  description?: string;
+  serviceCategory: string;
+  createdAt?: firestore.FieldValue;
+  updatedAt?: firestore.FieldValue;
+}
+
+export interface Badge {
+  id: string;
+  name: string;
+  description: string;
+  force: 'Air Force' | 'Army' | 'Navy' | 'General';
+  rankName: string;
+  imageUrl: string;
+  dataAiHint: string;
+  createdAt?: firestore.FieldValue;
+  updatedAt?: firestore.FieldValue;
+}
+
+export interface UserProfile {
+  uid: string;
+  name: string;
+  email: string;
+  phone: string;
+  imageUrl?: string;
+  roles?: ('user' | 'admin')[];
+  awardedBadgeIds?: string[];
+  gender?: 'Male' | 'Female' | 'Other' | 'Prefer not to say';
+  targetOrganization?: 'Army' | 'Navy' | 'Air Force' | 'Other';
+  createdAt?: firestore.FieldValue;
+  updatedAt?: firestore.FieldValue;
+}
+
+export interface MentorProfileData {
+  name: string;
+  title: string;
+  imageUrl: string;
+  dataAiHint: string;
+  bio: string;
+  experience: string[];
+  philosophy: string;
+  quote: string;
+  contactEmail: string;
+  contactPhone: string;
+  updatedAt?: firestore.FieldValue;
+}
+
+export interface Testimonial {
+  id: string;
+  uid: string;
+  name: string;
+  userEmail?: string;
+  batch?: string;
+  story: string;
+  imageUrl?: string;
+  dataAiHint?: string;
+  serviceTaken: string;
+  serviceId?: string;
+  submissionStatus?: 'aspirant' | 'selected_cleared';
+  status: 'pending' | 'approved' | 'rejected';
+  selectedForce?: 'Army' | 'Navy' | 'Air Force';
+  interviewLocation?: string;
+  numberOfAttempts?: number;
+  bodyImageUrl?: string;
+  bodyImageDataAiHint?: string;
+  createdAt?: firestore.FieldValue;
+  updatedAt?: firestore.FieldValue;
+}
+
+export interface FeedbackSubmissionHistoryEntry {
+  id: string;
+  submissionDate: firestore.FieldValue;
+  bookingId: string;
+  userName: string;
+  serviceName: string;
+  reportFileName?: string;
+  badgeAssignedName?: string;
+  adminUid?: string;
+  createdAt?: firestore.FieldValue;
 }
