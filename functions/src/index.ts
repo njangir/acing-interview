@@ -277,7 +277,7 @@ exports.onAdminMessage = functions.firestore.document("userMessages/{messageId}"
   return null;
 });
 
-exports.exportBookingsReport = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+exports.exportBookingsReport = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
     const firestore = getFirestore();
     const bookingsSnap = await firestore.collection("bookings").get();
@@ -285,7 +285,7 @@ exports.exportBookingsReport = functions.https.onCall(async (data: any, context:
     return { data: bookingsData };
 });
 
-exports.exportUsersReport = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+exports.exportUsersReport = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
     const firestore = getFirestore();
     const usersSnap = await firestore.collection("userProfiles").get();
@@ -293,7 +293,7 @@ exports.exportUsersReport = functions.https.onCall(async (data: any, context: fu
     return { data: usersData };
 });
 
-exports.exportServicesReport = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+exports.exportServicesReport = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
     const firestore = getFirestore();
     const servicesSnap = await firestore.collection("services").get();
@@ -595,7 +595,7 @@ exports.getAdminReportsPageData = functions.https.onCall(async (data: any, conte
     try {
         const bookingsQuery = firestore.collection("bookings").where("status", "==", "completed").orderBy("date", "desc");
         const badgesQuery = firestore.collection("badges");
-        const historyQuery = firestore.collection("feedbackSubmissions").orderBy("submissionDate", "desc");
+        const historyQuery = firestore.collection("feedbackSubmissions").orderBy("createdAt", "desc");
 
         const [bookingsSnapshot, badgesSnapshot, historySnapshot] = await Promise.all([
             bookingsQuery.get(),
