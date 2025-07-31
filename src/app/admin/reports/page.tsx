@@ -149,7 +149,9 @@ export default function AdminReportsPage() {
         updatedAt: serverTimestamp()
       });
       
-      const assignedBadge = badges.find(b => b.id === selectedBadgeId);
+      const isBadgeSelected = selectedBadgeId && selectedBadgeId !== 'none';
+      const assignedBadge = isBadgeSelected ? badges.find(b => b.id === selectedBadgeId) : undefined;
+      
       if (assignedBadge && selectedBookingDetails.uid) {
         const userProfileRef = doc(db, "userProfiles", selectedBookingDetails.uid);
         await updateDoc(userProfileRef, { 
@@ -327,7 +329,7 @@ export default function AdminReportsPage() {
                             <SelectValue placeholder="Choose a badge to assign..." />
                             </SelectTrigger>
                             <SelectContent>
-                            <SelectItem value="">No Badge</SelectItem>
+                            <SelectItem value="none">No Badge</SelectItem>
                             {badges.map(badge => (
                                 <SelectItem key={badge.id} value={badge.id}>
                                 {badge.force !== "General" && <span className='text-xs text-muted-foreground mr-1'>[{badge.force}]</span>} {badge.name} - {badge.rankName}
