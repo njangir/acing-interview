@@ -63,6 +63,7 @@ export default function AdminMentorProfilePage() {
           form.reset({
             ...data,
             experience: data.experience.join('\n'), // Convert array to newline-separated string for textarea
+            dataAiHint: data.dataAiHint || '', // Ensure dataAiHint is a string
           });
         } else {
           setError("Mentor profile not found. It might need to be created first.");
@@ -271,5 +272,3 @@ export default function AdminMentorProfilePage() {
     </>
   );
 }
-
-    
