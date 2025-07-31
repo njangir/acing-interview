@@ -256,7 +256,7 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
                 </DialogContent>
             </Dialog>
           )}
-          {booking.status === 'completed' && !booking.rating && (
+          {booking.status === 'completed' && !booking.userFeedback && (
              <Dialog open={isFeedbackModalOpen} onOpenChange={setIsFeedbackModalOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm" onClick={() => setIsFeedbackModalOpen(true)}>

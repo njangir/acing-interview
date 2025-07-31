@@ -186,4 +186,3 @@ export function UserSkillsChart({ completedBookingsWithFeedback }: UserSkillsCha
     </Card>
   );
 }
-

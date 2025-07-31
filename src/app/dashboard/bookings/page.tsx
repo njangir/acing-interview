@@ -14,7 +14,6 @@ import { Shield, Loader2, AlertTriangle } from 'lucide-react';
 import { parse } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
-// PRODUCTION TODO: Import Firebase and Firestore methods:
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
 
