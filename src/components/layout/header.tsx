@@ -23,10 +23,10 @@ import { IndianFlagIcon } from '../icons/indian-flag-icon';
 
 
 const mainSiteNavItems: Array<{ href: string; label: string; icon: LucideIcon }> = [
-  { href: '/', label: 'Home Base', icon: Home },
-  { href: '/services', label: 'Training Ops', icon: Briefcase },
-  { href: '/mentor', label: 'Your Mentor', icon: Award },
-  { href: '/testimonials', label: 'Success Stories', icon: MessageSquare },
+  { href: '/', label: 'Home', icon: Home },
+  { href: '/services', label: 'Services', icon: Briefcase },
+  { href: '/mentor', label: 'Mentor', icon: Award },
+  { href: '/testimonials', label: 'Testimonials', icon: MessageSquare },
 ];
 
 
@@ -100,17 +100,17 @@ export function Header() {
   const isAdminPath = pathname.startsWith('/admin');
 
   let contextualNavItems: Array<{ href: string; label: string; icon: LucideIcon }> = [];
-  let contextualNavTitle = "Field Menu";
+  let contextualNavTitle = "Main Menu";
   
   if (isLoggedIn && !isAdmin) {
     if (isDashboardPath) {
-      contextualNavTitle = "Officer Candidate HQ";
+      contextualNavTitle = "Dashboard";
       contextualNavItems = DASHBOARD_NAV_LINKS.map(link => ({...link, label: link.label.replace("My ", "")}));
     } else {
       contextualNavItems = [];
     }
   } else if (isAdmin && isAdminPath) {
-    contextualNavTitle = "Admin Command";
+    contextualNavTitle = "Admin Panel";
     contextualNavItems = ADMIN_DASHBOARD_NAV_LINKS;
   }
 
@@ -165,7 +165,7 @@ export function Header() {
                 (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) && "text-primary font-semibold"
               )}
             >
-              Officer HQ
+              Dashboard
             </Link>
           )}
            {isAdmin && (
@@ -176,7 +176,7 @@ export function Header() {
                 (pathname === '/admin' || pathname.startsWith('/admin/')) && "text-primary font-semibold"
               )}
             >
-              Admin Command
+              Admin Panel
             </Link>
            )}
         </nav>
@@ -252,7 +252,7 @@ export function Header() {
               <Button asChild size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
                 <Link href="/signup">
                   <UserPlus className="mr-0 sm:mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Enlist</span>
+                  <span className="hidden sm:inline">Sign Up</span>
                 </Link>
               </Button>
             </>
@@ -305,7 +305,7 @@ export function Header() {
                             onClick={() => setIsSheetOpen(false)}
                         >
                             <LayoutDashboard className="h-5 w-5" />
-                            Officer HQ
+                            Dashboard
                         </Link>
                         </>
                     )}
@@ -319,7 +319,7 @@ export function Header() {
                                             isAdminPath && "bg-primary/10 text-primary font-medium")}
                             onClick={() => setIsSheetOpen(false)}
                             >
-                            <ShieldCheck className="h-5 w-5" /> Admin Command
+                            <ShieldCheck className="h-5 w-5" /> Admin Panel
                         </Link>
                         </>
                     )}
@@ -338,7 +338,7 @@ export function Header() {
                                 </Button>
                                 <Button asChild size="sm" variant="outline" className="w-full">
                                     <Link href="/signup" onClick={() => setIsSheetOpen(false)}>
-                                    <UserPlus className="mr-2 h-4 w-4" /> Enlist
+                                    <UserPlus className="mr-2 h-4 w-4" /> Sign Up
                                     </Link>
                                 </Button>
                             </div>

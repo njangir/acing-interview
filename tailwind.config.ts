@@ -20,8 +20,7 @@ const config: Config = {
     },
     extend: {
       fontFamily: {
-        body: ['"Inter"', 'sans-serif'],
-        headline: ['"Playfair Display"', 'serif'],
+        sans: ['"Inter"', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",

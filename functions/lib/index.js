@@ -55,8 +55,6 @@ const razorpay_1 = __importDefault(require("razorpay"));
 const crypto_1 = __importDefault(require("crypto"));
 const storage_1 = require("firebase-admin/storage");
 (0, app_1.initializeApp)();
-const RAZORPAY_KEY_ID = functions.config().razorpay.key_id;
-const RAZORPAY_KEY_SECRET = functions.config().razorpay.key_secret;
 // Helper function to check for admin role
 const ensureAdmin = async (context) => {
     var _a;
@@ -123,8 +121,8 @@ exports.createPaymentOrder = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "R
         throw new functions.https.HttpsError("invalid-argument", "The function must be called with 'amount' and 'bookingId' arguments.");
     }
     const razorpay = new razorpay_1.default({
-        key_id: RAZORPAY_KEY_ID,
-        key_secret: RAZORPAY_KEY_SECRET,
+        key_id: process.env.RAZORPAY_KEY_ID,
+        key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
     const options = {
         amount: amount * 100, // Amount in paise
@@ -140,7 +138,7 @@ exports.createPaymentOrder = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "R
         logger.info("Razorpay order created:", { orderId: order.id, bookingId });
         return {
             orderId: order.id,
-            keyId: RAZORPAY_KEY_ID,
+            keyId: process.env.RAZORPAY_KEY_ID,
         };
     }
     catch (error) {
@@ -159,7 +157,7 @@ exports.verifyPayment = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORP
         !bookingId) {
         throw new functions.https.HttpsError("invalid-argument", "Missing required payment verification details.");
     }
-    const shasum = crypto_1.default.createHmac("sha256", RAZORPAY_KEY_SECRET);
+    const shasum = crypto_1.default.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET);
     shasum.update(`${razorpay_order_id}|${razorpay_payment_id}`);
     const digest = shasum.digest("hex");
     if (digest !== razorpay_signature) {
@@ -204,8 +202,8 @@ exports.processRefund = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORP
         throw new functions.https.HttpsError("failed-precondition", "Booking is not in a refundable state (not paid or no transaction ID).");
     }
     const razorpay = new razorpay_1.default({
-        key_id: RAZORPAY_KEY_ID,
-        key_secret: RAZORPAY_KEY_SECRET,
+        key_id: process.env.RAZORPAY_KEY_ID,
+        key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
     try {
         logger.info(`Attempting to refund Razorpay payment: ${booking.transactionId}`);
