@@ -1,6 +1,5 @@
 
 
-
 import * as functions from "firebase-functions";
 import * as logger from "firebase-functions/logger";
 import { initializeApp } from "firebase-admin/app";
@@ -11,9 +10,6 @@ import type { Booking, UserMessage, Service, Resource, Badge, UserProfile, Mento
 import { getStorage } from "firebase-admin/storage";
 
 initializeApp();
-
-const RAZORPAY_KEY_ID = functions.config().razorpay.key_id;
-const RAZORPAY_KEY_SECRET = functions.config().razorpay.key_secret;
 
 // Helper function to check for admin role
 const ensureAdmin = async (context: functions.https.CallableContext) => {
@@ -91,8 +87,8 @@ exports.createPaymentOrder = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "R
   }
 
   const razorpay = new Razorpay({
-    key_id: RAZORPAY_KEY_ID,
-    key_secret: RAZORPAY_KEY_SECRET,
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
   });
 
   const options = {
@@ -110,7 +106,7 @@ exports.createPaymentOrder = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "R
     logger.info("Razorpay order created:", { orderId: order.id, bookingId });
     return {
       orderId: order.id,
-      keyId: RAZORPAY_KEY_ID,
+      keyId: process.env.RAZORPAY_KEY_ID,
     };
   } catch (error) {
     logger.error("Error creating Razorpay order:", error);
@@ -145,7 +141,7 @@ exports.verifyPayment = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORP
     );
   }
 
-  const shasum = crypto.createHmac("sha256", RAZORPAY_KEY_SECRET as string);
+  const shasum = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET as string);
   shasum.update(`${razorpay_order_id}|${razorpay_payment_id}`);
   const digest = shasum.digest("hex");
 
@@ -200,8 +196,8 @@ exports.processRefund = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORP
   }
 
   const razorpay = new Razorpay({
-    key_id: RAZORPAY_KEY_ID,
-    key_secret: RAZORPAY_KEY_SECRET,
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
   });
 
   try {
