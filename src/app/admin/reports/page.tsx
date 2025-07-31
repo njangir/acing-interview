@@ -20,14 +20,23 @@ import { format } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-import { db, storage, functions } from '@/lib/firebase';
+import { db, functions } from '@/lib/firebase';
 import { collection, doc, addDoc, updateDoc, query, orderBy, serverTimestamp, arrayUnion, getDocs } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { httpsCallable } from 'firebase/functions';
 
 const getAdminReportsPageData = httpsCallable(functions, 'getAdminReportsPageData');
+const uploadReport = httpsCallable(functions, 'uploadReport');
 
 const ITEMS_PER_PAGE_HISTORY = 5;
+
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+  });
+};
 
 export default function AdminReportsPage() {
   const { toast } = useToast();
@@ -129,10 +138,17 @@ export default function AdminReportsPage() {
 
     try {
       if (reportFile) {
-        const reportFileName = `feedback_reports/${selectedBookingId}_${Date.now()}_${reportFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-        const fileRef = storageRef(storage, reportFileName);
-        const uploadResult = await uploadBytes(fileRef, reportFile);
-        finalReportUrl = await getDownloadURL(uploadResult.ref);
+        const fileDataUrl = await fileToBase64(reportFile);
+        const uploadResult: any = await uploadReport({
+          bookingId: selectedBookingId,
+          fileName: reportFile.name,
+          fileDataUrl: fileDataUrl,
+        });
+
+        if (!uploadResult.data.success) {
+          throw new Error(uploadResult.data.error || 'File upload failed on the server.');
+        }
+        finalReportUrl = uploadResult.data.downloadUrl;
       }
 
       const feedbackToSave = PREDEFINED_SKILLS.map(skill => ({

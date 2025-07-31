@@ -1,4 +1,5 @@
 
+
 import * as functions from "firebase-functions";
 import * as logger from "firebase-functions/logger";
 import { initializeApp } from "firebase-admin/app";
@@ -177,7 +178,7 @@ exports.verifyPayment = functions.https.onCall(async (data: any, context: functi
   }
 });
 
-exports.processRefund = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+exports.processRefund = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data: any, context: functions.https.CallableContext) => {
   await ensureAdmin(context);
   const { bookingId } = data as { bookingId: string };
   if (!bookingId) {
@@ -563,6 +564,44 @@ exports.markMessagesAsRead = functions.https.onCall(async (data: any, context: f
     });
     await batch.commit();
     return { success: true };
+});
+
+exports.uploadReport = functions.https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const { bookingId, fileName, fileDataUrl } = data as { bookingId: string, fileName: string, fileDataUrl: string };
+
+    if (!bookingId || !fileName || !fileDataUrl) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing required data for file upload.');
+    }
+
+    const storage = getStorage();
+    const bucket = storage.bucket();
+
+    // Extract content type and Base64 data from the data URL
+    const match = fileDataUrl.match(/^data:(.*);base64,(.*)$/);
+    if (!match) {
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid data URL format.');
+    }
+    const contentType = match[1];
+    const base64Data = match[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+    
+    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.]/g, '_');
+    const filePath = `feedback_reports/${bookingId}_${Date.now()}_${sanitizedFileName}`;
+    const file = bucket.file(filePath);
+
+    try {
+        await file.save(buffer, {
+            metadata: { contentType },
+            public: true, // Make the file publicly readable
+        });
+        const downloadUrl = file.publicUrl();
+        logger.info(`File uploaded successfully for booking ${bookingId}: ${downloadUrl}`);
+        return { success: true, downloadUrl: downloadUrl };
+    } catch (error) {
+        logger.error(`File upload failed for booking ${bookingId}:`, error);
+        throw new functions.https.HttpsError('internal', 'Failed to upload file to storage.');
+    }
 });
 
 exports.getAdminBookingsPageData = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
