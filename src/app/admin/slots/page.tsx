@@ -228,13 +228,13 @@ export default function AdminSlotsPage() {
                 mode="single"
                 selected={selectedDate}
                 onSelect={setSelectedDate}
-                className="rounded-md border mx-auto"
+                className="rounded-md border mx-auto sm:mx-0 w-full"
                 disabled={(date) => isBefore(date, todayForCalendar)}
                 modifiers={modifiers}
                 modifiersClassNames={modifiersClassNames}
               />
             </div>
-             <div className="grid grid-cols-2 gap-4">
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <Label htmlFor="startTime">Start Time (for setting slots)</Label>
                     <Input id="startTime" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
