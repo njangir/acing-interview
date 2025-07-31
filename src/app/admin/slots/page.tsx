@@ -215,7 +215,7 @@ export default function AdminSlotsPage() {
           Date colors: <span className="font-semibold text-green-600">Green</span> for available, <span className="font-semibold text-red-600">Red</span> for unavailable (future dates).
         </AlertDescription>
       </Alert>
-      <div className="grid md:grid-cols-2 gap-8">
+      <div className="grid md:grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         <Card>
           <CardHeader>
             <CardTitle>Manual Slot Configuration</CardTitle>
@@ -228,7 +228,7 @@ export default function AdminSlotsPage() {
                 mode="single"
                 selected={selectedDate}
                 onSelect={setSelectedDate}
-                className="rounded-md border max-w-xs mx-auto"
+                className="rounded-md border mx-auto"
                 disabled={(date) => isBefore(date, todayForCalendar)}
                 modifiers={modifiers}
                 modifiersClassNames={modifiersClassNames}
@@ -289,5 +289,3 @@ export default function AdminSlotsPage() {
     </>
   );
 }
-
-    

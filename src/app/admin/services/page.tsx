@@ -301,7 +301,7 @@ export default function AdminServicesPage() {
       </Card>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[625px]">
+        <DialogContent className="sm:max-w-2xl">
           <form onSubmit={handleSubmit}>
             <DialogHeader>
               <DialogTitle>{currentService ? 'Edit Service' : 'Add New Service'}</DialogTitle>
@@ -309,54 +309,52 @@ export default function AdminServicesPage() {
                 {currentService ? `Update details for ${currentService.name}.` : 'Fill in the details for the new service.'}
               </DialogDesc>
             </DialogHeader>
-            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto custom-scrollbar pr-2">
-              <div className="grid grid-cols-4 items-center gap-4">
+            <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto custom-scrollbar p-2">
+              <div>
                 <Label htmlFor="name" className="text-right">Name</Label>
-                <Input id="name" name="name" value={formData.name} onChange={handleInputChange} className="col-span-3" required />
+                <Input id="name" name="name" value={formData.name} onChange={handleInputChange} required />
               </div>
-              <div className="grid grid-cols-4 items-start gap-4">
+              <div>
                 <Label htmlFor="description" className="text-right pt-2">Description</Label>
-                <Textarea id="description" name="description" value={formData.description} onChange={handleInputChange} className="col-span-3" rows={3} required />
+                <Textarea id="description" name="description" value={formData.description} onChange={handleInputChange} rows={3} required />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="price" className="text-right">Price (₹)</Label>
-                <Input id="price" name="price" type="number" value={formData.price} onChange={handleInputChange} className="col-span-3" required min="0" />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="price" className="text-right">Price (₹)</Label>
+                  <Input id="price" name="price" type="number" value={formData.price} onChange={handleInputChange} required min="0" />
+                </div>
+                <div>
+                  <Label htmlFor="duration" className="text-right">Duration</Label>
+                  <Input id="duration" name="duration" value={formData.duration} onChange={handleInputChange} placeholder="e.g., 60 mins" required />
+                </div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="duration" className="text-right">Duration</Label>
-                <Input id="duration" name="duration" value={formData.duration} onChange={handleInputChange} className="col-span-3" placeholder="e.g., 60 mins" required />
-              </div>
-              <div className="grid grid-cols-4 items-start gap-4">
+              <div>
                 <Label htmlFor="features" className="text-right pt-2">Features</Label>
-                <Textarea id="features" name="features" value={formData.features} onChange={handleInputChange} className="col-span-3" placeholder="Comma-separated, e.g., Feature 1, Feature 2" rows={3} />
+                <Textarea id="features" name="features" value={formData.features} onChange={handleInputChange} placeholder="Comma-separated, e.g., Feature 1, Feature 2" rows={3} />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div>
                 <Label htmlFor="imageUpload" className="text-right">Thumbnail</Label>
-                <Input id="imageUpload" name="imageUpload" type="file" accept="image/*" onChange={handleFileChange} className="col-span-3" />
+                <Input id="imageUpload" name="imageUpload" type="file" accept="image/*" onChange={handleFileChange} />
               </div>
               {imagePreview && (
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <div className="col-start-2 col-span-3">
-                        <Image src={imagePreview} alt="Thumbnail preview" width={200} height={150} className="rounded-md object-cover border" />
-                    </div>
-                </div>
+                  <div className="flex justify-center">
+                      <Image src={imagePreview} alt="Thumbnail preview" width={200} height={150} className="rounded-md object-cover border" />
+                  </div>
               )}
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="dataAiHint" className="text-right">AI Hint</Label>
-                <Input id="dataAiHint" name="dataAiHint" value={formData.dataAiHint} onChange={handleInputChange} className="col-span-3" placeholder="e.g., meeting, study" />
+              <div>
+                <Label htmlFor="dataAiHint" className="text-right">AI Hint for Image</Label>
+                <Input id="dataAiHint" name="dataAiHint" value={formData.dataAiHint} onChange={handleInputChange} placeholder="e.g., meeting, study" />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="isBookable" className="text-right">Bookings Enabled</Label>
-                <div className="col-span-3 flex items-center">
-                   <Switch
-                    id="isBookable"
-                    checked={formData.isBookable}
-                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isBookable: checked }))}
-                  />
-                </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="isBookable"
+                  checked={formData.isBookable}
+                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isBookable: checked }))}
+                />
+                <Label htmlFor="isBookable">Bookings Enabled</Label>
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="mt-4">
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -369,5 +367,3 @@ export default function AdminServicesPage() {
     </>
   );
 }
-
-    

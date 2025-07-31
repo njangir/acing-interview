@@ -142,7 +142,7 @@ export function Header() {
         <Link href="/" className="mr-6 flex items-center space-x-2">
           <Logo />
         </Link>
-        <nav className="hidden md:flex gap-6 items-center">
+        <nav className="hidden lg:flex gap-6 items-center">
           {mainSiteNavItems.map((link) => (
             <Link
               key={link.href}
@@ -163,9 +163,20 @@ export function Header() {
                 (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) && "text-primary font-semibold"
               )}
             >
-              Officer Candidate HQ
+              Officer HQ
             </Link>
           )}
+           {isAdmin && (
+             <Link
+              href="/admin"
+              className={cn(
+                "text-sm font-medium text-foreground/70 transition-colors hover:text-foreground",
+                (pathname === '/admin' || pathname.startsWith('/admin/')) && "text-primary font-semibold"
+              )}
+            >
+              Admin Command
+            </Link>
+           )}
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-2">
           {isLoggedIn ? (
@@ -244,16 +255,9 @@ export function Header() {
               </Button>
             </>
           )}
-           {isAdmin && !isAdminPath && (
-             <Button asChild variant="outline" size="sm" className="hidden lg:flex border-primary text-primary hover:bg-primary/10 ml-2">
-                <Link href="/admin">
-                  <ShieldCheck className="mr-2 h-4 w-4" /> Admin Command
-                </Link>
-              </Button>
-           )}
         </div>
         {isMounted && (
-            <div className="md:hidden ml-2">
+            <div className="lg:hidden ml-2">
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetTrigger asChild>
                 <Button variant="ghost" size="icon">
@@ -299,7 +303,7 @@ export function Header() {
                             onClick={() => setIsSheetOpen(false)}
                         >
                             <LayoutDashboard className="h-5 w-5" />
-                            Officer Candidate HQ
+                            Officer HQ
                         </Link>
                         </>
                     )}

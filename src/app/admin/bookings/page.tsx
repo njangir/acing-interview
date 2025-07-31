@@ -392,11 +392,11 @@ export default function AdminBookingsPage() {
         title="Manage Booking Requests"
         description="Review, accept, edit, cancel, or create new booking requests."
       />
-       <div className="mb-6 flex justify-between items-center">
-        <div className="flex items-center gap-2">
+       <div className="mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
             <Filter className="h-5 w-5 text-muted-foreground" />
             <Select value={filterServiceId} onValueChange={setFilterServiceId}>
-                <SelectTrigger className="w-full md:w-[250px]">
+                <SelectTrigger className="w-full sm:w-[250px]">
                     <SelectValue placeholder="Filter by service..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -407,7 +407,7 @@ export default function AdminBookingsPage() {
                 </SelectContent>
             </Select>
         </div>
-        <Button onClick={() => setIsCreateBookingModalOpen(true)}>
+        <Button onClick={() => setIsCreateBookingModalOpen(true)} className="w-full sm:w-auto">
           <PlusCircle className="mr-2 h-4 w-4" /> Create New Booking
         </Button>
       </div>
@@ -417,160 +417,211 @@ export default function AdminBookingsPage() {
           <CardDescription>View and manage all bookings. Showing: {paginatedBookings.length} of {filteredBookings.length}</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[25%]">Booking & User Info</TableHead>
-                <TableHead className="w-[25%]">Service & Schedule</TableHead>
-                <TableHead className="w-[25%]">Payment & Refund</TableHead>
-                <TableHead className="w-[25%] text-right">Status & Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedBookings.length > 0 ? paginatedBookings.map((booking) => {
-                const showAsAddLink = booking.status === 'accepted' && booking.paymentStatus === 'paid' && !booking.meetingLink;
-                const hasFeedback = booking.status === 'completed' && (booking.detailedFeedback || booking.userFeedback);
-                const isActionInProgress = isProcessingAction === booking.id;
-
-                return (
-                <TableRow key={booking.id}>
-                  <TableCell>
-                    <div className="font-medium text-sm">{booking.id}</div>
-                    {booking.paymentStatus === 'paid' && booking.transactionId && (
-                        <div className="text-xs text-muted-foreground mt-0.5">Txn: {booking.transactionId}</div>
-                    )}
-                    <div className="font-medium mt-1.5">{booking.userName}</div>
-                    <div className="text-xs text-muted-foreground">{booking.userEmail}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium">{booking.serviceName}</div>
-                    <div className="text-sm text-muted-foreground">
-                        {new Date(booking.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </div>
-                    <div className="text-sm text-muted-foreground">{booking.time}</div>
-                  </TableCell>
-                  <TableCell>
-                     <UiBadge variant={booking.paymentStatus === 'paid' ? 'default' : 'secondary'}
-                      className={cn(
-                        "mb-1",
-                        booking.paymentStatus === 'paid' && 'bg-green-100 text-green-700',
-                        booking.paymentStatus === 'pay_later_unpaid' && 'bg-gray-100 text-gray-700 line-through opacity-75',
-                        booking.paymentStatus === 'pay_later_pending' && 'bg-orange-100 text-orange-700'
-                      )}
-                     >
-                       {booking.paymentStatus.replace(/_/g, ' ')}
-                     </UiBadge>
-                    <div>
-                        {booking.requestedRefund ? (
-                            <UiBadge variant="destructive">REFUND REQ: YES</UiBadge>
-                        ) : (
-                            <UiBadge variant="outline">REFUND REQ: NO</UiBadge>
-                        )}
-                        {booking.requestedRefund && booking.refundReason && (
-                             <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <p className="text-xs text-muted-foreground mt-1 truncate w-32 hover:w-auto hover:whitespace-normal cursor-help">
-                                        Reason: {booking.refundReason}
-                                    </p>
-                                </TooltipTrigger>
-                                <TooltipContent className="max-w-xs">
-                                    <p>{booking.refundReason}</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        )}
-                    </div>
-                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end items-center gap-2">
-                        {isActionInProgress && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
-                        <UiBadge
-                            variant={
-                                booking.status === 'pending_approval' ? 'secondary' :
-                                booking.status === 'accepted' ? 'outline' :
-                                booking.status === 'scheduled' ? 'default' :
-                                booking.status === 'completed' ? 'outline' :
-                                'destructive'
-                            }
-                            className={cn(
-                                "mb-1 block w-fit ml-auto", 
-                                booking.status === 'scheduled' && 'bg-blue-100 text-blue-700',
-                                booking.status === 'pending_approval' && 'bg-yellow-100 text-yellow-700',
-                                booking.status === 'accepted' && 'bg-orange-100 text-orange-700',
-                                booking.status === 'cancelled' && 'bg-red-100 text-red-700 line-through opacity-75'
-                            )}
-                        >
-                            {booking.status.replace(/_/g, ' ')}
-                        </UiBadge>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild disabled={isActionInProgress}>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                                <span className="sr-only">Open menu</span>
-                                <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            {booking.status === 'scheduled' && booking.meetingLink && (
-                                    <DropdownMenuItem asChild>
-                                        <Link href={booking.meetingLink} target="_blank" rel="noopener noreferrer" className="flex items-center">
-                                            <Video className="mr-2 h-4 w-4 text-green-500" /> Join Meeting
-                                        </Link>
-                                    </DropdownMenuItem>
-                                )}
-                            <DropdownMenuItem
-                                onClick={() => openEditModal(booking)}
-                                disabled={booking.status === 'cancelled' || booking.status === 'completed'}
-                            >
-                                {showAsAddLink ? (
-                                <Video className="mr-2 h-4 w-4 text-green-500" />
-                                ) : (
-                                <Edit className="mr-2 h-4 w-4 text-blue-500" />
-                                )}
-                                {showAsAddLink ? 'Add Meeting Link & Schedule' : 'Edit Details / Reschedule'}
-                            </DropdownMenuItem>
-                            {hasFeedback && (
-                                <DropdownMenuItem onClick={() => openViewFeedbackModal(booking)}>
-                                <Eye className="mr-2 h-4 w-4 text-purple-500" /> View Feedback
-                                </DropdownMenuItem>
-                            )}
-                            {booking.status === 'pending_approval' && (
-                                <DropdownMenuItem onClick={() => handleAdminAction(booking.id, 'accept')}>
-                                <CheckCircle className="mr-2 h-4 w-4 text-green-500" /> Accept Request
-                                </DropdownMenuItem>
-                            )}
-                            {booking.status !== 'cancelled' && booking.status !== 'completed' && booking.paymentStatus === 'paid' && booking.requestedRefund &&(
-                                <DropdownMenuItem onClick={() => openRefundDialog(booking)} className="text-green-600 hover:!text-green-600">
-                                    <RotateCcw className="mr-2 h-4 w-4" /> Process Refund
-                                </DropdownMenuItem>
-                            )}
-                            {(booking.status === 'scheduled' || booking.status === 'accepted') && (
-                                <DropdownMenuItem onClick={() => handleAdminAction(booking.id, 'complete')}>
-                                <CalendarClock className="mr-2 h-4 w-4 text-purple-500" /> Mark as Completed
-                                </DropdownMenuItem>
-                            )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                className={cn(
-                                    "text-red-600 hover:!text-red-600",
-                                    booking.status === 'cancelled' && 'opacity-50 cursor-not-allowed'
-                                )}
-                                disabled={booking.status === 'cancelled'}
-                                onClick={() => openCancelDialog(booking)}
-                                onSelect={(e) => { if (booking.status === 'cancelled') e.preventDefault();}}
-                            >
-                                <XCircle className="mr-2 h-4 w-4" /> Cancel Booking
-                            </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                  </TableCell>
+          <div className="hidden lg:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[25%]">Booking & User</TableHead>
+                  <TableHead className="w-[25%]">Service & Schedule</TableHead>
+                  <TableHead className="w-[25%]">Payment & Refund</TableHead>
+                  <TableHead className="w-[25%] text-right">Status & Actions</TableHead>
                 </TableRow>
-              );
-            }) : (
-                 <TableRow><TableCell colSpan={4} className="text-center h-24">No bookings found matching the criteria.</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {paginatedBookings.length > 0 ? paginatedBookings.map((booking) => {
+                  const showAsAddLink = booking.status === 'accepted' && booking.paymentStatus === 'paid' && !booking.meetingLink;
+                  const hasFeedback = booking.status === 'completed' && (booking.detailedFeedback || booking.userFeedback);
+                  const isActionInProgress = isProcessingAction === booking.id;
+
+                  return (
+                  <TableRow key={booking.id}>
+                    <TableCell>
+                      <div className="font-medium text-sm truncate" title={booking.id}>{booking.id}</div>
+                      {booking.paymentStatus === 'paid' && booking.transactionId && (
+                          <div className="text-xs text-muted-foreground mt-0.5 truncate" title={booking.transactionId}>Txn: {booking.transactionId}</div>
+                      )}
+                      <div className="font-medium mt-1.5">{booking.userName}</div>
+                      <div className="text-xs text-muted-foreground truncate" title={booking.userEmail}>{booking.userEmail}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium truncate">{booking.serviceName}</div>
+                      <div className="text-sm text-muted-foreground">
+                          {new Date(booking.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </div>
+                      <div className="text-sm text-muted-foreground">{booking.time}</div>
+                    </TableCell>
+                    <TableCell>
+                       <UiBadge variant={booking.paymentStatus === 'paid' ? 'default' : 'secondary'}
+                        className={cn(
+                          "mb-1",
+                          booking.paymentStatus === 'paid' && 'bg-green-100 text-green-700',
+                          booking.paymentStatus === 'pay_later_unpaid' && 'bg-gray-100 text-gray-700 line-through opacity-75',
+                          booking.paymentStatus === 'pay_later_pending' && 'bg-orange-100 text-orange-700'
+                        )}
+                       >
+                         {booking.paymentStatus.replace(/_/g, ' ')}
+                       </UiBadge>
+                      <div>
+                          {booking.requestedRefund ? (
+                              <UiBadge variant="destructive">REFUND REQ: YES</UiBadge>
+                          ) : (
+                              <UiBadge variant="outline">REFUND REQ: NO</UiBadge>
+                          )}
+                          {booking.requestedRefund && booking.refundReason && (
+                               <Tooltip>
+                                  <TooltipTrigger asChild>
+                                      <p className="text-xs text-muted-foreground mt-1 truncate w-32 hover:w-auto hover:whitespace-normal cursor-help">
+                                          Reason: {booking.refundReason}
+                                      </p>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                      <p>{booking.refundReason}</p>
+                                  </TooltipContent>
+                              </Tooltip>
+                          )}
+                      </div>
+                     </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end items-center gap-2">
+                          {isActionInProgress && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+                          <UiBadge
+                              variant={
+                                  booking.status === 'pending_approval' ? 'secondary' :
+                                  booking.status === 'accepted' ? 'outline' :
+                                  booking.status === 'scheduled' ? 'default' :
+                                  booking.status === 'completed' ? 'outline' :
+                                  'destructive'
+                              }
+                              className={cn(
+                                  "mb-1 block w-fit ml-auto", 
+                                  booking.status === 'scheduled' && 'bg-blue-100 text-blue-700',
+                                  booking.status === 'pending_approval' && 'bg-yellow-100 text-yellow-700',
+                                  booking.status === 'accepted' && 'bg-orange-100 text-orange-700',
+                                  booking.status === 'cancelled' && 'bg-red-100 text-red-700 line-through opacity-75'
+                              )}
+                          >
+                              {booking.status.replace(/_/g, ' ')}
+                          </UiBadge>
+                          <DropdownMenu>
+                              <DropdownMenuTrigger asChild disabled={isActionInProgress}>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <span className="sr-only">Open menu</span>
+                                  <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              {booking.status === 'scheduled' && booking.meetingLink && (
+                                      <DropdownMenuItem asChild>
+                                          <Link href={booking.meetingLink} target="_blank" rel="noopener noreferrer" className="flex items-center">
+                                              <Video className="mr-2 h-4 w-4 text-green-500" /> Join Meeting
+                                          </Link>
+                                      </DropdownMenuItem>
+                                  )}
+                              <DropdownMenuItem
+                                  onClick={() => openEditModal(booking)}
+                                  disabled={booking.status === 'cancelled' || booking.status === 'completed'}
+                              >
+                                  {showAsAddLink ? (
+                                  <Video className="mr-2 h-4 w-4 text-green-500" />
+                                  ) : (
+                                  <Edit className="mr-2 h-4 w-4 text-blue-500" />
+                                  )}
+                                  {showAsAddLink ? 'Add Meeting Link & Schedule' : 'Edit Details / Reschedule'}
+                              </DropdownMenuItem>
+                              {hasFeedback && (
+                                  <DropdownMenuItem onClick={() => openViewFeedbackModal(booking)}>
+                                  <Eye className="mr-2 h-4 w-4 text-purple-500" /> View Feedback
+                                  </DropdownMenuItem>
+                              )}
+                              {booking.status === 'pending_approval' && (
+                                  <DropdownMenuItem onClick={() => handleAdminAction(booking.id, 'accept')}>
+                                  <CheckCircle className="mr-2 h-4 w-4 text-green-500" /> Accept Request
+                                  </DropdownMenuItem>
+                              )}
+                              {booking.status !== 'cancelled' && booking.status !== 'completed' && booking.paymentStatus === 'paid' && booking.requestedRefund &&(
+                                  <DropdownMenuItem onClick={() => openRefundDialog(booking)} className="text-green-600 hover:!text-green-600">
+                                      <RotateCcw className="mr-2 h-4 w-4" /> Process Refund
+                                  </DropdownMenuItem>
+                              )}
+                              {(booking.status === 'scheduled' || booking.status === 'accepted') && (
+                                  <DropdownMenuItem onClick={() => handleAdminAction(booking.id, 'complete')}>
+                                  <CalendarClock className="mr-2 h-4 w-4 text-purple-500" /> Mark as Completed
+                                  </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                  className={cn(
+                                      "text-red-600 hover:!text-red-600",
+                                      booking.status === 'cancelled' && 'opacity-50 cursor-not-allowed'
+                                  )}
+                                  disabled={booking.status === 'cancelled'}
+                                  onClick={() => openCancelDialog(booking)}
+                                  onSelect={(e) => { if (booking.status === 'cancelled') e.preventDefault();}}
+                              >
+                                  <XCircle className="mr-2 h-4 w-4" /> Cancel Booking
+                              </DropdownMenuItem>
+                              </DropdownMenuContent>
+                          </DropdownMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              }) : (
+                   <TableRow><TableCell colSpan={4} className="text-center h-24">No bookings found matching the criteria.</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="lg:hidden space-y-4">
+              {paginatedBookings.length > 0 ? paginatedBookings.map((booking) => {
+                  const showAsAddLink = booking.status === 'accepted' && booking.paymentStatus === 'paid' && !booking.meetingLink;
+                  const hasFeedback = booking.status === 'completed' && (booking.detailedFeedback || booking.userFeedback);
+                  const isActionInProgress = isProcessingAction === booking.id;
+                  
+                  return (
+                      <Card key={booking.id} className="bg-muted/30">
+                          <CardHeader>
+                              <div className="flex justify-between items-start gap-2">
+                                  <div>
+                                      <CardTitle className="text-base">{booking.serviceName}</CardTitle>
+                                      <CardDescription>{booking.userName}</CardDescription>
+                                  </div>
+                                  <DropdownMenu>
+                                      <DropdownMenuTrigger asChild disabled={isActionInProgress}>
+                                      <Button variant="ghost" className="h-8 w-8 p-0">
+                                          <span className="sr-only">Open menu</span>
+                                          {isActionInProgress ? <Loader2 className="h-4 w-4 animate-spin"/> : <MoreHorizontal className="h-4 w-4" />}
+                                      </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                        {booking.status === 'scheduled' && booking.meetingLink && (<DropdownMenuItem asChild><Link href={booking.meetingLink} target="_blank" rel="noopener noreferrer" className="flex items-center"><Video className="mr-2 h-4 w-4 text-green-500" /> Join Meeting</Link></DropdownMenuItem>)}
+                                        <DropdownMenuItem onClick={() => openEditModal(booking)} disabled={booking.status === 'cancelled' || booking.status === 'completed'}>{showAsAddLink ? <><Video className="mr-2 h-4 w-4 text-green-500" /> Add Link & Schedule</> : <><Edit className="mr-2 h-4 w-4 text-blue-500" /> Edit Details</>}</DropdownMenuItem>
+                                        {hasFeedback && (<DropdownMenuItem onClick={() => openViewFeedbackModal(booking)}><Eye className="mr-2 h-4 w-4 text-purple-500" /> View Feedback</DropdownMenuItem>)}
+                                        {booking.status === 'pending_approval' && (<DropdownMenuItem onClick={() => handleAdminAction(booking.id, 'accept')}><CheckCircle className="mr-2 h-4 w-4 text-green-500" /> Accept Request</DropdownMenuItem>)}
+                                        {booking.status !== 'cancelled' && booking.status !== 'completed' && booking.paymentStatus === 'paid' && booking.requestedRefund &&(<DropdownMenuItem onClick={() => openRefundDialog(booking)} className="text-green-600 hover:!text-green-600"><RotateCcw className="mr-2 h-4 w-4" /> Process Refund</DropdownMenuItem>)}
+                                        {(booking.status === 'scheduled' || booking.status === 'accepted') && (<DropdownMenuItem onClick={() => handleAdminAction(booking.id, 'complete')}><CalendarClock className="mr-2 h-4 w-4 text-purple-500" /> Mark as Completed</DropdownMenuItem>)}
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem className={cn("text-red-600 hover:!text-red-600", booking.status === 'cancelled' && 'opacity-50 cursor-not-allowed')} disabled={booking.status === 'cancelled'} onClick={() => openCancelDialog(booking)} onSelect={(e) => { if (booking.status === 'cancelled') e.preventDefault();}}><XCircle className="mr-2 h-4 w-4" /> Cancel Booking</DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                  </DropdownMenu>
+                              </div>
+                          </CardHeader>
+                          <CardContent className="text-sm space-y-2">
+                                <p><strong>Date:</strong> {new Date(booking.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} at {booking.time}</p>
+                                <p><strong>User Email:</strong> {booking.userEmail}</p>
+                                <p><strong>Booking ID:</strong> <span className="font-mono text-xs">{booking.id}</span></p>
+                                <div className="flex flex-wrap gap-2 pt-2">
+                                    <UiBadge variant={booking.status === 'pending_approval' ? 'secondary' : booking.status === 'accepted' ? 'outline' : booking.status === 'scheduled' ? 'default' : booking.status === 'completed' ? 'outline' : 'destructive'} className={cn(booking.status === 'scheduled' && 'bg-blue-100 text-blue-700', booking.status === 'pending_approval' && 'bg-yellow-100 text-yellow-700', booking.status === 'accepted' && 'bg-orange-100 text-orange-700', booking.status === 'cancelled' && 'bg-red-100 text-red-700 line-through opacity-75')}>{booking.status.replace(/_/g, ' ')}</UiBadge>
+                                    <UiBadge variant={booking.paymentStatus === 'paid' ? 'default' : 'secondary'} className={cn(booking.paymentStatus === 'paid' && 'bg-green-100 text-green-700', booking.paymentStatus === 'pay_later_unpaid' && 'bg-gray-100 text-gray-700 line-through opacity-75', booking.paymentStatus === 'pay_later_pending' && 'bg-orange-100 text-orange-700')}>{booking.paymentStatus.replace(/_/g, ' ')}</UiBadge>
+                                    {booking.requestedRefund && <UiBadge variant="destructive">REFUND REQ</UiBadge>}
+                                </div>
+                          </CardContent>
+                      </Card>
+                  )
+              }) : <p className="text-center text-muted-foreground py-8">No bookings found matching the criteria.</p>}
+          </div>
         </CardContent>
         {totalPages > 1 && (
           <CardFooter className="flex justify-center items-center space-x-4 py-4">
