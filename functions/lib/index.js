@@ -114,7 +114,7 @@ exports.oncreateuser = functions.auth.user().onCreate(async (user) => {
         return;
     }
 });
-exports.createPaymentOrder = functions.https.onCall(async (data, context) => {
+exports.createPaymentOrder = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data, context) => {
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
     }
@@ -554,7 +554,7 @@ exports.getAdminReportsPageData = functions.https.onCall(async (data, context) =
     await ensureAdmin(context);
     const firestore = (0, firestore_1.getFirestore)();
     try {
-        const bookingsQuery = firestore.collection("bookings").where("status", "==", "completed").orderBy("date", "desc");
+        const bookingsQuery = firestore.collection("bookings").where("status", "==", "completed").orderBy("createdAt", "desc");
         const badgesQuery = firestore.collection("badges");
         const historyQuery = firestore.collection("feedbackSubmissions").orderBy("createdAt", "desc");
         const [bookingsSnapshot, badgesSnapshot, historySnapshot] = await Promise.all([

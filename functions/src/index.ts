@@ -592,10 +592,16 @@ exports.getAdminBookingsPageData = functions.https.onCall(async (data: any, cont
 
 exports.getAdminReportsPageData = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
+    logger.info("getAdminReportsPageData: Admin confirmed. Fetching data...");
     const firestore = getFirestore();
     try {
+        logger.info("Querying for completed bookings...");
         const bookingsQuery = firestore.collection("bookings").where("status", "==", "completed").orderBy("createdAt", "desc");
+        
+        logger.info("Querying for badges...");
         const badgesQuery = firestore.collection("badges");
+
+        logger.info("Querying for submission history...");
         const historyQuery = firestore.collection("feedbackSubmissions").orderBy("createdAt", "desc");
 
         const [bookingsSnapshot, badgesSnapshot, historySnapshot] = await Promise.all([
@@ -603,11 +609,15 @@ exports.getAdminReportsPageData = functions.https.onCall(async (data: any, conte
             badgesQuery.get(),
             historyQuery.get(),
         ]);
+        logger.info(`Fetched ${bookingsSnapshot.docs.length} completed bookings.`);
+        logger.info(`Fetched ${badgesSnapshot.docs.length} badges.`);
+        logger.info(`Fetched ${historySnapshot.docs.length} history entries.`);
 
         const completedBookings = bookingsSnapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() } as Booking));
         const badges = badgesSnapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() } as Badge));
         const history = historySnapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() } as FeedbackSubmissionHistoryEntry));
 
+        logger.info("Data processing complete. Returning data to client.");
         return { completedBookings, badges, history };
     } catch (error) {
         logger.error("Error fetching admin reports page data:", error);

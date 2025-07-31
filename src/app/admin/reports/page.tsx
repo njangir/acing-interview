@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge as UiBadge } from '@/components/ui/badge';
-import { PREDEFINED_SKILLS, SKILL_RATINGS, SKILL_RATING_VALUES, MAX_SKILL_RATING_VALUE, TARGET_SKILL_RATING_VALUE } from "@/constants";
+import { PREDEFINED_SKILLS, SKILL_RATINGS } from "@/constants";
 import type { Booking, Badge as BadgeType, FeedbackSubmissionHistoryEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { UploadCloud, AwardIcon, Star, History, ChevronLeft, ChevronRight, FileSpreadsheet, Loader2, AlertTriangle } from 'lucide-react';
@@ -20,11 +20,10 @@ import { format } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-import { db, storage } from '@/lib/firebase';
+import { db, storage, functions } from '@/lib/firebase';
 import { collection, doc, addDoc, updateDoc, query, orderBy, serverTimestamp, arrayUnion, getDocs } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '@/lib/firebase';
 
 const getAdminReportsPageData = httpsCallable(functions, 'getAdminReportsPageData');
 
@@ -34,104 +33,75 @@ export default function AdminReportsPage() {
   const { toast } = useToast();
   const { currentUser: adminUser } = useAuth();
 
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [completedBookings, setCompletedBookings] = useState<Booking[]>([]);
+  const [badges, setBadges] = useState<BadgeType[]>([]);
+  const [submissionHistory, setSubmissionHistory] = useState<FeedbackSubmissionHistoryEntry[]>([]);
+
   const [selectedBookingId, setSelectedBookingId] = useState<string>('');
   const [reportFile, setReportFile] = useState<File | null>(null);
   const [comments, setComments] = useState('');
   const [selectedBadgeId, setSelectedBadgeId] = useState<string>('');
   const [skillRatingsData, setSkillRatingsData] = useState<Record<string, string>>({});
-  const [currentUserAverageSkills, setCurrentUserAverageSkills] = useState<Record<string, { averageRatingValue: number; ratingCount: number }>>({});
-
-  const [isLoadingData, setIsLoadingData] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const [fetchedCompletedBookings, setFetchedCompletedBookings] = useState<Booking[]>([]);
-  const [fetchedBadges, setFetchedBadges] = useState<BadgeType[]>([]);
-  const [fullSubmissionHistory, setFullSubmissionHistory] = useState<FeedbackSubmissionHistoryEntry[]>([]);
-
+  
   const [userNameFilter, setUserNameFilter] = useState<string>('');
   const [currentHistoryPage, setCurrentHistoryPage] = useState(1);
 
   useEffect(() => {
     const loadInitialData = async () => {
-      setIsLoadingData(true);
+      setIsLoading(true);
       setError(null);
       try {
         const result: any = await getAdminReportsPageData();
         const data = result.data;
         
-        const history = data.history.map((h: any) => ({
+        const historyWithDates = data.history.map((h: any) => ({
             ...h,
-            submissionDate: h.submissionDate?._seconds ? new Date(h.submissionDate._seconds * 1000).toISOString() : new Date().toISOString()
+            submissionDate: h.submissionDate?._seconds ? new Date(h.submissionDate._seconds * 1000) : new Date()
         }));
 
-        setFetchedCompletedBookings(data.completedBookings || []);
-        setFetchedBadges(data.badges || []);
-        setFullSubmissionHistory(history || []);
+        setCompletedBookings(data.completedBookings || []);
+        setBadges(data.badges || []);
+        setSubmissionHistory(historyWithDates || []);
 
       } catch (err: any) {
         console.error("Error loading initial data:", err);
         setError(err.message || "Failed to load necessary data. Please try again.");
       } finally {
-        setIsLoadingData(false);
+        setIsLoading(false);
       }
     };
     loadInitialData();
   }, []);
 
-
   const selectedBookingDetails = useMemo(() => {
-    return fetchedCompletedBookings.find(b => b.id === selectedBookingId);
-  }, [selectedBookingId, fetchedCompletedBookings]);
-
+    return completedBookings.find(b => b.id === selectedBookingId);
+  }, [selectedBookingId, completedBookings]);
   
-  const availableBadges = useMemo(() => {
-      // In a real app with more complex logic, we might filter badges by service type etc.
-      return fetchedBadges;
-  }, [fetchedBadges]);
+  const userSpecificHistory = useMemo(() => {
+    if (!selectedBookingDetails) return [];
+    return submissionHistory.filter(entry => entry.userName === selectedBookingDetails.userName && entry.bookingId !== selectedBookingId);
+  }, [selectedBookingDetails, submissionHistory]);
 
   useEffect(() => {
-    if (selectedBookingDetails?.detailedFeedback) {
+    if (selectedBookingDetails) {
       const initialRatings: Record<string, string> = {};
-      selectedBookingDetails.detailedFeedback.forEach(fb => {
-        initialRatings[fb.skill] = fb.rating;
-      });
+      if (selectedBookingDetails.detailedFeedback) {
+        selectedBookingDetails.detailedFeedback.forEach(fb => {
+          initialRatings[fb.skill] = fb.rating;
+        });
+      }
       setSkillRatingsData(initialRatings);
+      setComments(selectedBookingDetails.userFeedback || '');
     } else {
       setSkillRatingsData({});
+      setComments('');
     }
+  }, [selectedBookingDetails]);
 
-    if (selectedBookingDetails?.userEmail) {
-      const userEmail = selectedBookingDetails.userEmail;
-      const userPreviousCompletedBookingsWithFeedback = fetchedCompletedBookings.filter(
-        b => b.userEmail === userEmail &&
-             b.status === 'completed' &&
-             b.id !== selectedBookingDetails.id &&
-             b.detailedFeedback && b.detailedFeedback.length > 0
-      );
-      const averages: Record<string, { totalRating: number; count: number }> = {};
-      PREDEFINED_SKILLS.forEach(skill => { averages[skill] = { totalRating: 0, count: 0 }; });
-      userPreviousCompletedBookingsWithFeedback.forEach(booking => {
-        booking.detailedFeedback?.forEach(fb => {
-          if (PREDEFINED_SKILLS.includes(fb.skill) && SKILL_RATING_VALUES[fb.rating]) {
-            averages[fb.skill].totalRating += SKILL_RATING_VALUES[fb.rating];
-            averages[fb.skill].count++;
-          }
-        });
-      });
-      const calculatedAverages: Record<string, { averageRatingValue: number; ratingCount: number }> = {};
-      PREDEFINED_SKILLS.forEach(skill => {
-        const avgData = averages[skill];
-        calculatedAverages[skill] = {
-          averageRatingValue: avgData.count > 0 ? parseFloat((avgData.totalRating / avgData.count).toFixed(1)) : 0,
-          ratingCount: avgData.count
-        };
-      });
-      setCurrentUserAverageSkills(calculatedAverages);
-    } else {
-      setCurrentUserAverageSkills({});
-    }
-  }, [selectedBookingDetails, fetchedCompletedBookings]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -175,11 +145,11 @@ export default function AdminReportsPage() {
       await updateDoc(bookingDocRef, {
         detailedFeedback: feedbackToSave,
         reportUrl: finalReportUrl,
-        userFeedback: comments, // Overall comments
+        userFeedback: comments,
         updatedAt: serverTimestamp()
       });
       
-      const assignedBadge = fetchedBadges.find(b => b.id === selectedBadgeId);
+      const assignedBadge = badges.find(b => b.id === selectedBadgeId);
       if (assignedBadge && selectedBookingDetails.uid) {
         const userProfileRef = doc(db, "userProfiles", selectedBookingDetails.uid);
         await updateDoc(userProfileRef, { 
@@ -205,21 +175,20 @@ export default function AdminReportsPage() {
         description: `Details for ${selectedBookingDetails.userName} saved.`,
       });
 
-      // Reset form state
+      // Reset form and refetch data
       setSelectedBookingId('');
       setReportFile(null);
       setComments('');
       setSelectedBadgeId('');
       setSkillRatingsData({});
-      setCurrentUserAverageSkills({});
       const fileInput = document.getElementById('reportFile') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
-
-      // Refresh history
-      const historyQuery = query(collection(db, "feedbackSubmissions"), orderBy("submissionDate", "desc"));
-      const historySnapshot = await getDocs(historyQuery);
-      setFullSubmissionHistory(historySnapshot.docs.map(d => ({id: d.id, ...d.data(), submissionDate: d.data().submissionDate.toDate().toISOString()} as FeedbackSubmissionHistoryEntry)));
-
+      
+      const result: any = await getAdminReportsPageData();
+      const data = result.data;
+      const historyWithDates = data.history.map((h: any) => ({ ...h, submissionDate: h.submissionDate?._seconds ? new Date(h.submissionDate._seconds * 1000) : new Date() }));
+      setSubmissionHistory(historyWithDates || []);
+      setCompletedBookings(data.completedBookings || []);
 
     } catch (err) {
       console.error("Error submitting feedback:", err);
@@ -230,14 +199,14 @@ export default function AdminReportsPage() {
   };
 
   const filteredSubmissionHistory = useMemo(() => {
-    let filtered = fullSubmissionHistory;
+    let filtered = submissionHistory;
     if (userNameFilter.trim() !== '') {
       filtered = filtered.filter(entry =>
         entry.userName.toLowerCase().includes(userNameFilter.toLowerCase())
       );
     }
     return filtered;
-  }, [fullSubmissionHistory, userNameFilter]);
+  }, [submissionHistory, userNameFilter]);
 
   const totalHistoryPages = Math.ceil(filteredSubmissionHistory.length / ITEMS_PER_PAGE_HISTORY);
   const paginatedHistory = useMemo(() => {
@@ -249,7 +218,7 @@ export default function AdminReportsPage() {
   const handlePreviousHistoryPage = () => setCurrentHistoryPage((prev) => Math.max(prev - 1, 1));
   const handleNextHistoryPage = () => setCurrentHistoryPage((prev) => Math.min(prev + 1, totalHistoryPages));
 
-  if (isLoadingData) {
+  if (isLoading) {
     return (
       <div className="container py-12 flex justify-center items-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -274,216 +243,208 @@ export default function AdminReportsPage() {
   return (
     <>
       <PageHeader
-        title="Upload Feedback Report &amp; Assign Badge"
+        title="Upload Feedback Report & Assign Badge"
         description="Upload PDF feedback reports for completed booking sessions, provide skill ratings, and optionally assign an achievement badge."
       />
-      <Card className="max-w-2xl mx-auto mb-8">
-        <CardHeader>
-          <CardTitle>Process Completed Session</CardTitle>
-          <CardDescription>Select a booking, upload the report, rate skills, and assign a badge if applicable.</CardDescription>
-        </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="bookingSelect">Select Booking</Label>
-              <Select value={selectedBookingId} onValueChange={(value) => {
-                const booking = fetchedCompletedBookings.find(b => b.id === value);
-                setSelectedBookingId(value);
-                setSelectedBadgeId('');
-                setSkillRatingsData({});
-                setComments(booking?.userFeedback || '');
-                setReportFile(null);
-                const fileInput = document.getElementById('reportFile') as HTMLInputElement;
-                if (fileInput) fileInput.value = '';
-              }}>
-                <SelectTrigger id="bookingSelect">
-                  <SelectValue placeholder="Choose a completed booking..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {fetchedCompletedBookings.length > 0 ? fetchedCompletedBookings.map(booking => (
-                    <SelectItem key={booking.id} value={booking.id}>
-                      {booking.userName} - {booking.serviceName} ({new Date(booking.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })})
-                    </SelectItem>
-                  )) : (
-                    <SelectItem value="no-bookings" disabled>No completed bookings available</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
+      <div className="grid lg:grid-cols-3 gap-8 items-start">
+        <Card className="lg:col-span-2">
+            <CardHeader>
+            <CardTitle>Process Completed Session</CardTitle>
+            <CardDescription>Select a booking, upload the report, rate skills, and assign a badge if applicable.</CardDescription>
+            </CardHeader>
+            <form onSubmit={handleSubmit}>
+            <CardContent className="space-y-6">
+                <div className="space-y-2">
+                <Label htmlFor="bookingSelect">Select Booking</Label>
+                <Select value={selectedBookingId} onValueChange={setSelectedBookingId}>
+                    <SelectTrigger id="bookingSelect">
+                    <SelectValue placeholder="Choose a completed booking..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                    {completedBookings.length > 0 ? completedBookings.map(booking => (
+                        <SelectItem key={booking.id} value={booking.id}>
+                        {booking.userName} - {booking.serviceName} ({new Date(booking.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })})
+                        </SelectItem>
+                    )) : (
+                        <SelectItem value="no-bookings" disabled>No completed bookings available</SelectItem>
+                    )}
+                    </SelectContent>
+                </Select>
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="reportFile">Report PDF File</Label>
-              <Input id="reportFile" type="file" accept=".pdf" onChange={handleFileChange} />
-              {reportFile && <p className="text-xs text-muted-foreground">Selected: {reportFile.name}</p>}
-              {!reportFile && selectedBookingDetails?.reportUrl && <p className="text-xs text-muted-foreground">Current report: <a href={selectedBookingDetails.reportUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">{selectedBookingDetails.reportUrl.split('%2F').pop()?.split('?')[0]}</a> (Upload new to replace)</p>}
-            </div>
+                <div className="space-y-2">
+                <Label htmlFor="reportFile">Report PDF File</Label>
+                <Input id="reportFile" type="file" accept=".pdf" onChange={handleFileChange} />
+                {reportFile && <p className="text-xs text-muted-foreground">Selected: {reportFile.name}</p>}
+                {!reportFile && selectedBookingDetails?.reportUrl && <p className="text-xs text-muted-foreground">Current report: <a href={selectedBookingDetails.reportUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">{selectedBookingDetails.reportUrl.split('%2F').pop()?.split('?')[0]}</a> (Upload new to replace)</p>}
+                </div>
 
-            {selectedBookingId && (
-              <>
-                <Card className="p-4 bg-muted/20">
-                  <CardTitle className="text-lg mb-3 font-headline text-primary flex items-center">
-                    <Star className="mr-2 h-5 w-5 text-accent" /> Skill Ratings (for this session)
-                  </CardTitle>
-                  <ScrollArea className="h-[250px] pr-3 custom-scrollbar">
-                    <div className="space-y-4">
-                    {PREDEFINED_SKILLS.map(skill => {
-                      const currentAvg = currentUserAverageSkills[skill];
-                      const avgDisplay = currentAvg && currentAvg.ratingCount > 0
-                        ? `(Prior Avg: ${currentAvg.averageRatingValue}/${MAX_SKILL_RATING_VALUE})`
-                        : `(No prior ratings)`;
-
-                      return (
-                        <div key={skill} className="space-y-1">
-                          <div className="flex justify-between items-baseline">
+                {selectedBookingId && (
+                <>
+                    <Card className="p-4 bg-muted/20">
+                    <CardTitle className="text-lg mb-3 font-headline text-primary flex items-center">
+                        <Star className="mr-2 h-5 w-5 text-accent" /> Skill Ratings
+                    </CardTitle>
+                    <ScrollArea className="h-[250px] pr-3 custom-scrollbar">
+                        <div className="space-y-4">
+                        {PREDEFINED_SKILLS.map(skill => (
+                            <div key={skill} className="space-y-1">
                             <Label htmlFor={`skill-${skill.replace(/\s+/g, '-')}`}>{skill}</Label>
-                            <span className="text-xs text-muted-foreground ml-2">{avgDisplay}</span>
-                          </div>
-                          <Select
-                            value={skillRatingsData[skill] || ''}
-                            onValueChange={(value) => handleSkillRatingChange(skill, value)}
-                          >
-                            <SelectTrigger id={`skill-${skill.replace(/\s+/g, '-')}`}>
-                              <SelectValue placeholder="Rate skill for this session..." />
+                            <Select
+                                value={skillRatingsData[skill] || ''}
+                                onValueChange={(value) => handleSkillRatingChange(skill, value)}
+                            >
+                                <SelectTrigger id={`skill-${skill.replace(/\s+/g, '-')}`}>
+                                <SelectValue placeholder="Rate skill for this session..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                {SKILL_RATINGS.map(rating => (
+                                    <SelectItem key={rating} value={rating}>{rating}</SelectItem>
+                                ))}
+                                </SelectContent>
+                            </Select>
+                            </div>
+                        ))}
+                        </div>
+                    </ScrollArea>
+                    </Card>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="comments">Overall Comments</Label>
+                        <Textarea
+                            id="comments"
+                            value={comments}
+                            onChange={(e) => setComments(e.target.value)}
+                            placeholder="Add any general comments about the report or session..."
+                            rows={3}
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="badgeSelect">Assign Badge (Optional)</Label>
+                        <Select value={selectedBadgeId} onValueChange={setSelectedBadgeId}>
+                            <SelectTrigger id="badgeSelect">
+                            <SelectValue placeholder="Choose a badge to assign..." />
                             </SelectTrigger>
                             <SelectContent>
-                              {SKILL_RATINGS.map(rating => (
-                                <SelectItem key={rating} value={rating}>{rating}</SelectItem>
-                              ))}
+                            <SelectItem value="">No Badge</SelectItem>
+                            {badges.map(badge => (
+                                <SelectItem key={badge.id} value={badge.id}>
+                                {badge.force !== "General" && <span className='text-xs text-muted-foreground mr-1'>[{badge.force}]</span>} {badge.name} - {badge.rankName}
+                                </SelectItem>
+                            ))}
                             </SelectContent>
-                          </Select>
-                        </div>
-                      );
-                    })}
+                        </Select>
                     </div>
-                  </ScrollArea>
-                </Card>
+                </>
+                )}
+            </CardContent>
+            <CardFooter>
+                <Button type="submit" className="w-full" disabled={!selectedBookingId || isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
+                {isSubmitting ? 'Processing...' : `Save Feedback & ${reportFile ? "Upload Report" : "Update Details"}`}
+                </Button>
+            </CardFooter>
+            </form>
+        </Card>
 
-                <div className="space-y-2">
-                    <Label htmlFor="comments">Overall Comments (for this session)</Label>
-                    <Textarea
-                        id="comments"
-                        value={comments}
-                        onChange={(e) => setComments(e.target.value)}
-                        placeholder="Add any general comments about the report or session..."
-                        rows={3}
-                    />
-                </div>
-
-                <div className="space-y-2">
-                    <Label htmlFor="badgeSelect">Assign Badge (Optional)</Label>
-                    <Select value={selectedBadgeId} onValueChange={setSelectedBadgeId}>
-                        <SelectTrigger id="badgeSelect">
-                        <SelectValue placeholder="Choose a badge to assign..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                        <SelectItem value="">No Badge</SelectItem>
-                        {availableBadges.map(badge => (
-                            <SelectItem key={badge.id} value={badge.id}>
-                            {badge.force !== "General" && <span className='text-xs text-muted-foreground mr-1'>[{badge.force}]</span>} {badge.name} - {badge.rankName}
-                            </SelectItem>
-                        ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-              </>
-            )}
-          </CardContent>
-          <CardFooter>
-            <Button type="submit" className="w-full" disabled={!selectedBookingId || isSubmitting}>
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
-              {isSubmitting ? 'Processing...' : `Save Feedback & ${reportFile ? "Upload Report" : "Update Details"}`}
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
-
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle className="flex items-center"><History className="mr-2 h-5 w-5 text-primary" /> Submission History</CardTitle>
-          <CardDescription>History of all feedback and report submissions. Showing {paginatedHistory.length} of {filteredSubmissionHistory.length} entries.</CardDescription>
-           <Input
-            placeholder="Filter by user name..."
-            value={userNameFilter}
-            onChange={(e) => {
-              setUserNameFilter(e.target.value);
-              setCurrentHistoryPage(1);
-            }}
-            className="mt-2 max-w-sm"
-          />
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Submitted On</TableHead>
-                <TableHead>Booking ID</TableHead>
-                <TableHead>User Name</TableHead>
-                <TableHead>Service</TableHead>
-                <TableHead>Report File</TableHead>
-                <TableHead>Badge Assigned</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedHistory.length > 0 ? paginatedHistory.map((entry) => {
-                return (
-                <TableRow key={entry.id}>
-                  <TableCell>{format(new Date(entry.submissionDate), 'MMM d, yyyy - h:mm a')}</TableCell>
-                  <TableCell>{entry.bookingId}</TableCell>
-                  <TableCell>{entry.userName}</TableCell>
-                  <TableCell>{entry.serviceName}</TableCell>
-                  <TableCell>
-                    {entry.reportFileName ? (
-                        <UiBadge variant="secondary" className="flex items-center gap-1 max-w-[150px] sm:max-w-xs truncate">
-                            <FileSpreadsheet className="h-3 w-3 flex-shrink-0"/> {entry.reportFileName}
-                        </UiBadge>
-                    ) : (
-                        <span className="text-xs text-muted-foreground">N/A</span>
+        <div className="lg:col-span-1 space-y-4">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center"><History className="mr-2 h-5 w-5 text-primary" /> User's Submission History</CardTitle>
+                    <CardDescription>{selectedBookingDetails ? `Previous feedback for ${selectedBookingDetails.userName}` : 'Select a booking to see user history'}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {selectedBookingDetails ? (
+                        userSpecificHistory.length > 0 ? (
+                             <ScrollArea className="h-48 pr-3 custom-scrollbar">
+                                <div className="space-y-2">
+                                {userSpecificHistory.map(entry => (
+                                    <div key={entry.id} className="text-xs border-b pb-1">
+                                        <p><strong>{entry.serviceName}</strong> on {format(new Date(entry.submissionDate), 'MMM d, yyyy')}</p>
+                                        {entry.badgeAssignedName && <p>Badge: {entry.badgeAssignedName}</p>}
+                                    </div>
+                                ))}
+                                </div>
+                             </ScrollArea>
+                        ) : (<p className="text-sm text-muted-foreground">No prior feedback history for this user.</p>)
+                    ) : (<p className="text-sm text-muted-foreground">No user selected.</p>)}
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader>
+                <CardTitle className="flex items-center"><History className="mr-2 h-5 w-5 text-primary" /> All Submission History</CardTitle>
+                <CardDescription>All feedback and report submissions. Showing {paginatedHistory.length} of {filteredSubmissionHistory.length} entries.</CardDescription>
+                <Input
+                    placeholder="Filter by user name..."
+                    value={userNameFilter}
+                    onChange={(e) => {
+                    setUserNameFilter(e.target.value);
+                    setCurrentHistoryPage(1);
+                    }}
+                    className="mt-2"
+                />
+                </CardHeader>
+                <CardContent>
+                <Table>
+                    <TableHeader>
+                    <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Badge</TableHead>
+                    </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                    {paginatedHistory.length > 0 ? paginatedHistory.map((entry) => (
+                        <TableRow key={entry.id}>
+                        <TableCell className="font-medium">{entry.userName}</TableCell>
+                        <TableCell>{format(new Date(entry.submissionDate), 'dd-MMM-yy')}</TableCell>
+                        <TableCell>
+                            {entry.badgeAssignedName ? (
+                                <UiBadge variant="outline" className="text-accent-foreground border-accent flex items-center gap-1">
+                                    <AwardIcon className="h-3 w-3"/>{entry.badgeAssignedName}
+                                </UiBadge>
+                            ) : (
+                                <span className="text-xs text-muted-foreground">None</span>
+                            )}
+                        </TableCell>
+                        </TableRow>
+                    )) : (
+                        <TableRow>
+                        <TableCell colSpan={3} className="text-center h-24">
+                            {userNameFilter ? "No submissions match your filter." : "No submission history found."}
+                        </TableCell>
+                        </TableRow>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    {entry.badgeAssignedName ? (
-                        <UiBadge variant="outline" className="text-accent-foreground border-accent flex items-center gap-1">
-                            <AwardIcon className="h-3 w-3"/>{entry.badgeAssignedName}
-                        </UiBadge>
-                    ) : (
-                        <span className="text-xs text-muted-foreground">None</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              )}) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center h-24">
-                    {userNameFilter ? "No submissions match your filter." : "No submission history found."}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-        {totalHistoryPages > 1 && (
-          <CardFooter className="flex justify-center items-center space-x-4 py-4">
-            <Button
-              variant="outline"
-              onClick={handlePreviousHistoryPage}
-              disabled={currentHistoryPage === 1}
-              size="sm"
-            >
-              <ChevronLeft className="mr-2 h-4 w-4" /> Previous
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              Page {currentHistoryPage} of {totalHistoryPages}
-            </span>
-            <Button
-              variant="outline"
-              onClick={handleNextHistoryPage}
-              disabled={currentHistoryPage === totalHistoryPages}
-              size="sm"
-            >
-              Next <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardFooter>
-        )}
-      </Card>
+                    </TableBody>
+                </Table>
+                </CardContent>
+                {totalHistoryPages > 1 && (
+                <CardFooter className="flex justify-center items-center space-x-4 py-4">
+                    <Button
+                    variant="outline"
+                    onClick={handlePreviousHistoryPage}
+                    disabled={currentHistoryPage === 1}
+                    size="sm"
+                    >
+                    <ChevronLeft className="mr-2 h-4 w-4" /> Previous
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                    Page {currentHistoryPage} of {totalHistoryPages}
+                    </span>
+                    <Button
+                    variant="outline"
+                    onClick={handleNextHistoryPage}
+                    disabled={currentHistoryPage === totalHistoryPages}
+                    size="sm"
+                    >
+                    Next <ChevronRight className="ml-2 h-4 w-4" />
+                    </Button>
+                </CardFooter>
+                )}
+            </Card>
+        </div>
+      </div>
     </>
   );
 }
