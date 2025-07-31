@@ -33,7 +33,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 import { db, functions } from '@/lib/firebase';
-import { doc, addDoc, updateDoc, serverTimestamp, writeBatch, collection, getDocs } from 'firebase/firestore';
+import { doc, addDoc, updateDoc, serverTimestamp, writeBatch, collection, getDocs, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 
 const processRefund = httpsCallable(functions, 'processRefund');
