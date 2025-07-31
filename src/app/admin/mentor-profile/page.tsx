@@ -10,7 +10,7 @@ import Image from 'next/image';
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -171,7 +171,7 @@ export default function AdminMentorProfilePage() {
               width={80}
               height={80}
               className="rounded-full border-2 border-primary object-cover"
-              data-ai-hint={editableProfile.dataAiHint}
+              data-ai-hint={editableProfile.dataAiHint || ''}
             />
           )}
           <div>
