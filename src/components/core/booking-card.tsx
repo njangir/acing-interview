@@ -16,6 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { cn } from '@/lib/utils';
 
 interface BookingCardProps {
   booking: Booking;
@@ -27,6 +28,8 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
   const [booking, setBooking] = useState<Booking>(initialBooking);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
   const [refundReason, setRefundReason] = useState('');
   const [isRefundEligible, setIsRefundEligible] = useState(false);
@@ -64,8 +67,8 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
   }, [booking.date, booking.time, booking.status]);
 
   const handleFeedbackSubmit = async () => {
-    if (!feedbackText.trim()) {
-      toast({ title: "Feedback Empty", description: "Please enter your feedback before submitting.", variant: "destructive" });
+    if (!feedbackText.trim() && rating === 0) {
+      toast({ title: "Feedback Empty", description: "Please provide a rating or a comment before submitting.", variant: "destructive" });
       return;
     }
     
@@ -73,6 +76,7 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
       const bookingDocRef = doc(db, 'bookings', booking.id);
       await updateDoc(bookingDocRef, {
         userFeedback: feedbackText,
+        rating: rating,
         updatedAt: serverTimestamp(),
       });
       toast({
@@ -81,6 +85,7 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
       });
       setIsFeedbackModalOpen(false);
       setFeedbackText('');
+      setRating(0);
     } catch (error) {
        console.error("Error submitting feedback:", error);
        toast({ title: "Submission Failed", description: "Could not submit your feedback.", variant: "destructive" });
@@ -251,7 +256,7 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
                 </DialogContent>
             </Dialog>
           )}
-          {booking.status === 'completed' && (
+          {booking.status === 'completed' && !booking.rating && (
              <Dialog open={isFeedbackModalOpen} onOpenChange={setIsFeedbackModalOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm" onClick={() => setIsFeedbackModalOpen(true)}>
@@ -265,19 +270,36 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
                     How was your session for "{booking.serviceName}" on {formattedDate}?
                   </DialogDesc>
                 </DialogHeader>
-                <div className="py-4">
-                  <Label htmlFor="feedbackText" className="sr-only">Your Feedback</Label>
-                  <Textarea
-                    id="feedbackText"
-                    value={feedbackText}
-                    onChange={(e) => setFeedbackText(e.target.value)}
-                    placeholder="Tell us about your experience..."
-                    rows={5}
-                  />
+                <div className="py-4 space-y-4">
+                  <div>
+                    <Label htmlFor="rating" className="mb-2 block">Your Rating</Label>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <StarIcon
+                          key={star}
+                          className={cn("h-6 w-6 cursor-pointer", (hoverRating || rating) >= star ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300')}
+                          onClick={() => setRating(star)}
+                          onMouseEnter={() => setHoverRating(star)}
+                          onMouseLeave={() => setHoverRating(0)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="feedbackText">Your Comments</Label>
+                    <Textarea
+                      id="feedbackText"
+                      className="mt-2"
+                      value={feedbackText}
+                      onChange={(e) => setFeedbackText(e.target.value)}
+                      placeholder="Tell us about your experience..."
+                      rows={4}
+                    />
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsFeedbackModalOpen(false)}>Cancel</Button>
-                  <Button onClick={handleFeedbackSubmit} disabled={!feedbackText.trim()}>Submit Feedback</Button>
+                  <Button onClick={handleFeedbackSubmit} disabled={!feedbackText.trim() && rating === 0}>Submit Feedback</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>

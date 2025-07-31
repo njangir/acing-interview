@@ -52,6 +52,7 @@ export interface Booking {
   paymentStatus: 'paid' | 'pay_later_pending' | 'pay_later_unpaid';
   reportUrl?: string;
   userFeedback?: string;
+  rating?: number;
   requestedRefund?: boolean;
   refundReason?: string;
   transactionId?: string | null;

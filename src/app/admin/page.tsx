@@ -56,7 +56,11 @@ export default function AdminOverviewPage() {
   }, 0);
 
   const newMessagesCount = messages.filter(m => m.status === 'new' && m.senderType === 'user').length;
-  const averageRating = "4.7/5 Stars"; // This remains a placeholder as we don't have a rating system yet.
+  
+  const ratedBookings = bookings.filter(b => typeof b.rating === 'number' && b.rating > 0);
+  const averageRating = ratedBookings.length > 0 
+    ? (ratedBookings.reduce((acc, b) => acc + (b.rating || 0), 0) / ratedBookings.length).toFixed(1)
+    : "N/A";
 
   if (isLoading) {
     return (
@@ -127,8 +131,8 @@ export default function AdminOverviewPage() {
             <Star className="h-5 w-5 text-accent" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{averageRating}</div>
-            <p className="text-xs text-muted-foreground">(Placeholder)</p>
+            <div className="text-2xl font-bold text-primary">{averageRating}/5</div>
+            <p className="text-xs text-muted-foreground">from {ratedBookings.length} ratings</p>
           </CardContent>
         </Card>
       </div>
