@@ -15,12 +15,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import type { MentorProfileData } from '@/types';
-import { UserCog, Loader2, AlertTriangle } from 'lucide-react';
+import { UserCog, Loader2, AlertTriangle, Upload } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-import { db, functions } from '@/lib/firebase';
+import { functions, storage } from '@/lib/firebase';
 import { httpsCallable } from 'firebase/functions';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const getMentorProfile = httpsCallable(functions, 'getMentorProfile');
 const saveMentorProfile = httpsCallable(functions, 'saveMentorProfile');
@@ -34,7 +34,7 @@ const mentorProfileSchema = z.object({
   philosophy: z.string().min(50, "Philosophy must be at least 50 characters."),
   quote: z.string().min(10, "Quote must be at least 10 characters."),
   experience: z.string().min(20, "Experience must be at least 20 characters.").transform(val => val.split('\n').map(s => s.trim()).filter(Boolean)),
-  imageUrl: z.string().url("Please enter a valid URL for the image."),
+  imageUrl: z.string().url("Image URL is required.").optional().or(z.literal('')),
   dataAiHint: z.string().max(50, "AI hint should be concise").optional(),
 });
 
@@ -46,6 +46,9 @@ export default function AdminMentorProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const form = useForm<MentorProfileFormValues>({
     resolver: zodResolver(mentorProfileSchema),
@@ -62,9 +65,10 @@ export default function AdminMentorProfilePage() {
           setEditableProfile(data);
           form.reset({
             ...data,
-            experience: data.experience.join('\n'), // Convert array to newline-separated string for textarea
-            dataAiHint: data.dataAiHint || '', // Ensure dataAiHint is a string
+            experience: data.experience.join('\n'),
+            dataAiHint: data.dataAiHint || '',
           });
+          setImagePreview(data.imageUrl); // Set initial preview
         } else {
           setError("Mentor profile not found. It might need to be created first.");
         }
@@ -77,11 +81,40 @@ export default function AdminMentorProfilePage() {
     fetchProfile();
   }, [form]);
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   async function onSubmit(data: MentorProfileFormValues) {
     setIsSaving(true);
+    let finalImageUrl = editableProfile?.imageUrl || '';
+
+    if (imageFile) {
+        try {
+            const imageFileName = `mentor_profile_${Date.now()}_${imageFile.name.replace(/\s+/g, '_')}`;
+            const imageRef = storageRef(storage, `mentor_profiles/${imageFileName}`);
+            await uploadBytes(imageRef, imageFile);
+            finalImageUrl = await getDownloadURL(imageRef);
+        } catch (uploadError) {
+            console.error("Error uploading mentor profile image:", uploadError);
+            toast({ title: "Image Upload Failed", description: "Could not upload the new profile image.", variant: "destructive" });
+            setIsSaving(false);
+            return;
+        }
+    }
+
     try {
       const profileToSave: MentorProfileData = {
           ...data,
+          imageUrl: finalImageUrl,
       };
       
       await saveMentorProfile({ profile: profileToSave });
@@ -130,15 +163,17 @@ export default function AdminMentorProfilePage() {
         description="Edit the public-facing profile of the mentor."
       />
       <Card className="shadow-lg">
-        <CardHeader className="flex flex-row items-start gap-4">
-          <Image
-            src={editableProfile.imageUrl}
-            alt={editableProfile.name}
-            width={80}
-            height={80}
-            className="rounded-full border-2 border-primary"
-            data-ai-hint={editableProfile.dataAiHint}
-          />
+        <CardHeader className="flex flex-col sm:flex-row items-start gap-4">
+          {imagePreview && (
+            <Image
+              src={imagePreview}
+              alt={editableProfile.name}
+              width={80}
+              height={80}
+              className="rounded-full border-2 border-primary object-cover"
+              data-ai-hint={editableProfile.dataAiHint}
+            />
+          )}
           <div>
             <CardTitle className="font-headline text-2xl text-primary flex items-center">
                 <UserCog className="h-6 w-6 mr-2 text-primary"/> Edit: {editableProfile.name}
@@ -171,17 +206,19 @@ export default function AdminMentorProfilePage() {
                   </FormItem>
                 )}
               />
-               <FormField
-                control={form.control}
-                name="imageUrl"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Image URL</FormLabel>
-                    <FormControl><Input type="url" placeholder="https://placehold.co/300x300.png" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+               <FormItem>
+                  <FormLabel className="flex items-center gap-2"><Upload className="h-4 w-4"/>Profile Image</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleFileChange}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                  <FormDescription>Upload a new image to replace the current one.</FormDescription>
+              </FormItem>
+
                <FormField
                 control={form.control}
                 name="dataAiHint"
