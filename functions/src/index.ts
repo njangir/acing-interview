@@ -1,3 +1,4 @@
+
 import * as functions from "firebase-functions";
 import * as logger from "firebase-functions/logger";
 import { initializeApp } from "firebase-admin/app";
@@ -71,7 +72,7 @@ exports.oncreateuser = functions.auth.user().onCreate(async (user) => {
   }
 });
 
-exports.createPaymentOrder = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+exports.createPaymentOrder = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data: any, context: functions.https.CallableContext) => {
   if (!context.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
@@ -593,7 +594,7 @@ exports.getAdminReportsPageData = functions.https.onCall(async (data: any, conte
     await ensureAdmin(context);
     const firestore = getFirestore();
     try {
-        const bookingsQuery = firestore.collection("bookings").where("status", "==", "completed").orderBy("date", "desc");
+        const bookingsQuery = firestore.collection("bookings").where("status", "==", "completed").orderBy("createdAt", "desc");
         const badgesQuery = firestore.collection("badges");
         const historyQuery = firestore.collection("feedbackSubmissions").orderBy("createdAt", "desc");
 
