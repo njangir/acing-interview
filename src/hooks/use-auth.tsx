@@ -55,8 +55,8 @@ const checkAndCancelExpiredBookings = async (userId: string) => {
         const batch = writeBatch(db);
         let bookingsToCancel = 0;
 
-        querySnapshot.forEach(doc => {
-            const booking = doc.data() as Booking;
+        querySnapshot.forEach(bookingDoc => {
+            const booking = bookingDoc.data() as Booking;
             const bookingDateTime = new Date(booking.date);
             const [timePart, ampm] = booking.time.split(' ');
             let [hours, minutes] = timePart.split(':').map(Number);
@@ -65,7 +65,7 @@ const checkAndCancelExpiredBookings = async (userId: string) => {
             bookingDateTime.setHours(hours, minutes, 0, 0);
 
             if (bookingDateTime < now) {
-                const bookingDocRef = doc(db, "bookings", doc.id);
+                const bookingDocRef = doc(db, "bookings", bookingDoc.id);
                 batch.update(bookingDocRef, {
                     status: 'cancelled',
                     paymentStatus: 'pay_later_unpaid',

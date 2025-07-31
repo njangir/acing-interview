@@ -552,19 +552,27 @@ exports.getAdminBookingsPageData = functions.https.onCall(async (data, context) 
 });
 exports.getAdminReportsPageData = functions.https.onCall(async (data, context) => {
     await ensureAdmin(context);
+    logger.info("getAdminReportsPageData: Admin confirmed. Fetching data...");
     const firestore = (0, firestore_1.getFirestore)();
     try {
+        logger.info("Querying for completed bookings...");
         const bookingsQuery = firestore.collection("bookings").where("status", "==", "completed").orderBy("createdAt", "desc");
+        logger.info("Querying for badges...");
         const badgesQuery = firestore.collection("badges");
+        logger.info("Querying for submission history...");
         const historyQuery = firestore.collection("feedbackSubmissions").orderBy("createdAt", "desc");
         const [bookingsSnapshot, badgesSnapshot, historySnapshot] = await Promise.all([
             bookingsQuery.get(),
             badgesQuery.get(),
             historyQuery.get(),
         ]);
+        logger.info(`Fetched ${bookingsSnapshot.docs.length} completed bookings.`);
+        logger.info(`Fetched ${badgesSnapshot.docs.length} badges.`);
+        logger.info(`Fetched ${historySnapshot.docs.length} history entries.`);
         const completedBookings = bookingsSnapshot.docs.map((doc) => (Object.assign({ id: doc.id }, doc.data())));
         const badges = badgesSnapshot.docs.map((doc) => (Object.assign({ id: doc.id }, doc.data())));
         const history = historySnapshot.docs.map((doc) => (Object.assign({ id: doc.id }, doc.data())));
+        logger.info("Data processing complete. Returning data to client.");
         return { completedBookings, badges, history };
     }
     catch (error) {
