@@ -117,7 +117,7 @@ exports.createPaymentOrder = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "R
   }
 });
 
-exports.verifyPayment = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+exports.verifyPayment = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data: any, context: functions.https.CallableContext) => {
   if (!context.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
@@ -144,7 +144,7 @@ exports.verifyPayment = functions.https.onCall(async (data: any, context: functi
     );
   }
 
-  const shasum = crypto.createHmac("sha256", RAZORPAY_KEY_SECRET);
+  const shasum = crypto.createHmac("sha256", RAZORPAY_KEY_SECRET as string);
   shasum.update(`${razorpay_order_id}|${razorpay_payment_id}`);
   const digest = shasum.digest("hex");
 
@@ -303,7 +303,7 @@ exports.exportServicesReport = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", 
     return { data: servicesData };
 });
 
-exports.getAdminDashboardData = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+exports.getAdminDashboardData = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
     const firestore = getFirestore();
     
@@ -566,7 +566,36 @@ exports.markMessagesAsRead = functions.https.onCall(async (data: any, context: f
     return { success: true };
 });
 
-exports.uploadReport = functions.https.onCall(async (data, context) => {
+exports.toggleMessageThreadStatus = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+    await ensureAdmin(context);
+    const { userEmail, subject, status } = data as { userEmail: string, subject: string, status: 'closed' | 'replied' };
+
+    if (!userEmail || !subject || !status) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing required arguments: userEmail, subject, status.');
+    }
+
+    const firestore = getFirestore();
+    const messagesQuery = firestore.collection("userMessages")
+        .where("userEmail", "==", userEmail)
+        .where("subject", "in", [subject, `Re: ${subject}`]);
+
+    const messagesSnapshot = await messagesQuery.get();
+
+    if (messagesSnapshot.empty) {
+        throw new functions.https.HttpsError('not-found', 'No messages found for this conversation thread.');
+    }
+
+    const batch = firestore.batch();
+    messagesSnapshot.forEach(doc => {
+        batch.update(doc.ref, { status: status, updatedAt: FieldValue.serverTimestamp() });
+    });
+
+    await batch.commit();
+    return { success: true, message: `Conversation thread has been ${status}.` };
+});
+
+
+exports.uploadReport = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data, context) => {
     await ensureAdmin(context);
     const { bookingId, fileName, fileDataUrl } = data as { bookingId: string, fileName: string, fileDataUrl: string };
 
@@ -604,7 +633,7 @@ exports.uploadReport = functions.https.onCall(async (data, context) => {
     }
 });
 
-exports.getAdminBookingsPageData = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+exports.getAdminBookingsPageData = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
     const firestore = getFirestore();
     try {
@@ -629,7 +658,7 @@ exports.getAdminBookingsPageData = functions.https.onCall(async (data: any, cont
     }
 });
 
-exports.getAdminReportsPageData = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+exports.getAdminReportsPageData = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
     logger.info("getAdminReportsPageData: Admin confirmed. Fetching data...");
     const firestore = getFirestore();
@@ -664,7 +693,7 @@ exports.getAdminReportsPageData = functions.https.onCall(async (data: any, conte
     }
 });
 
-exports.getAdminTestimonialsPageData = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+exports.getAdminTestimonialsPageData = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
     const firestore = getFirestore();
     try {
