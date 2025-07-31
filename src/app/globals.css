@@ -39,6 +39,10 @@ body {
     --ring: 210 85% 50%; /* Ring color based on new primary */
 
     --radius: 0.375rem; /* Slightly less rounded than 0.5rem for a more professional feel */
+    
+    /* Indian Flag Colors */
+    --saffron: 30 100% 60%;
+    --india-green: 145 80% 30%;
 
     /* Chart colors can be adjusted if needed, keeping defaults for now */
     --chart-1: 12 76% 61%;
@@ -79,6 +83,11 @@ body {
     --border: 210 10% 30%;
     --input: 210 10% 20%;
     --ring: 210 85% 60%;
+    
+    /* Indian Flag Colors */
+    --saffron: 30 100% 60%;
+    --india-green: 145 80% 30%;
+    
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;

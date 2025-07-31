@@ -148,7 +148,7 @@ exports.createPaymentOrder = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "R
         throw new functions.https.HttpsError("internal", "Could not create payment order.", error);
     }
 });
-exports.verifyPayment = functions.https.onCall(async (data, context) => {
+exports.verifyPayment = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data, context) => {
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
     }
@@ -186,7 +186,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError("internal", "Payment verified, but failed to update booking.");
     }
 });
-exports.processRefund = functions.https.onCall(async (data, context) => {
+exports.processRefund = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data, context) => {
     var _a;
     await ensureAdmin(context);
     const { bookingId } = data;
@@ -290,7 +290,7 @@ exports.exportServicesReport = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", 
     const servicesData = servicesSnap.docs.map((doc) => (Object.assign({ id: doc.id }, doc.data())));
     return { data: servicesData };
 });
-exports.getAdminDashboardData = functions.https.onCall(async (data, context) => {
+exports.getAdminDashboardData = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data, context) => {
     await ensureAdmin(context);
     const firestore = (0, firestore_1.getFirestore)();
     try {
@@ -528,7 +528,61 @@ exports.markMessagesAsRead = functions.https.onCall(async (data, context) => {
     await batch.commit();
     return { success: true };
 });
-exports.getAdminBookingsPageData = functions.https.onCall(async (data, context) => {
+exports.toggleMessageThreadStatus = functions.https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const { userEmail, subject, status } = data;
+    if (!userEmail || !subject || !status) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing required arguments: userEmail, subject, status.');
+    }
+    const firestore = (0, firestore_1.getFirestore)();
+    const messagesQuery = firestore.collection("userMessages")
+        .where("userEmail", "==", userEmail)
+        .where("subject", "in", [subject, `Re: ${subject}`]);
+    const messagesSnapshot = await messagesQuery.get();
+    if (messagesSnapshot.empty) {
+        throw new functions.https.HttpsError('not-found', 'No messages found for this conversation thread.');
+    }
+    const batch = firestore.batch();
+    messagesSnapshot.forEach(doc => {
+        batch.update(doc.ref, { status: status, updatedAt: firestore_1.FieldValue.serverTimestamp() });
+    });
+    await batch.commit();
+    return { success: true, message: `Conversation thread has been ${status}.` };
+});
+exports.uploadReport = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const { bookingId, fileName, fileDataUrl } = data;
+    if (!bookingId || !fileName || !fileDataUrl) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing required data for file upload.');
+    }
+    const storage = (0, storage_1.getStorage)();
+    const bucket = storage.bucket();
+    // Extract content type and Base64 data from the data URL
+    const match = fileDataUrl.match(/^data:(.*);base64,(.*)$/);
+    if (!match) {
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid data URL format.');
+    }
+    const contentType = match[1];
+    const base64Data = match[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.]/g, '_');
+    const filePath = `feedback_reports/${bookingId}_${Date.now()}_${sanitizedFileName}`;
+    const file = bucket.file(filePath);
+    try {
+        await file.save(buffer, {
+            metadata: { contentType },
+            public: true, // Make the file publicly readable
+        });
+        const downloadUrl = file.publicUrl();
+        logger.info(`File uploaded successfully for booking ${bookingId}: ${downloadUrl}`);
+        return { success: true, downloadUrl: downloadUrl };
+    }
+    catch (error) {
+        logger.error(`File upload failed for booking ${bookingId}:`, error);
+        throw new functions.https.HttpsError('internal', 'Failed to upload file to storage.');
+    }
+});
+exports.getAdminBookingsPageData = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data, context) => {
     await ensureAdmin(context);
     const firestore = (0, firestore_1.getFirestore)();
     try {
@@ -550,7 +604,7 @@ exports.getAdminBookingsPageData = functions.https.onCall(async (data, context) 
         throw new functions.https.HttpsError("internal", "Failed to fetch admin bookings page data.");
     }
 });
-exports.getAdminReportsPageData = functions.https.onCall(async (data, context) => {
+exports.getAdminReportsPageData = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data, context) => {
     await ensureAdmin(context);
     logger.info("getAdminReportsPageData: Admin confirmed. Fetching data...");
     const firestore = (0, firestore_1.getFirestore)();
@@ -580,7 +634,7 @@ exports.getAdminReportsPageData = functions.https.onCall(async (data, context) =
         throw new functions.https.HttpsError("internal", "Failed to fetch admin reports page data.");
     }
 });
-exports.getAdminTestimonialsPageData = functions.https.onCall(async (data, context) => {
+exports.getAdminTestimonialsPageData = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data, context) => {
     await ensureAdmin(context);
     const firestore = (0, firestore_1.getFirestore)();
     try {

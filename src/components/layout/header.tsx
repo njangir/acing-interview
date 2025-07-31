@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, orderBy, Timestamp, doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { IndianFlagIcon } from '../icons/indian-flag-icon';
 
 
 const mainSiteNavItems: Array<{ href: string; label: string; icon: LucideIcon }> = [
@@ -140,6 +141,7 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
         <Link href="/" className="mr-6 flex items-center space-x-2">
+          <IndianFlagIcon />
           <Logo />
         </Link>
         <nav className="hidden lg:flex gap-6 items-center">
