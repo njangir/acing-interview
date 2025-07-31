@@ -21,7 +21,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 import { db, storage } from '@/lib/firebase';
-import { collection, doc, addDoc, updateDoc, query, orderBy, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, query, orderBy, serverTimestamp, arrayUnion, getDocs } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '@/lib/firebase';
@@ -69,9 +69,9 @@ export default function AdminReportsPage() {
         setFetchedBadges(data.badges || []);
         setFullSubmissionHistory(history || []);
 
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error loading initial data:", err);
-        setError("Failed to load necessary data. Please try again.");
+        setError(err.message || "Failed to load necessary data. Please try again.");
       } finally {
         setIsLoadingData(false);
       }

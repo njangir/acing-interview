@@ -1,4 +1,3 @@
-
 import * as functions from "firebase-functions";
 import * as logger from "firebase-functions/logger";
 import { initializeApp } from "firebase-admin/app";
@@ -72,7 +71,7 @@ exports.oncreateuser = functions.auth.user().onCreate(async (user) => {
   }
 });
 
-exports.createPaymentOrder = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data: any, context: functions.https.CallableContext) => {
+exports.createPaymentOrder = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
   if (!context.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
@@ -116,7 +115,7 @@ exports.createPaymentOrder = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "R
   }
 });
 
-exports.verifyPayment = functions.runWith({ secrets: ["RAZORPAY_KEY_SECRET"] }).https.onCall(async (data: any, context: functions.https.CallableContext) => {
+exports.verifyPayment = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
   if (!context.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
@@ -143,7 +142,7 @@ exports.verifyPayment = functions.runWith({ secrets: ["RAZORPAY_KEY_SECRET"] }).
     );
   }
 
-  const shasum = crypto.createHmac("sha256", RAZORPAY_KEY_SECRET!);
+  const shasum = crypto.createHmac("sha256", RAZORPAY_KEY_SECRET);
   shasum.update(`${razorpay_order_id}|${razorpay_payment_id}`);
   const digest = shasum.digest("hex");
 
@@ -177,7 +176,7 @@ exports.verifyPayment = functions.runWith({ secrets: ["RAZORPAY_KEY_SECRET"] }).
   }
 });
 
-exports.processRefund = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data: any, context: functions.https.CallableContext) => {
+exports.processRefund = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
   await ensureAdmin(context);
   const { bookingId } = data as { bookingId: string };
   if (!bookingId) {
@@ -298,7 +297,7 @@ exports.exportServicesReport = functions.https.onCall(async (data: any, context:
     await ensureAdmin(context);
     const firestore = getFirestore();
     const servicesSnap = await firestore.collection("services").get();
-    const servicesData = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const servicesData = servicesSnap.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() }));
     return { data: servicesData };
 });
 
@@ -317,9 +316,9 @@ exports.getAdminDashboardData = functions.https.onCall(async (data: any, context
             messagesQuery.get()
         ]);
 
-        const bookings = bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const services = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const messages = messagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const bookings = bookingsSnapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() }));
+        const services = servicesSnapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() }));
+        const messages = messagesSnapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() }));
 
         return { bookings, services, messages };
 
@@ -342,17 +341,17 @@ exports.getServices = functions.https.onCall(async(data: any, context: functions
 });
 
 exports.saveService = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
-    await ensureAdmin(context);
-    const { service } = data as { service: Service };
-    const firestore = getFirestore();
-    if (service.id) {
-        const serviceRef = firestore.collection('services').doc(service.id);
-        const { id, ...serviceWithoutId } = service;
-        await serviceRef.update({ ...serviceWithoutId, updatedAt: FieldValue.serverTimestamp() });
-    } else {
-        await firestore.collection('services').add({ ...service, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
-    }
-    return { success: true };
+  await ensureAdmin(context);
+  const { service } = data as { service: Service };
+  const firestore = getFirestore();
+  if (service.id) {
+    const serviceRef = firestore.collection('services').doc(service.id);
+    const { id, ...serviceWithoutId } = service;
+    await serviceRef.update({ ...serviceWithoutId, updatedAt: FieldValue.serverTimestamp() });
+  } else {
+    await firestore.collection('services').add({ ...service, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+  }
+  return { success: true };
 });
 
 exports.deleteService = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
@@ -377,8 +376,8 @@ exports.getResourcesAndServices = functions.https.onCall(async(data: any, contex
     const firestore = getFirestore();
     const resourcesSnap = await firestore.collection("resources").orderBy('title', 'asc').get();
     const servicesSnap = await firestore.collection("services").orderBy('name', 'asc').get();
-    const resourcesData = resourcesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    const servicesData = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const resourcesData = resourcesSnap.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() }));
+    const servicesData = servicesSnap.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() }));
     return { resources: resourcesData, services: servicesData };
 });
 
@@ -428,7 +427,7 @@ exports.getBadges = functions.https.onCall(async (data: any, context: functions.
     await ensureAdmin(context);
     const firestore = getFirestore();
     const badgesSnap = await firestore.collection('badges').orderBy('name', 'asc').get();
-    const badgesData = badgesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const badgesData = badgesSnap.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() }));
     return { badges: badgesData };
 });
 
@@ -460,7 +459,7 @@ exports.getAvailability = functions.https.onCall(async (data: any, context: func
     const firestore = getFirestore();
     const snapshot = await firestore.collection('globalAvailability').get();
     const availabilityData: Record<string, string[]> = {};
-    snapshot.forEach(doc => {
+    snapshot.forEach((doc: FirebaseFirestore.QueryDocumentSnapshot) => {
         availabilityData[doc.id] = doc.data().timeSlots || [];
     });
     return { availability: availabilityData };
@@ -504,7 +503,7 @@ exports.getMessages = functions.https.onCall(async (data: any, context: function
     await ensureAdmin(context);
     const firestore = getFirestore();
     const messagesSnap = await firestore.collection('userMessages').orderBy('timestamp', 'desc').get();
-    const messagesData = messagesSnap.docs.map(doc => {
+    const messagesData = messagesSnap.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => {
         const docData = doc.data();
         return {
             id: doc.id,
@@ -542,7 +541,7 @@ exports.sendAdminReply = functions.https.onCall(async (data: any, context: funct
         .where("status", "in", ["new", "read"]);
     const userMessagesSnapshot = await userMessagesToUpdateQuery.get();
     const batch = firestore.batch();
-    userMessagesSnapshot.forEach(docToUpdate => {
+    userMessagesSnapshot.forEach((docToUpdate: FirebaseFirestore.QueryDocumentSnapshot) => {
         batch.update(docToUpdate.ref, { status: 'replied', updatedAt: FieldValue.serverTimestamp() });
     });
     await batch.commit();
@@ -565,8 +564,6 @@ exports.markMessagesAsRead = functions.https.onCall(async (data: any, context: f
     return { success: true };
 });
 
-// Admin Page Data Fetching Functions
-
 exports.getAdminBookingsPageData = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
     await ensureAdmin(context);
     const firestore = getFirestore();
@@ -581,9 +578,9 @@ exports.getAdminBookingsPageData = functions.https.onCall(async (data: any, cont
             usersQuery.get(),
         ]);
 
-        const services = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
-        const bookings = bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
-        const users = usersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile));
+        const services = servicesSnapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() } as Service));
+        const bookings = bookingsSnapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() } as Booking));
+        const users = usersSnapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ uid: doc.id, ...doc.data() } as UserProfile));
         
         return { services, bookings, users };
     } catch (error) {
@@ -606,9 +603,9 @@ exports.getAdminReportsPageData = functions.https.onCall(async (data: any, conte
             historyQuery.get(),
         ]);
 
-        const completedBookings = bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
-        const badges = badgesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Badge));
-        const history = historySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeedbackSubmissionHistoryEntry));
+        const completedBookings = bookingsSnapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() } as Booking));
+        const badges = badgesSnapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() } as Badge));
+        const history = historySnapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() } as FeedbackSubmissionHistoryEntry));
 
         return { completedBookings, badges, history };
     } catch (error) {
@@ -631,9 +628,9 @@ exports.getAdminTestimonialsPageData = functions.https.onCall(async (data: any, 
             bookingsQuery.get(),
         ]);
 
-        const testimonials = testimonialsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Testimonial));
-        const services = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
-        const bookings = bookingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
+        const testimonials = testimonialsSnapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() } as Testimonial));
+        const services = servicesSnapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() } as Service));
+        const bookings = bookingsSnapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() } as Booking));
         
         return { testimonials, services, bookings };
     } catch (error) {
@@ -643,6 +640,3 @@ exports.getAdminTestimonialsPageData = functions.https.onCall(async (data: any, 
 });
 
 // Add more admin write functions below as needed
-
-
-    
