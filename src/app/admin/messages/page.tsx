@@ -352,7 +352,7 @@ export default function AdminMessagesPage() {
         <Card className="lg:col-span-2 flex flex-col">
             {selectedConversation ? (
                 <>
-                <CardHeader className="border-b">
+                <CardHeader className="border-b flex-shrink-0">
                     <div className="flex justify-between items-center">
                         <div>
                             <CardTitle className="font-headline text-lg">{selectedConversation.subject}</CardTitle>
@@ -403,7 +403,7 @@ export default function AdminMessagesPage() {
                     ))}
                     </div>
                 </ScrollArea>
-                 <CardFooter className="pt-4 border-t">
+                 <CardFooter className="pt-4 border-t flex-shrink-0">
                     <div className="w-full">
                         <Label htmlFor="reply-text" className="font-semibold mb-2 block">Your Reply:</Label>
                         <Textarea
@@ -435,4 +435,3 @@ export default function AdminMessagesPage() {
     </>
   );
 }
-
