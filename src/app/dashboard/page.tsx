@@ -16,7 +16,7 @@ import { UserSkillsChart } from '@/components/core/user-skills-chart';
 import { PREDEFINED_AVATARS } from '@/constants';
 
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, limit, onSnapshot, orderBy } from 'firebase/firestore';
 
 
 export default function DashboardOverviewPage() {
@@ -37,54 +37,53 @@ export default function DashboardOverviewPage() {
       return;
     }
 
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        // Fetch User Profile and Badges
-        const profileDocRef = doc(db, "userProfiles", currentUser.uid);
-        const profileSnap = await getDoc(profileDocRef);
-        if (profileSnap.exists()) {
-          const profileData = profileSnap.data() as UserProfile;
-          if (profileData.awardedBadgeIds && profileData.awardedBadgeIds.length > 0) {
-            const lastBadgeId = profileData.awardedBadgeIds[profileData.awardedBadgeIds.length - 1];
-            const badgeDocRef = doc(db, 'badges', lastBadgeId);
-            const badgeSnap = await getDoc(badgeDocRef);
-            if(badgeSnap.exists()){
-                setLatestBadge({ id: badgeSnap.id, ...badgeSnap.data() } as BadgeType);
-            }
-          }
-          setUserProfileData(profileData);
-        }
-
-        // Fetch User Bookings
-        const bookingsQuery = query(collection(db, 'bookings'), where('uid', '==', currentUser.uid), limit(50));
-        const bookingsSnap = await getDocs(bookingsQuery);
-        const bookingsData = bookingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
+    const bookingsQuery = query(collection(db, 'bookings'), where('uid', '==', currentUser.uid), orderBy('createdAt', 'desc'));
+    const bookingsUnsubscribe = onSnapshot(bookingsQuery, (snapshot) => {
+        const bookingsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
         setUserBookings(bookingsData);
 
-        // Fetch Accessible Resources
+        // Fetch resources based on new bookings data
         const paidServiceIds = ['general'];
         bookingsData.forEach(booking => {
-          if (booking.paymentStatus === 'paid') {
+            if (booking.paymentStatus === 'paid') {
             paidServiceIds.push(booking.serviceId);
-          }
+            }
         });
         const uniqueServiceIds = [...new Set(paidServiceIds)];
 
         if (uniqueServiceIds.length > 0) {
-          const resourcesQuery = query(collection(db, 'resources'), where('serviceCategory', 'in', uniqueServiceIds));
-          const resourcesSnap = await getDocs(resourcesQuery);
-          setAccessibleResources(resourcesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ResourceType)));
+            const resourcesQuery = query(collection(db, 'resources'), where('serviceCategory', 'in', uniqueServiceIds));
+            getDocs(resourcesQuery).then(resourcesSnap => {
+                setAccessibleResources(resourcesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ResourceType)));
+            });
         }
+    });
 
-      } catch (error) {
-        console.error("Error loading dashboard data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    const profileDocRef = doc(db, "userProfiles", currentUser.uid);
+    const profileUnsubscribe = onSnapshot(profileDocRef, async (profileSnap) => {
+        if (profileSnap.exists()) {
+            const profileData = profileSnap.data() as UserProfile;
+            setUserProfileData(profileData);
+            if (profileData.awardedBadgeIds && profileData.awardedBadgeIds.length > 0) {
+                const lastBadgeId = profileData.awardedBadgeIds[profileData.awardedBadgeIds.length - 1];
+                const badgeDocRef = doc(db, 'badges', lastBadgeId);
+                const badgeSnap = await getDoc(badgeDocRef);
+                if(badgeSnap.exists()){
+                    setLatestBadge({ id: badgeSnap.id, ...badgeSnap.data() } as BadgeType);
+                }
+            } else {
+                setLatestBadge(null);
+            }
+        }
+    });
 
-    fetchData();
+    setIsLoading(false);
+
+    return () => {
+        bookingsUnsubscribe();
+        profileUnsubscribe();
+    }
+
   }, [currentUser, loadingAuth]);
 
 

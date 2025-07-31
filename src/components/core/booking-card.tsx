@@ -20,10 +20,9 @@ import { cn } from '@/lib/utils';
 
 interface BookingCardProps {
   booking: Booking;
-  onBookingUpdate?: (updatedBooking: Booking) => void; // This can be removed if relying on real-time updates
 }
 
-export function BookingCard({ booking: initialBooking, onBookingUpdate }: BookingCardProps) {
+export function BookingCard({ booking: initialBooking }: BookingCardProps) {
   const { toast } = useToast();
   const [booking, setBooking] = useState<Booking>(initialBooking);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
@@ -256,7 +255,7 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
                 </DialogContent>
             </Dialog>
           )}
-          {booking.status === 'completed' && !booking.userFeedback && (
+          {booking.status === 'completed' && !booking.userFeedback && !booking.rating && (
              <Dialog open={isFeedbackModalOpen} onOpenChange={setIsFeedbackModalOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm" onClick={() => setIsFeedbackModalOpen(true)}>
@@ -286,10 +285,9 @@ export function BookingCard({ booking: initialBooking, onBookingUpdate }: Bookin
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor="feedbackText">Your Comments</Label>
+                    <Label htmlFor="feedbackText" className="mb-2 block">Your Comments</Label>
                     <Textarea
                       id="feedbackText"
-                      className="mt-2"
                       value={feedbackText}
                       onChange={(e) => setFeedbackText(e.target.value)}
                       placeholder="Tell us about your experience..."
