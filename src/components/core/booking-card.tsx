@@ -5,7 +5,7 @@ import type { Booking } from '@/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Video, FileText, DollarSign, AlertTriangle, MessageSquare, RotateCcw, Edit2, Star as StarIcon, ClipboardCheck } from 'lucide-react';
+import { Calendar, Video, FileText, DollarSign, AlertTriangle, MessageSquare, RotateCcw, Edit2, Star as StarIcon, ClipboardCheck, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -14,21 +14,25 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/use-auth';
 
 interface BookingCardProps {
   booking: Booking;
 }
 
 export function BookingCard({ booking: initialBooking }: BookingCardProps) {
+  const { currentUser } = useAuth();
   const { toast } = useToast();
   const [booking, setBooking] = useState<Booking>(initialBooking);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
   const [refundReason, setRefundReason] = useState('');
   const [isRefundEligible, setIsRefundEligible] = useState(false);
@@ -66,21 +70,44 @@ export function BookingCard({ booking: initialBooking }: BookingCardProps) {
   }, [booking.date, booking.time, booking.status]);
 
   const handleFeedbackSubmit = async () => {
+    if (!currentUser) {
+      toast({ title: "Not Authenticated", description: "You must be logged in to leave feedback.", variant: "destructive"});
+      return;
+    }
     if (!feedbackText.trim() && rating === 0) {
       toast({ title: "Feedback Empty", description: "Please provide a rating or a comment before submitting.", variant: "destructive" });
       return;
     }
     
+    setIsSubmitting(true);
     try {
+      const feedbackMessage = `Rating: ${rating > 0 ? `${rating}/5 stars` : 'Not provided'}\n\nComment: ${feedbackText || 'No comment provided.'}`;
+
+      const userMessagesColRef = collection(db, "userMessages");
+      await addDoc(userMessagesColRef, {
+        uid: currentUser.uid,
+        userName: currentUser.name,
+        userEmail: currentUser.email,
+        subject: `Feedback for: ${booking.serviceName} on ${formattedDate}`,
+        messageBody: feedbackMessage,
+        senderType: 'user',
+        status: 'closed', // Create as a closed thread
+        timestamp: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      
+      // Also update the booking to mark that feedback has been left
       const bookingDocRef = doc(db, 'bookings', booking.id);
       await updateDoc(bookingDocRef, {
-        userFeedback: feedbackText,
+        userFeedback: "submitted", // Use a flag to indicate submission
         rating: rating,
         updatedAt: serverTimestamp(),
       });
+
       toast({
         title: "Feedback Submitted!",
-        description: "Thank you for your valuable feedback.",
+        description: "Thank you for your valuable feedback. It has been sent to the admin.",
       });
       setIsFeedbackModalOpen(false);
       setFeedbackText('');
@@ -88,6 +115,8 @@ export function BookingCard({ booking: initialBooking }: BookingCardProps) {
     } catch (error) {
        console.error("Error submitting feedback:", error);
        toast({ title: "Submission Failed", description: "Could not submit your feedback.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -255,11 +284,11 @@ export function BookingCard({ booking: initialBooking }: BookingCardProps) {
                 </DialogContent>
             </Dialog>
           )}
-          {booking.status === 'completed' && !booking.userFeedback && !booking.rating && (
+          {booking.status === 'completed' && (
              <Dialog open={isFeedbackModalOpen} onOpenChange={setIsFeedbackModalOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm" onClick={() => setIsFeedbackModalOpen(true)}>
-                  <Edit2 className="mr-2 h-4 w-4" /> Leave Feedback
+                <Button variant="outline" size="sm" onClick={() => setIsFeedbackModalOpen(true)} disabled={booking.userFeedback === 'submitted'}>
+                  <Edit2 className="mr-2 h-4 w-4" /> {booking.userFeedback === 'submitted' ? 'Feedback Submitted' : 'Leave Feedback'}
                 </Button>
               </DialogTrigger>
               <DialogContent>
@@ -297,7 +326,10 @@ export function BookingCard({ booking: initialBooking }: BookingCardProps) {
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsFeedbackModalOpen(false)}>Cancel</Button>
-                  <Button onClick={handleFeedbackSubmit} disabled={!feedbackText.trim() && rating === 0}>Submit Feedback</Button>
+                  <Button onClick={handleFeedbackSubmit} disabled={(!feedbackText.trim() && rating === 0) || isSubmitting}>
+                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Submit Feedback
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>

@@ -121,6 +121,18 @@ export default function AdminMessagesPage() {
     });
   }, [groupedMessages]);
 
+  useEffect(() => {
+    if (selectedConversation) {
+        const updatedConversation = allConversationList.find(c => c.conversationId === selectedConversation.conversationId);
+        if (updatedConversation) {
+            setSelectedConversation(updatedConversation);
+        } else {
+          // If the selected conversation is no longer in the list (e.g., due to filter change), deselect it.
+          setSelectedConversation(null);
+        }
+    }
+  }, [allConversationList, selectedConversation]);
+
   const totalPages = Math.ceil(allConversationList.length / ITEMS_PER_PAGE);
 
   const paginatedConversationList = useMemo(() => {
