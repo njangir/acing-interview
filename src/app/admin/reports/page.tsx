@@ -176,16 +176,20 @@ export default function AdminReportsPage() {
         });
       }
 
-      const historyEntry = {
+      const historyEntry: any = {
         submissionDate: serverTimestamp(),
         bookingId: selectedBookingId,
         userName: selectedBookingDetails.userName,
         serviceName: selectedBookingDetails.serviceName,
         reportFileName: reportFile ? reportFile.name : (finalReportUrl ? finalReportUrl.split('/').pop()?.split('?')[0].split('%2F').pop() : undefined),
-        badgeAssignedName: assignedBadge ? assignedBadge.name : undefined,
         adminUid: adminUser?.uid, 
         createdAt: serverTimestamp()
       };
+      
+      if (assignedBadge) {
+        historyEntry.badgeAssignedName = assignedBadge.name;
+      }
+
       await addDoc(collection(db, "feedbackSubmissions"), historyEntry);
       
       toast({
