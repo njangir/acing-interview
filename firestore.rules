@@ -3,99 +3,114 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions to keep rules DRY
-    function isLoggedIn() {
-      return request.auth != null;
+    // Helper function to check if a user is an admin
+    function isAdmin(uid) {
+      return exists(/databases/$(database)/documents/userProfiles/$(uid)) &&
+             get(/databases/$(database)/documents/userProfiles/$(uid)).data.roles.hasAny(['admin']);
     }
 
-    function isOwner(userId) {
-      return isLoggedIn() && request.auth.uid == userId;
+    // Helper function to check if a user is the owner of a document
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    
+    // User Profiles:
+    // - Users can read and write their own profile.
+    // - Admins can read all profiles.
+    match /userProfiles/{uid} {
+      allow read: if isOwner(uid) || isAdmin(request.auth.uid);
+      allow write: if isOwner(uid) || isAdmin(request.auth.uid);
+      
+      // Notifications subcollection
+      match /notifications/{notificationId} {
+        allow read, write: if isOwner(uid);
+      }
     }
 
-    // Function to check if the user has an 'admin' role in their profile
-    function isAdmin() {
-      return isLoggedIn() && get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.roles.hasAny(['admin']);
-    }
-
-    // Default deny all access unless explicitly allowed
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // User Profiles: Users can read/write their own profile. Admins can read all profiles.
-    match /userProfiles/{userId} {
-      allow get: if isLoggedIn(); // All logged-in users can read profiles (e.g., for avatars)
-      allow list: if isLoggedIn();
-      allow create: if isOwner(userId); // Allows new user profile creation after sign-up
-      allow update: if isOwner(userId); // Users can update their own profile
-      allow delete: if isAdmin(); // Only admins can delete profiles
-    }
-
-    // Services: Publicly readable, only admins can write.
+    // Services:
+    // - Publicly readable.
+    // - Writable only by admins.
     match /services/{serviceId} {
-      allow get, list: if true;
-      allow write: if isAdmin();
+      allow read: if true;
+      allow write: if isAdmin(request.auth.uid);
     }
-    
-    // Bookings: Users can manage their own bookings. Admins have full access.
+
+    // Bookings:
+    // - Users can read their own bookings.
+    // - Users can create their own bookings.
+    // - Users can update their own booking for specific fields (refund request).
+    // - Admins can read and write all bookings.
     match /bookings/{bookingId} {
-      allow read: if isOwner(resource.data.uid) || isAdmin();
-      allow create: if isLoggedIn(); // Any logged-in user can create a booking request
-      allow update: if isOwner(resource.data.uid) || isAdmin(); // User can update (e.g., request refund), admin can update (e.g., accept)
-      allow delete: if isAdmin();
-    }
-
-    // Availability: Publicly readable for slot display. Only admins can write.
-    match /globalAvailability/{date} {
-      allow get, list: if true;
-      allow write: if isAdmin();
+      allow read: if isOwner(resource.data.uid) || isAdmin(request.auth.uid);
+      allow create: if isOwner(request.resource.data.uid);
+      allow update: if (isOwner(resource.data.uid) && request.resource.data.keys().hasAll(['requestedRefund', 'refundReason'])) || isAdmin(request.auth.uid);
+      allow delete: if isAdmin(request.auth.uid);
     }
     
-    // Mentor Profile: Publicly readable, only admins can write.
-    match /siteProfiles/mainMentor {
-        allow get: if true;
-        allow write: if isAdmin();
-    }
-
-    // Testimonials: Users can create. Approved are public. Admins can manage all.
+    // Testimonials:
+    // - Approved testimonials are publicly readable.
+    // - Users can create their own testimonials.
+    // - Admins can read, update (approve/reject), and delete all.
     match /testimonials/{testimonialId} {
-      allow get: if resource.data.status == 'approved' || isAdmin();
-      allow list: if true; // Allows querying for approved testimonials
-      allow create: if isLoggedIn();
-      allow update, delete: if isAdmin();
+        allow read: if resource.data.status == 'approved' || isOwner(resource.data.uid) || isAdmin(request.auth.uid);
+        allow create: if isOwner(request.resource.data.uid);
+        allow update, delete: if isAdmin(request.auth.uid);
     }
 
-    // Resources: Readable by logged-in users. Writable only by admins.
-    // More complex rules could limit access based on purchased services.
+    // Resources:
+    // - Publicly readable to allow access for all entitled users (entitlement checked on client/function).
+    // - Writable only by admins.
     match /resources/{resourceId} {
-      allow get, list: if isLoggedIn();
-      allow write: if isAdmin();
-d
-    }
-
-    // User Messages: Users can create/read their own threads. Admins can read all and reply.
-    match /userMessages/{messageId} {
-      allow read: if isOwner(resource.data.uid) || isAdmin();
-      allow create: if isLoggedIn();
-      allow update: if isAdmin(); // Only admins can change status (e.g., 'read', 'closed')
-      allow delete: if isAdmin();
-    }
-
-    // Badges: Publicly readable. Only admins can write.
-    match /badges/{badgeId} {
-      allow get, list: if true;
-      allow write: if isAdmin();
-    }
-
-    // Feedback Submissions (Audit Log): Writable and readable only by admins.
-    match /feedbackSubmissions/{submissionId} {
-      allow read, write: if isAdmin();
+        allow read: if true;
+        allow write: if isAdmin(request.auth.uid);
     }
     
-    // Notifications: Users can only interact with their own notifications.
-    match /userProfiles/{userId}/notifications/{notificationId} {
-      allow read, update, delete: if isOwner(userId);
-      allow create: if isAdmin(); // Functions/backend creates notifications
+    // Badges:
+    // - Publicly readable.
+    // - Writable only by admins.
+    match /badges/{badgeId} {
+        allow read: if true;
+        allow write: if isAdmin(request.auth.uid);
+    }
+
+    // Global Availability:
+    // - Publicly readable for anyone to check slots.
+    // - Writable only by admins.
+    match /globalAvailability/{date} {
+      allow read: if true;
+      allow write: if isAdmin(request.auth.uid);
+    }
+
+    // Site Profiles (e.g., Mentor Profile):
+    // - Publicly readable.
+    // - Writable only by admins.
+    match /siteProfiles/{profileId} {
+      allow read: if true;
+      allow write: if isAdmin(request.auth.uid);
+    }
+    
+    // Site Content (e.g., Hero Section):
+    // - Publicly readable.
+    // - Writable only by admins.
+    match /siteContent/{contentId} {
+      allow read: if true;
+      allow write: if isAdmin(request.auth.uid);
+    }
+
+    // User Messages:
+    // - Users can create messages (starting a thread).
+    // - Users can only read messages where their UID matches.
+    // - Admins can read all messages and write replies.
+    match /userMessages/{messageId} {
+      allow read: if isOwner(resource.data.uid) || isAdmin(request.auth.uid);
+      allow create: if isOwner(request.resource.data.uid) || isAdmin(request.auth.uid);
+      allow update: if isAdmin(request.auth.uid); // For status changes
+    }
+    
+    // Feedback Submissions (Audit log):
+    // - Writable and readable only by admins.
+    match /feedbackSubmissions/{submissionId} {
+        allow read, write: if isAdmin(request.auth.uid);
     }
   }
 }

@@ -20,9 +20,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { functions, storage } from '@/lib/firebase';
 import { httpsCallable } from 'firebase/functions';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import type { HeroSectionData } from '@/types';
 
+const saveHeroSection = httpsCallable(functions, 'saveHeroSection');
 
 const heroSectionSchema = z.object({
   heroTitle: z.string().min(10, "Title must be at least 10 characters."),
@@ -33,10 +35,6 @@ const heroSectionSchema = z.object({
 });
 
 type HeroSectionFormValues = z.infer<typeof heroSectionSchema>;
-
-interface HeroSectionData extends HeroSectionFormValues {
-    updatedAt?: any;
-}
 
 export default function AdminHeroSectionPage() {
   const { toast } = useToast();
@@ -65,7 +63,7 @@ export default function AdminHeroSectionPage() {
           form.reset(data);
           setImagePreview(data.heroImageUrl || null);
         } else {
-            const defaultData = {
+            const defaultData: HeroSectionData = {
                 heroTitle: 'Crack Your SSB Interview with Expert Guidance',
                 heroSubtitle: 'Led by a 4-time SSB recommended professional. Get personalized mock interviews, in-depth feedback, and proven strategies to achieve your armed forces dream.',
                 heroCtaText: 'Book Your Interview Now',
@@ -78,12 +76,12 @@ export default function AdminHeroSectionPage() {
         }
       } catch (err) {
         console.error("Error fetching hero section data:", err);
-        setError("Failed to load hero section data.");
+        setError("Failed to load hero section data. Check Firestore permissions.");
       }
       setIsLoading(false);
     };
     fetchHeroData();
-  }, [form]);
+  }, [form, heroDocRef]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -115,13 +113,13 @@ export default function AdminHeroSectionPage() {
         }
     }
 
+    const dataToSave: HeroSectionData = {
+        ...data,
+        heroImageUrl: finalImageUrl,
+    };
+    
     try {
-      const dataToSave: HeroSectionData = {
-          ...data,
-          heroImageUrl: finalImageUrl,
-      };
-      
-      await setDoc(heroDocRef, { ...dataToSave, updatedAt: serverTimestamp() }, { merge: true });
+      await saveHeroSection({ heroData: dataToSave });
       setHeroData(dataToSave);
       
       toast({
@@ -251,5 +249,3 @@ export default function AdminHeroSectionPage() {
     </>
   );
 }
-
-    

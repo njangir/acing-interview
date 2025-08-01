@@ -6,7 +6,7 @@ import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import Razorpay from "razorpay";
 import crypto from "crypto";
-import type { Booking, UserMessage, Service, Resource, Badge, UserProfile, MentorProfileData, Testimonial, FeedbackSubmissionHistoryEntry } from "./types";
+import type { Booking, UserMessage, Service, Resource, Badge, UserProfile, MentorProfileData, Testimonial, FeedbackSubmissionHistoryEntry, HeroSectionData } from "./types";
 import { getStorage } from "firebase-admin/storage";
 
 initializeApp();
@@ -254,6 +254,10 @@ exports.onBookingUpdate = functions.firestore.document("bookings/{bookingId}").o
 
   if (before.status !== 'cancelled' && after.status === 'cancelled') {
     return createNotification(after.uid, `Session for '${serviceName}' was cancelled.`, '/dashboard/bookings');
+  }
+
+  if (before.status !== 'completed' && after.status === 'completed') {
+    return createNotification(after.uid, `Feedback for '${serviceName}' is available.`, '/dashboard/bookings');
   }
 
   if (!before.reportUrl && after.reportUrl) {
@@ -714,6 +718,31 @@ exports.getAdminTestimonialsPageData = functions.runWith({ secrets: ["RAZORPAY_K
         throw new functions.https.HttpsError("internal", "Failed to fetch admin testimonials page data.");
     }
 });
+
+// New function to save hero section data
+exports.saveHeroSection = functions.https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const { heroData } = data as { heroData: HeroSectionData };
+    
+    if (!heroData) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing heroData payload.');
+    }
+    
+    const firestore = getFirestore();
+    const heroDocRef = firestore.collection('siteContent').doc('homePage');
+    
+    try {
+        await heroDocRef.set({
+            ...heroData,
+            updatedAt: FieldValue.serverTimestamp()
+        }, { merge: true });
+        return { success: true, message: "Hero section updated successfully." };
+    } catch (error) {
+        logger.error("Error saving hero section data:", error);
+        throw new functions.https.HttpsError('internal', 'Failed to save hero section data.');
+    }
+});
+
 
 // Add more admin write functions below as needed
 

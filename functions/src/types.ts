@@ -1,7 +1,8 @@
 
 
-// This file contains shared types between frontend and backend.
 import type { firestore } from 'firebase-admin';
+
+// This file contains shared types between frontend and backend.
 
 export interface Booking {
   id:string;
@@ -17,6 +18,7 @@ export interface Booking {
   paymentStatus: 'paid' | 'pay_later_pending' | 'pay_later_unpaid';
   reportUrl?: string;
   userFeedback?: string;
+  rating?: number;
   requestedRefund?: boolean;
   refundReason?: string;
   transactionId?: string | null;
@@ -51,6 +53,10 @@ export interface Service {
   dataAiHint?: string;
   defaultForce?: 'Air Force' | 'Army' | 'Navy' | 'General';
   isBookable?: boolean;
+  hasDetailsPage?: boolean;
+  howItWorks?: string;
+  whatToExpect?: string;
+  howItWillHelp?: string;
   createdAt?: firestore.FieldValue;
   updatedAt?: firestore.FieldValue;
 }
@@ -138,4 +144,13 @@ export interface FeedbackSubmissionHistoryEntry {
   badgeAssignedName?: string;
   adminUid?: string;
   createdAt?: firestore.FieldValue;
+}
+
+export interface HeroSectionData {
+  heroTitle: string;
+  heroSubtitle: string;
+  heroCtaText: string;
+  heroImageUrl: string;
+  heroDataAiHint?: string;
+  updatedAt?: firestore.FieldValue;
 }
