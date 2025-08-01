@@ -7,13 +7,46 @@ import { CheckCircle, Shield, Target } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+
+interface HeroData {
+    heroTitle: string;
+    heroSubtitle: string;
+    heroCtaText: string;
+    heroImageUrl: string;
+    heroDataAiHint: string;
+}
+
+async function getHeroData(): Promise<HeroData> {
+    try {
+        const heroDocRef = doc(db, 'siteContent', 'homePage');
+        const docSnap = await getDoc(heroDocRef);
+        if (docSnap.exists()) {
+            return docSnap.data() as HeroData;
+        }
+    } catch (error) {
+        console.error("Error fetching hero data, using fallback.", error);
+    }
+    // Fallback data if Firestore fetch fails or document doesn't exist
+    return {
+        heroTitle: 'Crack Your SSB Interview with Expert Guidance',
+        heroSubtitle: 'Led by a 4-time SSB recommended professional. Get personalized mock interviews, in-depth feedback, and proven strategies to achieve your armed forces dream.',
+        heroCtaText: 'Book Your Interview Now',
+        heroImageUrl: 'https://placehold.co/600x450.png',
+        heroDataAiHint: 'interview coaching',
+    };
+}
+
 
 export const metadata: Metadata = {
   description: 'Achieve your armed forces dream with expert-led SSB mock interviews, personalized feedback, and proven strategies from a 4-time recommended professional.',
 };
 
 
-export default function HomePage() {
+export default async function HomePage() {
+  const heroData = await getHeroData();
+
   return (
     <>
       {/* Hero Section */}
@@ -21,26 +54,26 @@ export default function HomePage() {
         <div className="container grid md:grid-cols-2 gap-8 items-center">
           <div className="space-y-6">
             <h1 className="text-4xl md:text-5xl font-bold font-headline animate-subtle-appear" style={{ animationDelay: '0.1s' }}>
-              Crack Your SSB Interview with Expert Guidance
+              {heroData.heroTitle}
             </h1>
             <p className="text-lg md:text-xl text-primary-foreground/80 animate-subtle-appear" style={{ animationDelay: '0.3s' }}>
-              Led by a 4-time SSB recommended professional. Get personalized mock interviews,
-              in-depth feedback, and proven strategies to achieve your armed forces dream.
+              {heroData.heroSubtitle}
             </p>
             <div className="animate-subtle-appear" style={{ animationDelay: '0.5s' }}>
               <Button size="lg" asChild className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg transform hover:scale-105 transition-transform duration-300">
-                <Link href="/services">Book Your Interview Now</Link>
+                <Link href="/services">{heroData.heroCtaText}</Link>
               </Button>
             </div>
           </div>
           <div className="hidden md:block relative animate-subtle-appear group overflow-hidden rounded-lg shadow-2xl" style={{ animationDelay: '0.2s' }}>
             <Image
-              src="https://placehold.co/600x450.png"
+              src={heroData.heroImageUrl}
               alt="SSB Interview Preparation"
               width={600}
               height={450}
               className="rounded-lg transition-transform duration-300 group-hover:scale-105"
-              data-ai-hint="interview coaching"
+              data-ai-hint={heroData.heroDataAiHint}
+              priority
             />
           </div>
         </div>
@@ -99,3 +132,5 @@ export default function HomePage() {
     </>
   );
 }
+
+    
