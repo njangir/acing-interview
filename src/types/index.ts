@@ -157,3 +157,14 @@ export interface FeedbackSubmissionHistoryEntry {
   adminUid?: string;
   createdAt?: any;
 }
+
+export interface HeroSectionData {
+  heroTitle: string;
+  heroSubtitle: string;
+  heroCtaText: string;
+  heroImageUrl: string;
+  heroDataAiHint?: string;
+  updatedAt?: any;
+}
+
+    

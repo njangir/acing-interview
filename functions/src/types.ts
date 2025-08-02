@@ -165,3 +165,5 @@ export interface UserNotification {
     timestamp: firestore.FieldValue;
     type: 'booking_update' | 'message_reply' | 'general';
 }
+
+    

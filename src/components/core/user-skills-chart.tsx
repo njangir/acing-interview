@@ -2,7 +2,7 @@
 'use client';
 
 import type { Booking } from '@/types';
-import { PREDEFINED_SKILLS, SKILL_RATING_VALUES, MAX_SKILL_RATING_VALUE, TARGET_SKILL_RATING_VALUE } from '@/constants';
+import { PREDEFINED_SKILLS, SKILL_RATING_VALUES, MAX_SKILL_RATING_VALUE, TARGET_SKILL_RATING_VALUE, KEY_SKILLS_FOR_CHART } from '@/constants';
 import { useMemo } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, ReferenceLine, Legend } from 'recharts';
 import {
@@ -30,31 +30,33 @@ interface ChartDataItem {
   skill: string; // Shortened skill name for XAxis
   fullSkillName: string; // Full skill name for tooltip
   averageRating: number;
-  firstRating: number;
+  latestRating: number;
 }
 
 const chartConfig = {
   averageRating: {
     label: "Average Rating",
-    color: "hsl(var(--chart-1))",
-  },
-  firstRating: {
-    label: "First Session Rating",
     color: "hsl(var(--chart-2))",
+  },
+  latestRating: {
+    label: "Latest Rating",
+    color: "hsl(var(--chart-1))",
   },
 } satisfies ChartConfig;
 
 export function UserSkillsChart({ completedBookingsWithFeedback }: UserSkillsChartProps) {
   const chartData = useMemo(() => {
     const skillDataItems: ChartDataItem[] = [];
+    
+    const relevantSkills = KEY_SKILLS_FOR_CHART;
 
     if (!completedBookingsWithFeedback || completedBookingsWithFeedback.length === 0) {
-      PREDEFINED_SKILLS.forEach((skill) => {
+      relevantSkills.forEach((skill) => {
         skillDataItems.push({
           skill: skill.length > 15 ? skill.substring(0, 13) + '...' : skill,
           fullSkillName: skill,
           averageRating: 0,
-          firstRating: 0,
+          latestRating: 0,
         });
       });
       return skillDataItems;
@@ -63,13 +65,13 @@ export function UserSkillsChart({ completedBookingsWithFeedback }: UserSkillsCha
     const sortedBookingsWithFeedback = [...completedBookingsWithFeedback].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
-    const firstBookingWithAnyFeedback = sortedBookingsWithFeedback[0];
+    const latestBookingWithFeedback = sortedBookingsWithFeedback[sortedBookingsWithFeedback.length - 1];
 
-    PREDEFINED_SKILLS.forEach((skill) => {
+    relevantSkills.forEach((skill) => {
       let totalRating = 0;
       let count = 0;
 
-      completedBookingsWithFeedback.forEach(booking => {
+      sortedBookingsWithFeedback.forEach(booking => {
         if (booking.detailedFeedback) {
           const skillFeedback = booking.detailedFeedback.find(fb => fb.skill === skill);
           if (skillFeedback && skillFeedback.rating && SKILL_RATING_VALUES[skillFeedback.rating]) {
@@ -80,11 +82,11 @@ export function UserSkillsChart({ completedBookingsWithFeedback }: UserSkillsCha
       });
       const average = count > 0 ? parseFloat((totalRating / count).toFixed(1)) : 0;
 
-      let firstRatingValue = 0;
-      if (firstBookingWithAnyFeedback && firstBookingWithAnyFeedback.detailedFeedback) {
-        const skillFeedbackInFirst = firstBookingWithAnyFeedback.detailedFeedback.find(fb => fb.skill === skill);
-        if (skillFeedbackInFirst && skillFeedbackInFirst.rating && SKILL_RATING_VALUES[skillFeedbackInFirst.rating]) {
-          firstRatingValue = SKILL_RATING_VALUES[skillFeedbackInFirst.rating];
+      let latestRatingValue = 0;
+      if (latestBookingWithFeedback && latestBookingWithFeedback.detailedFeedback) {
+        const skillFeedbackInLatest = latestBookingWithFeedback.detailedFeedback.find(fb => fb.skill === skill);
+        if (skillFeedbackInLatest && skillFeedbackInLatest.rating && SKILL_RATING_VALUES[skillFeedbackInLatest.rating]) {
+          latestRatingValue = SKILL_RATING_VALUES[skillFeedbackInLatest.rating];
         }
       }
 
@@ -92,13 +94,13 @@ export function UserSkillsChart({ completedBookingsWithFeedback }: UserSkillsCha
         skill: skill.length > 15 ? skill.substring(0, 13) + '...' : skill,
         fullSkillName: skill,
         averageRating: average,
-        firstRating: firstRatingValue,
+        latestRating: latestRatingValue,
       });
     });
     return skillDataItems;
   }, [completedBookingsWithFeedback]);
 
-  const noDataAvailable = chartData.every(d => d.averageRating === 0 && d.firstRating === 0) && completedBookingsWithFeedback.length === 0;
+  const noDataAvailable = chartData.every(d => d.averageRating === 0 && d.latestRating === 0) && completedBookingsWithFeedback.length === 0;
 
   if (noDataAvailable) {
     return (
@@ -116,14 +118,6 @@ export function UserSkillsChart({ completedBookingsWithFeedback }: UserSkillsCha
     );
   }
 
-  // Prepare a config that maps full skill names to their display names for the tooltip
-  const tooltipChartConfig: ChartConfig = Object.fromEntries(
-    Object.entries(chartConfig).concat(
-      chartData.map(item => [item.fullSkillName, { label: item.fullSkillName }]) // this part might not be strictly needed if tooltip auto-uses dataKey name
-    )
-  );
-
-
   return (
     <Card className="shadow-lg">
       <CardHeader>
@@ -131,16 +125,16 @@ export function UserSkillsChart({ completedBookingsWithFeedback }: UserSkillsCha
            <TrendingUp className="mr-2 h-5 w-5" /> My Skills Overview
         </CardTitle>
         <CardDescription>
-          Comparison of first session ratings vs. average ratings. Max: {MAX_SKILL_RATING_VALUE}. Target (Good): {TARGET_SKILL_RATING_VALUE}.
+          Comparison of your latest session ratings vs. your historical average. Max: {MAX_SKILL_RATING_VALUE}. Target: {TARGET_SKILL_RATING_VALUE}.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={tooltipChartConfig} className="h-[400px] w-full">
+        <ChartContainer config={chartConfig} className="h-[400px] w-full">
           <BarChart
             accessibilityLayer
             data={chartData}
             margin={{
-              top: 20, // Increased top margin for legend
+              top: 20, 
               right: 5,
               left: -20,
               bottom: 5,
@@ -154,11 +148,10 @@ export function UserSkillsChart({ completedBookingsWithFeedback }: UserSkillsCha
               axisLine={false}
               angle={-30}
               textAnchor="end"
-              height={70} // Increased height for angled labels
+              height={70} 
               interval={0}
             />
             <YAxis
-              dataKey="averageRating" // This sets the scale, firstRating will use the same scale
               type="number"
               domain={[0, MAX_SKILL_RATING_VALUE]}
               allowDecimals={false}
@@ -178,11 +171,13 @@ export function UserSkillsChart({ completedBookingsWithFeedback }: UserSkillsCha
               stroke="hsl(var(--muted-foreground))"
               strokeDasharray="3 3"
             />
-            <Bar dataKey="firstRating" fill="var(--color-firstRating)" radius={[4, 4, 0, 0]} name="First Session Rating" />
             <Bar dataKey="averageRating" fill="var(--color-averageRating)" radius={[4, 4, 0, 0]} name="Average Rating" />
+            <Bar dataKey="latestRating" fill="var(--color-latestRating)" radius={[4, 4, 0, 0]} name="Latest Rating" />
           </BarChart>
         </ChartContainer>
       </CardContent>
     </Card>
   );
 }
+
+    

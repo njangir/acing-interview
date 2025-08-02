@@ -86,16 +86,25 @@ export const MOCK_BADGES: Badge[] = [
 ];
 
 export const PREDEFINED_SKILLS: string[] = [
-    "Communication Skills",
-    "Officer-Like Qualities (OLQs)",
-    "General Awareness",
-    "Confidence Level",
-    "Problem Solving Ability",
-    "Group Interaction",
-    "Technical Knowledge (if applicable)",
-    "AFCAT Exam Knowledge",
-    "Time Management Strategy",
+    "Clarity of Thought and Expression",
+    "Self-Awareness",
+    "Leadership Potential",
+    "Social Adaptability",
+    "Effective Intelligence",
+    "Reasoning Ability",
+    "Determination and Willpower",
+    "Emotional Stability",
+    "Responsibility and Maturity",
 ];
+
+export const KEY_SKILLS_FOR_CHART: string[] = [
+    "Leadership Potential",
+    "Effective Intelligence",
+    "Reasoning Ability",
+    "Social Adaptability",
+    "Clarity of Thought and Expression",
+];
+
 
 export const SKILL_RATINGS: string[] = [
     "Needs Significant Improvement",

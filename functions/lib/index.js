@@ -314,6 +314,7 @@ exports.getAdminDashboardData = functions.runWith({ secrets: ["RAZORPAY_KEY_ID",
     }
 });
 exports.getAvailableSlots = functions.https.onCall(async (data, context) => {
+    var _a;
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
     }
@@ -323,16 +324,25 @@ exports.getAvailableSlots = functions.https.onCall(async (data, context) => {
     }
     try {
         const firestore = (0, firestore_1.getFirestore)();
-        // Query for bookings on the selected date that have an active status
+        // 1. Get all possible slots for the day from the already fetched global data
+        const availabilityDocRef = firestore.collection('globalAvailability').doc(dateString);
+        const availabilitySnap = await availabilityDocRef.get();
+        const allPossibleSlotsForDay = availabilitySnap.exists ? ((_a = availabilitySnap.data()) === null || _a === void 0 ? void 0 : _a.timeSlots) || [] : [];
+        if (allPossibleSlotsForDay.length === 0) {
+            return { availableSlots: [] };
+        }
+        // 2. Fetch only the BOOKED slots for this date from the backend
         const bookingsQuery = firestore.collection("bookings")
             .where("date", "==", dateString)
             .where("status", "in", ["pending_approval", "accepted", "scheduled"]);
         const bookingsSnapshot = await bookingsQuery.get();
-        const bookedTimes = bookingsSnapshot.docs.map(doc => doc.data().time);
-        return { bookedSlots: bookedTimes };
+        const bookedTimes = new Set(bookingsSnapshot.docs.map(doc => doc.data().time));
+        // 3. Filter out the booked times
+        const trulyAvailableSlots = allPossibleSlotsForDay.filter((time) => !bookedTimes.has(time));
+        return { availableSlots: trulyAvailableSlots };
     }
     catch (err) {
-        logger.error("Error fetching available slots:", err);
+        logger.error(`Error fetching available slots for ${dateString}:`, err);
         throw new functions.https.HttpsError("internal", "Could not retrieve available slots.", err.message);
     }
 });
