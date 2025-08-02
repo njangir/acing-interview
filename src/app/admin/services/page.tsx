@@ -358,101 +358,101 @@ export default function AdminServicesPage() {
       </Card>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-2xl flex flex-col max-h-[calc(100vh-4rem)]">
-          <DialogHeader className="flex-shrink-0">
-            <DialogTitle>{currentService ? 'Edit Service' : 'Add New Service'}</DialogTitle>
-            <DialogDesc>
-              {currentService ? `Update details for ${currentService.name}.` : 'Fill in the details for the new service.'}
-            </DialogDesc>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="flex-grow overflow-hidden">
-            <ScrollArea className="h-full pr-6 -mr-6">
-              <div className="space-y-4 py-4">
-                <div>
-                  <Label htmlFor="name" className="text-right">Name</Label>
-                  <Input id="name" name="name" value={formData.name} onChange={handleInputChange} required />
-                </div>
-                <div>
-                  <Label htmlFor="description" className="text-right pt-2">Description</Label>
-                  <Textarea id="description" name="description" value={formData.description} onChange={handleInputChange} rows={3} required />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+        <DialogContent className="sm:max-w-2xl">
+           <form onSubmit={handleSubmit}>
+            <DialogHeader>
+              <DialogTitle>{currentService ? 'Edit Service' : 'Add New Service'}</DialogTitle>
+              <DialogDesc>
+                {currentService ? `Update details for ${currentService.name}.` : 'Fill in the details for the new service.'}
+              </DialogDesc>
+            </DialogHeader>
+            <ScrollArea className="max-h-[65vh] p-6 custom-scrollbar">
+                <div className="space-y-4">
                   <div>
-                    <Label htmlFor="price" className="text-right">Price (₹)</Label>
-                    <Input id="price" name="price" type="number" value={formData.price} onChange={handleInputChange} required min="0" />
+                    <Label htmlFor="name" className="text-right">Name</Label>
+                    <Input id="name" name="name" value={formData.name} onChange={handleInputChange} required />
                   </div>
                   <div>
-                    <Label htmlFor="duration" className="text-right">Duration</Label>
-                    <Input id="duration" name="duration" value={formData.duration} onChange={handleInputChange} placeholder="e.g., 60 mins" required />
+                    <Label htmlFor="description" className="text-right pt-2">Description</Label>
+                    <Textarea id="description" name="description" value={formData.description} onChange={handleInputChange} rows={3} required />
                   </div>
-                </div>
-                <div>
-                  <Label htmlFor="features" className="text-right pt-2">Features</Label>
-                  <Textarea id="features" name="features" value={formData.features} onChange={handleInputChange} placeholder="Comma-separated, e.g., Feature 1, Feature 2" rows={3} />
-                </div>
-                <div>
-                  <Label htmlFor="imageUpload" className="text-right">Thumbnail Image</Label>
-                  <Input id="imageUpload" name="imageUpload" type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'thumbnail')} />
-                </div>
-                {thumbnailPreview && (
-                    <div className="flex justify-center">
-                        <Image src={thumbnailPreview} alt="Thumbnail preview" width={200} height={150} className="rounded-md object-cover border" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="price" className="text-right">Price (₹)</Label>
+                      <Input id="price" name="price" type="number" value={formData.price} onChange={handleInputChange} required min="0" />
                     </div>
-                )}
-                <div>
-                  <Label htmlFor="dataAiHint" className="text-right">AI Hint for Thumbnail</Label>
-                  <Input id="dataAiHint" name="dataAiHint" value={formData.dataAiHint} onChange={handleInputChange} placeholder="e.g., meeting, study" />
-                </div>
-                <div className="flex items-center space-x-2 pt-2">
-                  <Switch
-                    id="isBookable"
-                    checked={formData.isBookable}
-                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isBookable: checked }))}
-                  />
-                  <Label htmlFor="isBookable">Bookings Enabled</Label>
-                </div>
-                <div className="space-y-4 rounded-md border p-4">
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="hasDetailsPage"
-                        checked={formData.hasDetailsPage}
-                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, hasDetailsPage: checked }))}
-                      />
-                      <Label htmlFor="hasDetailsPage" className="font-semibold">Enable "Know More" Details Page</Label>
+                    <div>
+                      <Label htmlFor="duration" className="text-right">Duration</Label>
+                      <Input id="duration" name="duration" value={formData.duration} onChange={handleInputChange} placeholder="e.g., 60 mins" required />
                     </div>
-                    {formData.hasDetailsPage && (
-                      <div className="space-y-4 pl-2 pt-2 border-l-2 border-primary/20 ml-2">
-                          <div>
-                              <Label htmlFor="bannerImageUpload">Details Page Banner Image</Label>
-                              <Input id="bannerImageUpload" name="bannerImageUpload" type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'banner')} />
-                          </div>
-                           {bannerPreview && (
-                              <div className="flex justify-center">
-                                  <Image src={bannerPreview} alt="Banner preview" width={300} height={150} className="rounded-md object-cover border" />
-                              </div>
-                          )}
-                          <div>
-                            <Label htmlFor="bannerImageDataAiHint">AI Hint for Banner</Label>
-                            <Input id="bannerImageDataAiHint" name="bannerImageDataAiHint" value={formData.bannerImageDataAiHint} onChange={handleInputChange} placeholder="e.g., professional, interview" />
-                          </div>
-                          <div>
-                              <Label htmlFor="howItWorks">How It Works</Label>
-                              <Textarea id="howItWorks" name="howItWorks" value={formData.howItWorks} onChange={handleInputChange} placeholder="Explain the process step-by-step..." rows={4} />
-                          </div>
-                          <div>
-                              <Label htmlFor="whatToExpect">What To Expect</Label>
-                              <Textarea id="whatToExpect" name="whatToExpect" value={formData.whatToExpect} onChange={handleInputChange} placeholder="Use bullet points (e.g., - Point 1) for clarity..." rows={4} />
-                          </div>
-                          <div>
-                              <Label htmlFor="howItWillHelp">How It Will Help</Label>
-                              <Textarea id="howItWillHelp" name="howItWillHelp" value={formData.howItWillHelp} onChange={handleInputChange} placeholder="Describe the benefits and outcomes..." rows={4} />
-                          </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="features" className="text-right pt-2">Features</Label>
+                    <Textarea id="features" name="features" value={formData.features} onChange={handleInputChange} placeholder="Comma-separated, e.g., Feature 1, Feature 2" rows={3} />
+                  </div>
+                  <div>
+                    <Label htmlFor="imageUpload" className="text-right">Thumbnail Image</Label>
+                    <Input id="imageUpload" name="imageUpload" type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'thumbnail')} />
+                  </div>
+                  {thumbnailPreview && (
+                      <div className="flex justify-center">
+                          <Image src={thumbnailPreview} alt="Thumbnail preview" width={200} height={150} className="rounded-md object-cover border" />
                       </div>
-                    )}
+                  )}
+                  <div>
+                    <Label htmlFor="dataAiHint" className="text-right">AI Hint for Thumbnail</Label>
+                    <Input id="dataAiHint" name="dataAiHint" value={formData.dataAiHint} onChange={handleInputChange} placeholder="e.g., meeting, study" />
+                  </div>
+                  <div className="flex items-center space-x-2 pt-2">
+                    <Switch
+                      id="isBookable"
+                      checked={formData.isBookable}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isBookable: checked }))}
+                    />
+                    <Label htmlFor="isBookable">Bookings Enabled</Label>
+                  </div>
+                  <div className="space-y-4 rounded-md border p-4">
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="hasDetailsPage"
+                          checked={formData.hasDetailsPage}
+                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, hasDetailsPage: checked }))}
+                        />
+                        <Label htmlFor="hasDetailsPage" className="font-semibold">Enable "Know More" Details Page</Label>
+                      </div>
+                      {formData.hasDetailsPage && (
+                        <div className="space-y-4 pl-2 pt-2 border-l-2 border-primary/20 ml-2">
+                            <div>
+                                <Label htmlFor="bannerImageUpload">Details Page Banner Image</Label>
+                                <Input id="bannerImageUpload" name="bannerImageUpload" type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'banner')} />
+                            </div>
+                            {bannerPreview && (
+                                <div className="flex justify-center">
+                                    <Image src={bannerPreview} alt="Banner preview" width={300} height={150} className="rounded-md object-cover border" />
+                                </div>
+                            )}
+                            <div>
+                              <Label htmlFor="bannerImageDataAiHint">AI Hint for Banner</Label>
+                              <Input id="bannerImageDataAiHint" name="bannerImageDataAiHint" value={formData.bannerImageDataAiHint} onChange={handleInputChange} placeholder="e.g., professional, interview" />
+                            </div>
+                            <div>
+                                <Label htmlFor="howItWorks">How It Works</Label>
+                                <Textarea id="howItWorks" name="howItWorks" value={formData.howItWorks} onChange={handleInputChange} placeholder="Explain the process step-by-step..." rows={4} />
+                            </div>
+                            <div>
+                                <Label htmlFor="whatToExpect">What To Expect</Label>
+                                <Textarea id="whatToExpect" name="whatToExpect" value={formData.whatToExpect} onChange={handleInputChange} placeholder="Use bullet points (e.g., - Point 1) for clarity..." rows={4} />
+                            </div>
+                            <div>
+                                <Label htmlFor="howItWillHelp">How It Will Help</Label>
+                                <Textarea id="howItWillHelp" name="howItWillHelp" value={formData.howItWillHelp} onChange={handleInputChange} placeholder="Describe the benefits and outcomes..." rows={4} />
+                            </div>
+                        </div>
+                      )}
+                  </div>
                 </div>
-              </div>
             </ScrollArea>
-            <DialogFooter className="pt-6 border-t flex-shrink-0">
+            <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
