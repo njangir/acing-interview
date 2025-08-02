@@ -330,11 +330,11 @@ exports.getAdminDashboardData = functions.runWith({ secrets: ["RAZORPAY_KEY_ID",
     }
 });
 
-exports.getAvailableSlots = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+exports.getAvailableSlots = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
     }
-    const { dateString } = data as { dateString: string };
+    const { dateString } = data;
     if (!dateString) {
         throw new functions.https.HttpsError("invalid-argument", "The function must be called with a 'dateString'.");
     }
@@ -345,7 +345,7 @@ exports.getAvailableSlots = functions.https.onCall(async (data: any, context: fu
         // Query for bookings on the selected date that are not cancelled
         const bookingsQuery = firestore.collection("bookings")
             .where("date", "==", dateString)
-            .where("status", "!=", "cancelled");
+            .where("status", "in", ["pending_approval", "accepted", "scheduled"]);
 
         const bookingsSnapshot = await bookingsQuery.get();
         const bookedTimes = bookingsSnapshot.docs.map(doc => doc.data().time);
@@ -783,3 +783,4 @@ exports.saveHeroSection = functions.https.onCall(async (data, context) => {
 
 
 // Add more admin write functions below as needed
+
