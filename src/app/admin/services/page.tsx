@@ -358,16 +358,16 @@ export default function AdminServicesPage() {
       </Card>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <form onSubmit={handleSubmit}>
-            <DialogHeader>
-              <DialogTitle>{currentService ? 'Edit Service' : 'Add New Service'}</DialogTitle>
-              <DialogDesc>
-                {currentService ? `Update details for ${currentService.name}.` : 'Fill in the details for the new service.'}
-              </DialogDesc>
-            </DialogHeader>
-            <ScrollArea className="max-h-[70vh] p-1 custom-scrollbar">
-              <div className="space-y-4 py-4 px-5">
+        <DialogContent className="sm:max-w-2xl flex flex-col max-h-[calc(100vh-4rem)]">
+          <DialogHeader>
+            <DialogTitle>{currentService ? 'Edit Service' : 'Add New Service'}</DialogTitle>
+            <DialogDesc>
+              {currentService ? `Update details for ${currentService.name}.` : 'Fill in the details for the new service.'}
+            </DialogDesc>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="flex-grow overflow-hidden flex flex-col">
+            <ScrollArea className="flex-grow pr-6 -mr-6">
+              <div className="space-y-4 py-4">
                 <div>
                   <Label htmlFor="name" className="text-right">Name</Label>
                   <Input id="name" name="name" value={formData.name} onChange={handleInputChange} required />
@@ -452,7 +452,7 @@ export default function AdminServicesPage() {
                 </div>
               </div>
             </ScrollArea>
-            <DialogFooter className="mt-4 px-6 pb-6">
+            <DialogFooter className="pt-6 border-t">
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
