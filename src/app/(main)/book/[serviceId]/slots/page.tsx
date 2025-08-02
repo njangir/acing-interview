@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { PageHeader } from "@/components/core/page-header";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,12 @@ import { CheckCircle, XCircle, Loader2, Ban } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 
-import { db } from '@/lib/firebase';
+import { db, functions } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { format } from 'date-fns';
+import { httpsCallable } from 'firebase/functions';
+
+const getAvailableSlots = httpsCallable(functions, 'getAvailableSlots');
 
 export default function SlotSelectionPage() {
   const params = useParams();
@@ -35,6 +38,29 @@ export default function SlotSelectionPage() {
   const [isProceeding, setIsProceeding] = useState(false);
   const [firestoreSlots, setFirestoreSlots] = useState<Record<string, string[]>>({});
 
+  const fetchServiceDetails = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const serviceDocRef = doc(db, "services", serviceId);
+      const serviceSnap = await getDoc(serviceDocRef);
+      if (serviceSnap.exists()) {
+        const serviceData = serviceSnap.data() as Service;
+        setService({ id: serviceSnap.id, ...serviceData });
+        setIsServiceBookable(serviceData.isBookable === undefined ? true : serviceData.isBookable);
+      } else {
+        setError("Service not found.");
+        setIsServiceBookable(false);
+      }
+    } catch (err) {
+      console.error("Error fetching service details:", err);
+      setError("Failed to load service details. Please try again.");
+      setIsServiceBookable(false);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [serviceId]);
+
   useEffect(() => {
     if (loadingAuth) {
       setIsLoading(true);
@@ -45,75 +71,30 @@ export default function SlotSelectionPage() {
       return;
     }
 
-    const fetchInitialData = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        // Fetch service details
-        const serviceDocRef = doc(db, "services", serviceId);
-        const serviceSnap = await getDoc(serviceDocRef);
-        if (serviceSnap.exists()) {
-          const serviceData = serviceSnap.data() as Service;
-          setService({ id: serviceSnap.id, ...serviceData });
-          setIsServiceBookable(serviceData.isBookable === undefined ? true : serviceData.isBookable);
-        } else {
-          setError("Service not found.");
-          setIsServiceBookable(false);
-          setIsLoading(false);
-          return;
-        }
-
-        // Fetch all availability data
-        const availabilityColRef = collection(db, 'globalAvailability');
-        const availabilitySnapshot = await getDocs(availabilityColRef);
-        const fetchedSlots: Record<string, string[]> = {};
-        availabilitySnapshot.forEach(doc => {
-          fetchedSlots[doc.id] = doc.data().timeSlots || [];
-        });
-        setFirestoreSlots(fetchedSlots);
-
-      } catch (err) {
-        console.error("Error fetching initial data:", err);
-        setError("Failed to load service details or availability. Please try again.");
-        setIsServiceBookable(false);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchInitialData();
-  }, [serviceId, currentUser, router, loadingAuth]);
+    fetchServiceDetails();
+  }, [serviceId, currentUser, router, loadingAuth, fetchServiceDetails]);
 
   useEffect(() => {
-    if (selectedDate && serviceId) { 
+    if (selectedDate) {
       const fetchAndFilterSlots = async () => {
         setIsFetchingSlots(true);
         setError(null);
         try {
           const dateString = format(selectedDate, 'yyyy-MM-dd');
           
-          // Get all potentially available slots for the day from admin settings
-          const allPossibleSlots = firestoreSlots[dateString] || [];
+          const result: any = await getAvailableSlots({ dateString });
 
-          // Query for bookings on the selected date that are not cancelled
-          const bookingsQuery = query(
-            collection(db, "bookings"), 
-            where("date", "==", dateString),
-            where("status", "!=", "cancelled")
-          );
-
-          const bookingsSnapshot = await getDocs(bookingsQuery);
-          const bookedTimes = new Set(bookingsSnapshot.docs.map(doc => doc.data().time));
+          if (result.data.availableSlots) {
+             setAvailableTimes(result.data.availableSlots);
+          } else {
+             setAvailableTimes([]);
+          }
           
-          // Filter out the booked times from the available slots
-          const trulyAvailableSlots = allPossibleSlots.filter(time => !bookedTimes.has(time));
-          
-          setAvailableTimes(trulyAvailableSlots);
           setSelectedTime(null);
 
-        } catch (err) {
+        } catch (err: any) {
             console.error("Error fetching or filtering slots:", err);
-            setError("Could not retrieve available slots for this date. Please try again.");
+            setError(err.message || "Could not retrieve available slots for this date. Please try again.");
             setAvailableTimes([]);
         } finally {
             setIsFetchingSlots(false);
@@ -125,7 +106,7 @@ export default function SlotSelectionPage() {
       setAvailableTimes([]);
       setSelectedTime(null);
     }
-  }, [selectedDate, serviceId, firestoreSlots]);
+  }, [selectedDate, serviceId]);
 
   const handleProceed = async () => {
     if (!selectedDate || !selectedTime) {
@@ -252,10 +233,9 @@ export default function SlotSelectionPage() {
                 onSelect={setSelectedDate}
                 className="rounded-md border"
                 disabled={(date) => {
-                  const dateString = format(date, 'yyyy-MM-dd');
                   const currentDayStart = new Date();
                   currentDayStart.setHours(0,0,0,0);
-                  return date < currentDayStart || (!isFetchingSlots && (!firestoreSlots[dateString] || firestoreSlots[dateString]?.length === 0));
+                  return date < currentDayStart;
                 }}
               />
             </div>

@@ -254,6 +254,9 @@ exports.onBookingUpdate = functions.firestore.document("bookings/{bookingId}").o
     if (before.status !== 'cancelled' && after.status === 'cancelled') {
         return createNotification(after.uid, `Session for '${serviceName}' was cancelled.`, '/dashboard/bookings');
     }
+    if (before.status !== 'completed' && after.status === 'completed') {
+        return createNotification(after.uid, `Feedback for '${serviceName}' is available.`, '/dashboard/bookings');
+    }
     if (!before.reportUrl && after.reportUrl) {
         return createNotification(after.uid, `Feedback report for '${serviceName}' is now available.`, '/dashboard/bookings');
     }
@@ -652,6 +655,24 @@ exports.getAdminTestimonialsPageData = functions.runWith({ secrets: ["RAZORPAY_K
     catch (error) {
         logger.error("Error fetching admin testimonials page data:", error);
         throw new functions.https.HttpsError("internal", "Failed to fetch admin testimonials page data.");
+    }
+});
+// New function to save hero section data
+exports.saveHeroSection = functions.https.onCall(async (data, context) => {
+    await ensureAdmin(context);
+    const { heroData } = data;
+    if (!heroData) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing heroData payload.');
+    }
+    const firestore = (0, firestore_1.getFirestore)();
+    const heroDocRef = firestore.collection('siteContent').doc('homePage');
+    try {
+        await heroDocRef.set(Object.assign(Object.assign({}, heroData), { updatedAt: firestore_1.FieldValue.serverTimestamp() }), { merge: true });
+        return { success: true, message: "Hero section updated successfully." };
+    }
+    catch (error) {
+        logger.error("Error saving hero section data:", error);
+        throw new functions.https.HttpsError('internal', 'Failed to save hero section data.');
     }
 });
 // Add more admin write functions below as needed

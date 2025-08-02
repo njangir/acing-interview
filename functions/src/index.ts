@@ -330,6 +330,44 @@ exports.getAdminDashboardData = functions.runWith({ secrets: ["RAZORPAY_KEY_ID",
         throw new functions.https.HttpsError("internal", "Failed to fetch dashboard data.");
     }
 });
+
+exports.getAvailableSlots = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
+    }
+    const { dateString } = data as { dateString: string };
+    if (!dateString) {
+        throw new functions.https.HttpsError("invalid-argument", "The function must be called with a 'dateString'.");
+    }
+
+    try {
+        const firestore = getFirestore();
+
+        // Get all potentially available slots for the day from admin settings
+        const availabilityDoc = await firestore.collection('globalAvailability').doc(dateString).get();
+        const allPossibleSlots = availabilityDoc.exists ? availabilityDoc.data()?.timeSlots || [] : [];
+        if (allPossibleSlots.length === 0) {
+            return { availableSlots: [] };
+        }
+
+        // Query for bookings on the selected date that are not cancelled
+        const bookingsQuery = firestore.collection("bookings")
+            .where("date", "==", dateString)
+            .where("status", "!=", "cancelled");
+
+        const bookingsSnapshot = await bookingsQuery.get();
+        const bookedTimes = new Set(bookingsSnapshot.docs.map(doc => doc.data().time));
+        
+        // Filter out the booked times from the available slots
+        const trulyAvailableSlots = allPossibleSlots.filter((time: string) => !bookedTimes.has(time));
+        
+        return { availableSlots: trulyAvailableSlots };
+
+    } catch (err: any) {
+        logger.error("Error fetching available slots:", err);
+        throw new functions.https.HttpsError("internal", "Could not retrieve available slots.", err.message);
+    }
+});
     
 
 // New Admin Write Functions
@@ -722,7 +760,7 @@ exports.getAdminTestimonialsPageData = functions.runWith({ secrets: ["RAZORPAY_K
 // New function to save hero section data
 exports.saveHeroSection = functions.https.onCall(async (data, context) => {
     await ensureAdmin(context);
-    const { heroData } = data as { heroData: HeroSectionData };
+    const { heroData } = data;
     
     if (!heroData) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing heroData payload.');
