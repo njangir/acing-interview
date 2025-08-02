@@ -1,5 +1,4 @@
 
-
 import * as functions from "firebase-functions";
 import * as logger from "firebase-functions/logger";
 import { initializeApp } from "firebase-admin/app";
@@ -766,7 +765,7 @@ exports.getAdminTestimonialsPageData = functions.runWith({ secrets: ["RAZORPAY_K
 // New function to save hero section data
 exports.saveHeroSection = functions.https.onCall(async (data, context) => {
     await ensureAdmin(context);
-    const { heroData } = data;
+    const { heroData } = data as { heroData: HeroSectionData };
     
     if (!heroData) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing heroData payload.');
@@ -790,5 +789,3 @@ exports.saveHeroSection = functions.https.onCall(async (data, context) => {
 
 
 // Add more admin write functions below as needed
-
-    

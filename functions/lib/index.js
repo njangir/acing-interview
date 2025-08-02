@@ -590,7 +590,6 @@ exports.uploadReport = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPA
     }
     const storage = (0, storage_1.getStorage)();
     const bucket = storage.bucket();
-    // Extract content type and Base64 data from the data URL
     const match = fileDataUrl.match(/^data:(.*);base64,(.*)$/);
     if (!match) {
         throw new functions.https.HttpsError('invalid-argument', 'Invalid data URL format.');
@@ -599,14 +598,19 @@ exports.uploadReport = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPA
     const base64Data = match[2];
     const buffer = Buffer.from(base64Data, 'base64');
     const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.]/g, '_');
-    const filePath = `feedback_reports/${bookingId}_${Date.now()}_${sanitizedFileName}`;
+    const folder = bookingId.startsWith('site_content') ? 'site_content' : 'feedback_reports';
+    const filePath = `${folder}/${bookingId}_${Date.now()}_${sanitizedFileName}`;
     const file = bucket.file(filePath);
     try {
         await file.save(buffer, {
-            metadata: { contentType },
-            public: true, // Make the file publicly readable
+            metadata: {
+                contentType,
+                cacheControl: 'public, max-age=31536000',
+            },
+            public: true,
         });
-        const downloadUrl = file.publicUrl();
+        // This is the correct public URL format for Next/Image whitelisting.
+        const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media`;
         logger.info(`File uploaded successfully for booking ${bookingId}: ${downloadUrl}`);
         return { success: true, downloadUrl: downloadUrl };
     }
