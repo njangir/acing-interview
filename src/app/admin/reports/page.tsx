@@ -14,16 +14,15 @@ import { Badge as UiBadge } from '@/components/ui/badge';
 import { PREDEFINED_SKILLS, SKILL_RATINGS } from "@/constants";
 import type { Booking, Badge as BadgeType, FeedbackSubmissionHistoryEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { UploadCloud, AwardIcon, Star, History, ChevronLeft, ChevronRight, FileSpreadsheet, Loader2, AlertTriangle, Eye } from 'lucide-react';
+import { UploadCloud, AwardIcon, Star, History, ChevronLeft, ChevronRight, FileSpreadsheet, Loader2, AlertTriangle, Eye, Edit } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription as DialogDesc, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
-
 import { db, functions } from '@/lib/firebase';
-import { collection, doc, addDoc, updateDoc, query, orderBy, serverTimestamp, arrayUnion, getDocs } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, query, orderBy, serverTimestamp, arrayUnion, getDocs, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 
 const getAdminReportsPageData = httpsCallable(functions, 'getAdminReportsPageData');
@@ -62,30 +61,31 @@ export default function AdminReportsPage() {
   const [currentHistoryPage, setCurrentHistoryPage] = useState(1);
   const [selectedHistoryEntry, setSelectedHistoryEntry] = useState<FeedbackSubmissionHistoryEntry | null>(null);
 
+  const loadInitialData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result: any = await getAdminReportsPageData();
+      const data = result.data;
+      
+      const historyWithDates = data.history.map((h: any) => ({
+          ...h,
+          submissionDate: h.submissionDate?._seconds ? new Date(h.submissionDate._seconds * 1000) : new Date(),
+      }));
+
+      setCompletedBookings(data.completedBookings || []);
+      setBadges(data.badges || []);
+      setSubmissionHistory(historyWithDates || []);
+
+    } catch (err: any) {
+      console.error("Error loading initial data:", err);
+      setError(err.message || "Failed to load necessary data. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   useEffect(() => {
-    const loadInitialData = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const result: any = await getAdminReportsPageData();
-        const data = result.data;
-        
-        const historyWithDates = data.history.map((h: any) => ({
-            ...h,
-            submissionDate: h.submissionDate?._seconds ? new Date(h.submissionDate._seconds * 1000) : new Date(),
-        }));
-
-        setCompletedBookings(data.completedBookings || []);
-        setBadges(data.badges || []);
-        setSubmissionHistory(historyWithDates || []);
-
-      } catch (err: any) {
-        console.error("Error loading initial data:", err);
-        setError(err.message || "Failed to load necessary data. Please try again.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
     loadInitialData();
   }, []);
 
@@ -102,7 +102,7 @@ export default function AdminReportsPage() {
     if (!selectedBookingDetails) return [];
     
     // Find all completed bookings for the selected user
-    const userCompletedBookings = completedBookings.filter(b => b.userName === selectedBookingDetails.userName);
+    const userCompletedBookings = completedBookings; // We now check all bookings
 
     // Map submission history to these bookings
     const historyWithDetails = submissionHistory
@@ -129,10 +129,13 @@ export default function AdminReportsPage() {
       }
       setSkillRatingsData(initialRatings);
       setComments(selectedBookingDetails.userFeedback || '');
+      // Do not reset badge ID when selecting a booking; it might be set from history click
     } else {
       setSkillRatingsData({});
       setComments('');
+      setSelectedBadgeId('');
     }
+    setReportFile(null);
   }, [selectedBookingDetails]);
 
 
@@ -144,6 +147,20 @@ export default function AdminReportsPage() {
 
   const handleSkillRatingChange = (skillName: string, rating: string) => {
     setSkillRatingsData(prev => ({ ...prev, [skillName]: rating }));
+  };
+  
+  const handleEditHistoryItem = (historyEntry: FeedbackSubmissionHistoryEntry) => {
+    const bookingToEdit = completedBookings.find(b => b.id === historyEntry.bookingId);
+    if (bookingToEdit) {
+      setSelectedBookingId(bookingToEdit.id);
+      
+      // Get the badge ID if a badge was assigned
+      const assignedBadge = badges.find(b => b.name === historyEntry.badgeAssignedName);
+      setSelectedBadgeId(assignedBadge ? assignedBadge.id : 'none');
+
+    } else {
+       toast({ title: "Booking Not Found", description: "The original booking for this feedback could not be found.", variant: "destructive" });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -194,30 +211,42 @@ export default function AdminReportsPage() {
       
       if (assignedBadge && selectedBookingDetails.uid) {
         const userProfileRef = doc(db, "userProfiles", selectedBookingDetails.uid);
+        // This will add the badge. If it already exists, Firestore handles it gracefully.
         await updateDoc(userProfileRef, { 
             awardedBadgeIds: arrayUnion(assignedBadge.id),
             updatedAt: serverTimestamp() 
         });
       }
 
-      const historyEntry: any = {
+      // Check if history entry exists for this booking
+      const existingHistoryEntry = submissionHistory.find(h => h.bookingId === selectedBookingId);
+
+      const historyDataPayload: any = {
         submissionDate: serverTimestamp(),
         bookingId: selectedBookingId,
         userName: selectedBookingDetails.userName,
         serviceName: selectedBookingDetails.serviceName,
-        reportFileName: reportFile ? reportFile.name : (finalReportUrl ? finalReportUrl.split('/').pop()?.split('?')[0].split('%2F').pop() : undefined),
+        reportFileName: reportFile ? reportFile.name : (finalReportUrl ? finalReportUrl.split('%2F').pop()?.split('?')[0].split('%2F').pop() : undefined),
         adminUid: adminUser?.uid, 
-        createdAt: serverTimestamp()
       };
       
       if (assignedBadge) {
-        historyEntry.badgeAssignedName = assignedBadge.name;
+        historyDataPayload.badgeAssignedName = assignedBadge.name;
+      } else {
+        historyDataPayload.badgeAssignedName = null; // Ensure it's cleared if no badge is selected
       }
 
-      await addDoc(collection(db, "feedbackSubmissions"), historyEntry);
+      if (existingHistoryEntry) {
+        // Update existing history entry
+        const historyDocRef = doc(db, "feedbackSubmissions", existingHistoryEntry.id);
+        await updateDoc(historyDocRef, historyDataPayload);
+      } else {
+        // Add new history entry
+        await addDoc(collection(db, "feedbackSubmissions"), { ...historyDataPayload, createdAt: serverTimestamp() });
+      }
       
       toast({
-        title: "Feedback Processed Successfully",
+        title: `Feedback ${existingHistoryEntry ? "Updated" : "Processed"} Successfully`,
         description: `Details for ${selectedBookingDetails.userName} saved.`,
       });
 
@@ -230,11 +259,7 @@ export default function AdminReportsPage() {
       const fileInput = document.getElementById('reportFile') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
       
-      const result: any = await getAdminReportsPageData();
-      const data = result.data;
-      const historyWithDates = data.history.map((h: any) => ({ ...h, submissionDate: h.submissionDate?._seconds ? new Date(h.submissionDate._seconds * 1000) : new Date() }));
-      setSubmissionHistory(historyWithDates || []);
-      setCompletedBookings(data.completedBookings || []);
+      await loadInitialData();
 
     } catch (err) {
       console.error("Error submitting feedback:", err);
@@ -251,7 +276,7 @@ export default function AdminReportsPage() {
         entry.userName.toLowerCase().includes(userNameFilter.toLowerCase())
       );
     }
-    return filtered;
+    return filtered.sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime());
   }, [submissionHistory, userNameFilter]);
 
   const totalHistoryPages = Math.ceil(filteredSubmissionHistory.length / ITEMS_PER_PAGE_HISTORY);
@@ -296,7 +321,7 @@ export default function AdminReportsPage() {
         <Card className="lg:col-span-2">
             <CardHeader>
             <CardTitle>Process Completed Session</CardTitle>
-            <CardDescription>Select a booking, upload the report, rate skills, and assign a badge if applicable.</CardDescription>
+            <CardDescription>{selectedBookingDetails ? `Editing feedback for ${selectedBookingDetails.userName}` : 'Select a booking to submit new feedback.'}</CardDescription>
             </CardHeader>
             <form onSubmit={handleSubmit}>
             <CardContent className="space-y-6">
@@ -406,7 +431,7 @@ export default function AdminReportsPage() {
                              <ScrollArea className="h-48 pr-3 custom-scrollbar">
                                 <div className="space-y-2">
                                 {userSpecificHistory.map(entry => (
-                                    <Dialog key={entry.id} onOpenChange={(isOpen) => !isOpen && setSelectedHistoryEntry(null)}>
+                                    <Dialog key={entry.id}>
                                         <DialogTrigger asChild>
                                             <button 
                                                 className="text-left w-full p-2 text-xs border-b hover:bg-muted/50 rounded"
@@ -417,6 +442,37 @@ export default function AdminReportsPage() {
                                                 {entry.badgeAssignedName && <p className="text-accent">Badge: {entry.badgeAssignedName}</p>}
                                             </button>
                                         </DialogTrigger>
+                                        <DialogContent className="sm:max-w-lg">
+                                            <DialogHeader>
+                                                <DialogTitle>Past Feedback Details</DialogTitle>
+                                                <DialogDesc>
+                                                    Feedback for {entry.userName} on {entry.serviceName} 
+                                                    ({format(new Date(entry.submissionDate), 'MMM d, yyyy')}).
+                                                </DialogDesc>
+                                            </DialogHeader>
+                                            <ScrollArea className="max-h-[60vh] p-1 pr-3 custom-scrollbar">
+                                                <div className="space-y-4 py-4">
+                                                    {(entry as any).userFeedback && (
+                                                        <div>
+                                                            <h4 className="font-semibold text-primary mb-1">Overall Comments:</h4>
+                                                            <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded-md">{(entry as any).userFeedback}</p>
+                                                        </div>
+                                                    )}
+                                                    {(entry as any).detailedFeedback && (entry as any).detailedFeedback.length > 0 && (
+                                                        <div>
+                                                            <h4 className="font-semibold text-primary mb-2">Skill Ratings:</h4>
+                                                            <div className="space-y-2">
+                                                                {(entry as any).detailedFeedback.map((fb: any, index: number) => (
+                                                                <div key={index} className="border-b pb-1 last:border-b-0">
+                                                                    <p className="text-sm font-medium">{fb.skill}: <span className="font-normal text-foreground">{fb.rating}</span></p>
+                                                                </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </ScrollArea>
+                                        </DialogContent>
                                     </Dialog>
                                 ))}
                                 </div>
@@ -445,7 +501,7 @@ export default function AdminReportsPage() {
                     <TableRow>
                         <TableHead>User</TableHead>
                         <TableHead>Date</TableHead>
-                        <TableHead>Badge</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -453,14 +509,14 @@ export default function AdminReportsPage() {
                         <TableRow key={entry.id}>
                         <TableCell className="font-medium">{entry.userName}</TableCell>
                         <TableCell>{format(new Date(entry.submissionDate), 'dd-MMM-yy')}</TableCell>
-                        <TableCell>
-                            {entry.badgeAssignedName ? (
-                                <UiBadge variant="outline" className="text-accent-foreground border-accent flex items-center gap-1">
-                                    <AwardIcon className="h-3 w-3"/>{entry.badgeAssignedName}
-                                </UiBadge>
-                            ) : (
-                                <span className="text-xs text-muted-foreground">None</span>
-                            )}
+                        <TableCell className="text-right">
+                           <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditHistoryItem(entry)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
                         </TableCell>
                         </TableRow>
                     )) : (
@@ -499,41 +555,6 @@ export default function AdminReportsPage() {
             </Card>
         </div>
       </div>
-      
-      {/* Dialog for viewing past feedback */}
-      <Dialog open={!!selectedHistoryEntry} onOpenChange={(isOpen) => !isOpen && setSelectedHistoryEntry(null)}>
-        <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-                <DialogTitle>Past Feedback Details</DialogTitle>
-                <DialogDesc>
-                    Feedback for {selectedHistoryEntry?.userName} on {selectedHistoryEntry?.serviceName} 
-                    ({selectedHistoryEntry?.submissionDate ? format(new Date(selectedHistoryEntry.submissionDate), 'MMM d, yyyy') : ''}).
-                </DialogDesc>
-            </DialogHeader>
-            <ScrollArea className="max-h-[60vh] p-1 pr-3 custom-scrollbar">
-                <div className="space-y-4 py-4">
-                    {selectedHistoryEntry?.userFeedback && (
-                        <div>
-                            <h4 className="font-semibold text-primary mb-1">Overall Comments:</h4>
-                            <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded-md">{selectedHistoryEntry.userFeedback}</p>
-                        </div>
-                    )}
-                    {selectedHistoryEntry?.detailedFeedback && selectedHistoryEntry.detailedFeedback.length > 0 && (
-                        <div>
-                            <h4 className="font-semibold text-primary mb-2">Skill Ratings:</h4>
-                            <div className="space-y-2">
-                                {selectedHistoryEntry.detailedFeedback.map((fb, index) => (
-                                <div key={index} className="border-b pb-1 last:border-b-0">
-                                    <p className="text-sm font-medium">{fb.skill}: <span className="font-normal text-foreground">{fb.rating}</span></p>
-                                </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </ScrollArea>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
