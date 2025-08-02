@@ -391,7 +391,8 @@ exports.saveService = functions.https.onCall(async (data: any, context: function
     const { id, ...serviceWithoutId } = service;
     await serviceRef.update({ ...serviceWithoutId, updatedAt: FieldValue.serverTimestamp() });
   } else {
-    await firestore.collection('services').add({ ...service, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    const { id, ...serviceWithoutId } = service;
+    await firestore.collection('services').add({ ...serviceWithoutId, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
   }
   return { success: true };
 });
@@ -482,7 +483,8 @@ exports.saveBadge = functions.https.onCall(async (data: any, context: functions.
         const { id, ...badgeWithoutId } = badge;
         await badgeRef.update({ ...badgeWithoutId, updatedAt: FieldValue.serverTimestamp() });
     } else {
-        await firestore.collection('badges').add({ ...badge, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+        const { id, ...badgeWithoutId } = badge;
+        await firestore.collection('badges').add({ ...badgeWithoutId, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
     }
     return { success: true };
 });
@@ -658,7 +660,11 @@ exports.uploadReport = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPA
     const buffer = Buffer.from(base64Data, 'base64');
     
     const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.]/g, '_');
-    const folder = bookingId.startsWith('site_content') ? 'site_content' : 'feedback_reports';
+    // Determine folder based on a prefix in bookingId, or default to feedback_reports
+    const folder = bookingId.startsWith('services_thumbnails') ? 'services/thumbnails' :
+                   bookingId.startsWith('services_banners') ? 'services/banners' :
+                   bookingId.startsWith('site_content_') ? 'site_content' : 
+                   'feedback_reports';
     const filePath = `${folder}/${bookingId}_${Date.now()}_${sanitizedFileName}`;
     const file = bucket.file(filePath);
 
@@ -796,3 +802,4 @@ exports.saveHeroSection = functions.https.onCall(async (data, context) => {
 
 // Add more admin write functions below as needed
 
+    
