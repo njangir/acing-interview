@@ -86,17 +86,46 @@ export default function SlotSelectionPage() {
 
   useEffect(() => {
     if (selectedDate && serviceId) { 
-      setIsFetchingSlots(true);
-      setError(null);
-      const dateString = format(selectedDate, 'yyyy-MM-dd');
-      setAvailableTimes(firestoreSlots[dateString] || []);
-      setSelectedTime(null);
-      setIsFetchingSlots(false);
+      const fetchAndFilterSlots = async () => {
+        setIsFetchingSlots(true);
+        setError(null);
+        try {
+          const dateString = format(selectedDate, 'yyyy-MM-dd');
+          
+          // Get all potentially available slots for the day from admin settings
+          const allPossibleSlots = firestoreSlots[dateString] || [];
+
+          // Query for bookings on the selected date that are not cancelled
+          const bookingsQuery = query(
+            collection(db, "bookings"), 
+            where("date", "==", dateString),
+            where("status", "!=", "cancelled")
+          );
+
+          const bookingsSnapshot = await getDocs(bookingsQuery);
+          const bookedTimes = new Set(bookingsSnapshot.docs.map(doc => doc.data().time));
+          
+          // Filter out the booked times from the available slots
+          const trulyAvailableSlots = allPossibleSlots.filter(time => !bookedTimes.has(time));
+          
+          setAvailableTimes(trulyAvailableSlots);
+          setSelectedTime(null);
+
+        } catch (err) {
+            console.error("Error fetching or filtering slots:", err);
+            setError("Could not retrieve available slots for this date. Please try again.");
+            setAvailableTimes([]);
+        } finally {
+            setIsFetchingSlots(false);
+        }
+      };
+      
+      fetchAndFilterSlots();
     } else {
       setAvailableTimes([]);
       setSelectedTime(null);
     }
-  }, [selectedDate, serviceId, firestoreSlots]); 
+  }, [selectedDate, serviceId, firestoreSlots]);
 
   const handleProceed = async () => {
     if (!selectedDate || !selectedTime) {
