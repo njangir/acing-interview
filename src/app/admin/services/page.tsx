@@ -359,14 +359,14 @@ export default function AdminServicesPage() {
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-2xl flex flex-col max-h-[calc(100vh-4rem)]">
-          <DialogHeader>
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>{currentService ? 'Edit Service' : 'Add New Service'}</DialogTitle>
             <DialogDesc>
               {currentService ? `Update details for ${currentService.name}.` : 'Fill in the details for the new service.'}
             </DialogDesc>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="flex-grow overflow-hidden flex flex-col">
-            <ScrollArea className="flex-grow pr-6 -mr-6">
+          <form onSubmit={handleSubmit} className="flex-grow overflow-hidden">
+            <ScrollArea className="h-full pr-6 -mr-6">
               <div className="space-y-4 py-4">
                 <div>
                   <Label htmlFor="name" className="text-right">Name</Label>
@@ -452,7 +452,7 @@ export default function AdminServicesPage() {
                 </div>
               </div>
             </ScrollArea>
-            <DialogFooter className="pt-6 border-t">
+            <DialogFooter className="pt-6 border-t flex-shrink-0">
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
