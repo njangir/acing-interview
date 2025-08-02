@@ -342,18 +342,30 @@ exports.getAvailableSlots = functions.https.onCall(async (data, context) => {
     try {
         const firestore = getFirestore();
         
-        // Query for bookings on the selected date that have an active status
+        // 1. Get all possible slots for the day from the already fetched global data
+        const availabilityDocRef = firestore.collection('globalAvailability').doc(dateString);
+        const availabilitySnap = await availabilityDocRef.get();
+        const allPossibleSlotsForDay = availabilitySnap.exists ? availabilitySnap.data()?.timeSlots || [] : [];
+        
+        if (allPossibleSlotsForDay.length === 0) {
+            return { availableSlots: [] };
+        }
+
+        // 2. Fetch only the BOOKED slots for this date from the backend
         const bookingsQuery = firestore.collection("bookings")
             .where("date", "==", dateString)
             .where("status", "in", ["pending_approval", "accepted", "scheduled"]);
 
         const bookingsSnapshot = await bookingsQuery.get();
-        const bookedTimes = bookingsSnapshot.docs.map(doc => doc.data().time);
+        const bookedTimes = new Set(bookingsSnapshot.docs.map(doc => doc.data().time));
+
+        // 3. Filter out the booked times
+        const trulyAvailableSlots = allPossibleSlotsForDay.filter((time: string) => !bookedTimes.has(time));
         
-        return { bookedSlots: bookedTimes };
+        return { availableSlots: trulyAvailableSlots };
 
     } catch (err: any) {
-        logger.error("Error fetching available slots:", err);
+        logger.error(`Error fetching available slots for ${dateString}:`, err);
         throw new functions.https.HttpsError("internal", "Could not retrieve available slots.", err.message);
     }
 });

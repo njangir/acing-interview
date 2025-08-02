@@ -38,14 +38,12 @@ export default function SlotSelectionPage() {
   const [isFetchingSlots, setIsFetchingSlots] = useState(false);
   const [isProceeding, setIsProceeding] = useState(false);
   
-  // New state to hold all possible slots from admin settings
   const [globalSlotsData, setGlobalSlotsData] = useState<Record<string, string[]>>({});
 
   const fetchInitialData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch service details and global availability concurrently
       const [serviceSnap, availabilityResult]: [any, any] = await Promise.all([
         getDoc(doc(db, "services", serviceId)),
         getGlobalAvailability()
@@ -96,20 +94,12 @@ export default function SlotSelectionPage() {
         try {
           const dateString = format(selectedDate, 'yyyy-MM-dd');
           
-          // Get all possible slots for the day from the already fetched global data
-          const allPossibleSlotsForDay = globalSlotsData[dateString] || [];
-          if(allPossibleSlotsForDay.length === 0) {
-            setAvailableTimes([]);
-            return;
-          }
-
-          // Fetch only the BOOKED slots for this date from the backend
           const result: any = await getAvailableSlots({ dateString });
-          const bookedTimes = new Set(result.data.bookedSlots || []);
-
-          // Filter out the booked times
-          const trulyAvailableSlots = allPossibleSlotsForDay.filter(time => !bookedTimes.has(time));
-          setAvailableTimes(trulyAvailableSlots);
+          if(result.data.availableSlots) {
+              setAvailableTimes(result.data.availableSlots);
+          } else {
+              throw new Error("Could not retrieve available slots from the server.");
+          }
 
         } catch (err: any) {
             console.error("Error fetching or filtering slots:", err);
@@ -125,7 +115,7 @@ export default function SlotSelectionPage() {
       setAvailableTimes([]);
       setSelectedTime(null);
     }
-  }, [selectedDate, globalSlotsData]);
+  }, [selectedDate]);
 
   const handleProceed = async () => {
     if (!selectedDate || !selectedTime) {
