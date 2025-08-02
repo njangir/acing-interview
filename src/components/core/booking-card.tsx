@@ -357,17 +357,21 @@ export function BookingCard({ booking: initialBooking }: BookingCardProps) {
                 </DialogHeader>
                 <ScrollArea className="max-h-[60vh] p-1 pr-3 custom-scrollbar">
                   <div className="space-y-4 py-4">
-                    {booking.detailedFeedback.map((fb, index) => (
-                      <div key={index} className="border-b pb-2 last:border-b-0">
-                        <h4 className="font-semibold text-sm text-primary">{fb.skill}</h4>
-                        <p className="text-sm text-foreground">Rating: <span className="font-medium">{fb.rating}</span></p>
-                        {fb.comments && (
-                          <p className="text-xs text-muted-foreground mt-1">Comments: {fb.comments}</p>
-                        )}
+                    {booking.userFeedback && booking.userFeedback !== 'submitted' && (
+                        <div>
+                            <h4 className="font-semibold text-sm text-primary">Overall Comments:</h4>
+                            <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded-md whitespace-pre-wrap">{booking.userFeedback}</p>
+                        </div>
+                    )}
+                    {booking.detailedFeedback && booking.detailedFeedback.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="font-semibold text-sm text-primary">Skill Ratings:</h4>
+                        {booking.detailedFeedback.map((fb, index) => (
+                          <div key={index} className="border-b pb-2 last:border-b-0">
+                            <p className="text-sm font-medium">{fb.skill}: <span className="font-normal text-foreground">{fb.rating}</span></p>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                    {booking.detailedFeedback.length === 0 && (
-                        <p className="text-sm text-muted-foreground">No detailed skill feedback provided for this session.</p>
                     )}
                   </div>
                 </ScrollArea>
@@ -389,5 +393,3 @@ export function BookingCard({ booking: initialBooking }: BookingCardProps) {
     </Card>
   );
 }
-
-    

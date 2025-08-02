@@ -14,11 +14,13 @@ import { Badge as UiBadge } from '@/components/ui/badge';
 import { PREDEFINED_SKILLS, SKILL_RATINGS } from "@/constants";
 import type { Booking, Badge as BadgeType, FeedbackSubmissionHistoryEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { UploadCloud, AwardIcon, Star, History, ChevronLeft, ChevronRight, FileSpreadsheet, Loader2, AlertTriangle } from 'lucide-react';
+import { UploadCloud, AwardIcon, Star, History, ChevronLeft, ChevronRight, FileSpreadsheet, Loader2, AlertTriangle, Eye } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogDescription as DialogDesc, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+
 
 import { db, functions } from '@/lib/firebase';
 import { collection, doc, addDoc, updateDoc, query, orderBy, serverTimestamp, arrayUnion, getDocs } from 'firebase/firestore';
@@ -58,6 +60,7 @@ export default function AdminReportsPage() {
   
   const [userNameFilter, setUserNameFilter] = useState<string>('');
   const [currentHistoryPage, setCurrentHistoryPage] = useState(1);
+  const [selectedHistoryEntry, setSelectedHistoryEntry] = useState<FeedbackSubmissionHistoryEntry | null>(null);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -69,7 +72,7 @@ export default function AdminReportsPage() {
         
         const historyWithDates = data.history.map((h: any) => ({
             ...h,
-            submissionDate: h.submissionDate?._seconds ? new Date(h.submissionDate._seconds * 1000) : new Date()
+            submissionDate: h.submissionDate?._seconds ? new Date(h.submissionDate._seconds * 1000) : new Date(),
         }));
 
         setCompletedBookings(data.completedBookings || []);
@@ -86,14 +89,35 @@ export default function AdminReportsPage() {
     loadInitialData();
   }, []);
 
+  const bookingsAwaitingFeedback = useMemo(() => {
+    const submittedBookingIds = new Set(submissionHistory.map(entry => entry.bookingId));
+    return completedBookings.filter(booking => !submittedBookingIds.has(booking.id));
+  }, [completedBookings, submissionHistory]);
+
   const selectedBookingDetails = useMemo(() => {
     return completedBookings.find(b => b.id === selectedBookingId);
   }, [selectedBookingId, completedBookings]);
   
   const userSpecificHistory = useMemo(() => {
     if (!selectedBookingDetails) return [];
-    return submissionHistory.filter(entry => entry.userName === selectedBookingDetails.userName && entry.bookingId !== selectedBookingId);
-  }, [selectedBookingDetails, submissionHistory]);
+    
+    // Find all completed bookings for the selected user
+    const userCompletedBookings = completedBookings.filter(b => b.userName === selectedBookingDetails.userName);
+
+    // Map submission history to these bookings
+    const historyWithDetails = submissionHistory
+        .filter(entry => entry.userName === selectedBookingDetails.userName && entry.bookingId !== selectedBookingId)
+        .map(entry => {
+            const bookingDetail = userCompletedBookings.find(b => b.id === entry.bookingId);
+            return {
+                ...entry,
+                detailedFeedback: bookingDetail?.detailedFeedback,
+                userFeedback: bookingDetail?.userFeedback,
+            }
+        });
+
+    return historyWithDetails;
+  }, [selectedBookingDetails, submissionHistory, completedBookings]);
 
   useEffect(() => {
     if (selectedBookingDetails) {
@@ -161,7 +185,7 @@ export default function AdminReportsPage() {
       await updateDoc(bookingDocRef, {
         detailedFeedback: feedbackToSave,
         reportUrl: finalReportUrl,
-        userFeedback: comments,
+        userFeedback: comments, // Save overall comments here
         updatedAt: serverTimestamp()
       });
       
@@ -277,18 +301,18 @@ export default function AdminReportsPage() {
             <form onSubmit={handleSubmit}>
             <CardContent className="space-y-6">
                 <div className="space-y-2">
-                <Label htmlFor="bookingSelect">Select Booking</Label>
+                <Label htmlFor="bookingSelect">Select Booking (Awaiting Feedback)</Label>
                 <Select value={selectedBookingId} onValueChange={setSelectedBookingId}>
                     <SelectTrigger id="bookingSelect">
                     <SelectValue placeholder="Choose a completed booking..." />
                     </SelectTrigger>
                     <SelectContent>
-                    {completedBookings.length > 0 ? completedBookings.map(booking => (
+                    {bookingsAwaitingFeedback.length > 0 ? bookingsAwaitingFeedback.map(booking => (
                         <SelectItem key={booking.id} value={booking.id}>
                         {booking.userName} - {booking.serviceName} ({new Date(booking.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })})
                         </SelectItem>
                     )) : (
-                        <SelectItem value="no-bookings" disabled>No completed bookings available</SelectItem>
+                        <SelectItem value="no-bookings" disabled>No pending feedback submissions</SelectItem>
                     )}
                     </SelectContent>
                 </Select>
@@ -382,10 +406,18 @@ export default function AdminReportsPage() {
                              <ScrollArea className="h-48 pr-3 custom-scrollbar">
                                 <div className="space-y-2">
                                 {userSpecificHistory.map(entry => (
-                                    <div key={entry.id} className="text-xs border-b pb-1">
-                                        <p><strong>{entry.serviceName}</strong> on {format(new Date(entry.submissionDate), 'MMM d, yyyy')}</p>
-                                        {entry.badgeAssignedName && <p>Badge: {entry.badgeAssignedName}</p>}
-                                    </div>
+                                    <Dialog key={entry.id} onOpenChange={(isOpen) => !isOpen && setSelectedHistoryEntry(null)}>
+                                        <DialogTrigger asChild>
+                                            <button 
+                                                className="text-left w-full p-2 text-xs border-b hover:bg-muted/50 rounded"
+                                                onClick={() => setSelectedHistoryEntry(entry)}
+                                            >
+                                                <p className="font-semibold flex items-center">{entry.serviceName} <Eye className="ml-2 h-3 w-3"/></p>
+                                                <p>{format(new Date(entry.submissionDate), 'MMM d, yyyy')}</p>
+                                                {entry.badgeAssignedName && <p className="text-accent">Badge: {entry.badgeAssignedName}</p>}
+                                            </button>
+                                        </DialogTrigger>
+                                    </Dialog>
                                 ))}
                                 </div>
                              </ScrollArea>
@@ -467,8 +499,41 @@ export default function AdminReportsPage() {
             </Card>
         </div>
       </div>
+      
+      {/* Dialog for viewing past feedback */}
+      <Dialog open={!!selectedHistoryEntry} onOpenChange={(isOpen) => !isOpen && setSelectedHistoryEntry(null)}>
+        <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+                <DialogTitle>Past Feedback Details</DialogTitle>
+                <DialogDesc>
+                    Feedback for {selectedHistoryEntry?.userName} on {selectedHistoryEntry?.serviceName} 
+                    ({selectedHistoryEntry?.submissionDate ? format(new Date(selectedHistoryEntry.submissionDate), 'MMM d, yyyy') : ''}).
+                </DialogDesc>
+            </DialogHeader>
+            <ScrollArea className="max-h-[60vh] p-1 pr-3 custom-scrollbar">
+                <div className="space-y-4 py-4">
+                    {selectedHistoryEntry?.userFeedback && (
+                        <div>
+                            <h4 className="font-semibold text-primary mb-1">Overall Comments:</h4>
+                            <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded-md">{selectedHistoryEntry.userFeedback}</p>
+                        </div>
+                    )}
+                    {selectedHistoryEntry?.detailedFeedback && selectedHistoryEntry.detailedFeedback.length > 0 && (
+                        <div>
+                            <h4 className="font-semibold text-primary mb-2">Skill Ratings:</h4>
+                            <div className="space-y-2">
+                                {selectedHistoryEntry.detailedFeedback.map((fb, index) => (
+                                <div key={index} className="border-b pb-1 last:border-b-0">
+                                    <p className="text-sm font-medium">{fb.skill}: <span className="font-normal text-foreground">{fb.rating}</span></p>
+                                </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
-
-    
