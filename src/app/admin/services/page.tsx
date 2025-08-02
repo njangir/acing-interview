@@ -359,39 +359,40 @@ export default function AdminServicesPage() {
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-2xl">
-           <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit}>
             <DialogHeader>
               <DialogTitle>{currentService ? 'Edit Service' : 'Add New Service'}</DialogTitle>
               <DialogDesc>
                 {currentService ? `Update details for ${currentService.name}.` : 'Fill in the details for the new service.'}
               </DialogDesc>
             </DialogHeader>
-            <ScrollArea className="max-h-[65vh] p-6 custom-scrollbar">
+            <div className="p-6">
+              <ScrollArea className="max-h-[60vh] pr-6 custom-scrollbar">
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="name" className="text-right">Name</Label>
+                    <Label htmlFor="name">Name</Label>
                     <Input id="name" name="name" value={formData.name} onChange={handleInputChange} required />
                   </div>
                   <div>
-                    <Label htmlFor="description" className="text-right pt-2">Description</Label>
+                    <Label htmlFor="description">Description</Label>
                     <Textarea id="description" name="description" value={formData.description} onChange={handleInputChange} rows={3} required />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="price" className="text-right">Price (₹)</Label>
+                      <Label htmlFor="price">Price (₹)</Label>
                       <Input id="price" name="price" type="number" value={formData.price} onChange={handleInputChange} required min="0" />
                     </div>
                     <div>
-                      <Label htmlFor="duration" className="text-right">Duration</Label>
+                      <Label htmlFor="duration">Duration</Label>
                       <Input id="duration" name="duration" value={formData.duration} onChange={handleInputChange} placeholder="e.g., 60 mins" required />
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor="features" className="text-right pt-2">Features</Label>
+                    <Label htmlFor="features">Features</Label>
                     <Textarea id="features" name="features" value={formData.features} onChange={handleInputChange} placeholder="Comma-separated, e.g., Feature 1, Feature 2" rows={3} />
                   </div>
                   <div>
-                    <Label htmlFor="imageUpload" className="text-right">Thumbnail Image</Label>
+                    <Label htmlFor="imageUpload">Thumbnail Image</Label>
                     <Input id="imageUpload" name="imageUpload" type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'thumbnail')} />
                   </div>
                   {thumbnailPreview && (
@@ -400,7 +401,7 @@ export default function AdminServicesPage() {
                       </div>
                   )}
                   <div>
-                    <Label htmlFor="dataAiHint" className="text-right">AI Hint for Thumbnail</Label>
+                    <Label htmlFor="dataAiHint">AI Hint for Thumbnail</Label>
                     <Input id="dataAiHint" name="dataAiHint" value={formData.dataAiHint} onChange={handleInputChange} placeholder="e.g., meeting, study" />
                   </div>
                   <div className="flex items-center space-x-2 pt-2">
@@ -451,7 +452,8 @@ export default function AdminServicesPage() {
                       )}
                   </div>
                 </div>
-            </ScrollArea>
+              </ScrollArea>
+            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>
