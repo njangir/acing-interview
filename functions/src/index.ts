@@ -342,7 +342,7 @@ exports.getAvailableSlots = functions.https.onCall(async (data, context) => {
     try {
         const firestore = getFirestore();
         
-        // Query for bookings on the selected date that are not cancelled
+        // Query for bookings on the selected date that have an active status
         const bookingsQuery = firestore.collection("bookings")
             .where("date", "==", dateString)
             .where("status", "in", ["pending_approval", "accepted", "scheduled"]);
