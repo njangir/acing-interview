@@ -760,7 +760,7 @@ exports.getAdminTestimonialsPageData = functions.runWith({ secrets: ["RAZORPAY_K
 // New function to save hero section data
 exports.saveHeroSection = functions.https.onCall(async (data, context) => {
     await ensureAdmin(context);
-    const { heroData } = data;
+    const { heroData } = data as { heroData: HeroSectionData };
     
     if (!heroData) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing heroData payload.');
@@ -774,6 +774,7 @@ exports.saveHeroSection = functions.https.onCall(async (data, context) => {
             ...heroData,
             updatedAt: FieldValue.serverTimestamp()
         }, { merge: true });
+        logger.info("Hero section data successfully saved for user:", context.auth?.uid);
         return { success: true, message: "Hero section updated successfully." };
     } catch (error) {
         logger.error("Error saving hero section data:", error);
