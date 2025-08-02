@@ -19,16 +19,24 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import Image from 'next/image';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-import { functions, storage } from '@/lib/firebase'; 
+import { functions } from '@/lib/firebase'; 
 import { httpsCallable } from 'firebase/functions';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const getServices = httpsCallable(functions, 'getServices');
 const saveService = httpsCallable(functions, 'saveService');
 const deleteService = httpsCallable(functions, 'deleteService');
 const toggleServiceBookable = httpsCallable(functions, 'toggleServiceBookable');
+const uploadFile = httpsCallable(functions, 'uploadReport'); // Reusing the function
 
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+  });
+};
 
 const initialServiceFormState: Omit<Service, 'id' | 'features'> & { features: string } = {
   name: '',
@@ -38,6 +46,8 @@ const initialServiceFormState: Omit<Service, 'id' | 'features'> & { features: st
   features: '',
   image: '',
   dataAiHint: '',
+  bannerImageUrl: '',
+  bannerImageDataAiHint: '',
   defaultForce: 'General',
   isBookable: true,
   hasDetailsPage: false,
@@ -55,8 +65,13 @@ export default function AdminServicesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentService, setCurrentService] = useState<Service | null>(null);
   const [formData, setFormData] = useState<Omit<Service, 'id' | 'features'> & { features: string }>(initialServiceFormState);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [selectedThumbnailFile, setSelectedThumbnailFile] = useState<File | null>(null);
+  
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [selectedBannerFile, setSelectedBannerFile] = useState<File | null>(null);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
 
@@ -89,6 +104,8 @@ export default function AdminServicesPage() {
         features: currentService.features.join(', '),
         image: currentService.image || '',
         dataAiHint: currentService.dataAiHint || '',
+        bannerImageUrl: currentService.bannerImageUrl || '',
+        bannerImageDataAiHint: currentService.bannerImageDataAiHint || '',
         defaultForce: currentService.defaultForce || 'General',
         isBookable: currentService.isBookable === undefined ? true : currentService.isBookable,
         hasDetailsPage: currentService.hasDetailsPage || false,
@@ -96,12 +113,15 @@ export default function AdminServicesPage() {
         whatToExpect: currentService.whatToExpect || '',
         howItWillHelp: currentService.howItWillHelp || '',
       });
-      setImagePreview(currentService.image || null);
+      setThumbnailPreview(currentService.image || null);
+      setBannerPreview(currentService.bannerImageUrl || null);
     } else {
       setFormData(initialServiceFormState);
-      setImagePreview(null);
+      setThumbnailPreview(null);
+      setBannerPreview(null);
     }
-    setSelectedFile(null); 
+    setSelectedThumbnailFile(null); 
+    setSelectedBannerFile(null);
   }, [currentService, isModalOpen]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -109,14 +129,24 @@ export default function AdminServicesPage() {
     setFormData(prev => ({ ...prev, [name]: name === 'price' ? parseFloat(value) || 0 : value }));
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'thumbnail' | 'banner') => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setSelectedFile(file);
-      setImagePreview(URL.createObjectURL(file));
+      if (type === 'thumbnail') {
+        setSelectedThumbnailFile(file);
+        setThumbnailPreview(URL.createObjectURL(file));
+      } else {
+        setSelectedBannerFile(file);
+        setBannerPreview(URL.createObjectURL(file));
+      }
     } else {
-      setSelectedFile(null);
-      setImagePreview(currentService?.image || (isModalOpen && !currentService ? null : formData.image || null) );
+       if (type === 'thumbnail') {
+        setSelectedThumbnailFile(null);
+        setThumbnailPreview(currentService?.image || null);
+      } else {
+        setSelectedBannerFile(null);
+        setBannerPreview(currentService?.bannerImageUrl || null);
+      }
     }
   };
 
@@ -130,31 +160,50 @@ export default function AdminServicesPage() {
     setIsModalOpen(true);
   };
 
+  const uploadImageViaFunction = async (file: File, folder: string): Promise<string> => {
+    const fileDataUrl = await fileToBase64(file);
+    const result: any = await uploadFile({
+      bookingId: `services_${folder}`, // Generic identifier
+      fileName: file.name,
+      fileDataUrl: fileDataUrl,
+    });
+
+    if (!result.data.success) {
+      throw new Error(result.data.error || 'File upload failed on the server.');
+    }
+    return result.data.downloadUrl;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    let finalImageUrl = formData.image;
+    let finalThumbnailUrl = formData.image;
+    let finalBannerUrl = formData.bannerImageUrl;
 
-    if (selectedFile) {
-      try {
-        const imageFileName = `${Date.now()}_${selectedFile.name.replace(/\s+/g, '_')}`;
-        const imageRef = storageRef(storage, `services/${imageFileName}`);
-        await uploadBytes(imageRef, selectedFile);
-        finalImageUrl = await getDownloadURL(imageRef);
-      } catch (uploadError) {
+    try {
+      if (selectedThumbnailFile) {
+        console.log("Uploading thumbnail...");
+        finalThumbnailUrl = await uploadImageViaFunction(selectedThumbnailFile, 'thumbnails');
+      }
+      if (selectedBannerFile) {
+        console.log("Uploading banner...");
+        finalBannerUrl = await uploadImageViaFunction(selectedBannerFile, 'banners');
+      }
+    } catch (uploadError: any) {
         console.error("Error uploading image:", uploadError);
-        toast({ title: "Image Upload Failed", description: "Could not upload the service image. Please try again.", variant: "destructive" });
+        toast({ title: "Image Upload Failed", description: uploadError.message || "Could not upload service image.", variant: "destructive" });
         setIsSubmitting(false);
         return;
-      }
     }
 
     const serviceToSave: Omit<Service, 'id'> & { id?: string } = {
       ...formData,
       features: formData.features.split(',').map(f => f.trim()).filter(f => f),
-      image: finalImageUrl || 'https://placehold.co/600x400.png',
+      image: finalThumbnailUrl || 'https://placehold.co/600x400.png',
       dataAiHint: formData.dataAiHint || 'service related',
+      bannerImageUrl: finalBannerUrl || '',
+      bannerImageDataAiHint: formData.bannerImageDataAiHint || '',
       price: Number(formData.price),
       isBookable: formData.isBookable,
       id: currentService?.id
@@ -317,78 +366,91 @@ export default function AdminServicesPage() {
                 {currentService ? `Update details for ${currentService.name}.` : 'Fill in the details for the new service.'}
               </DialogDesc>
             </DialogHeader>
-            <ScrollArea className="max-h-[70vh] p-1">
-            <div className="space-y-4 py-4 px-5">
-              <div>
-                <Label htmlFor="name" className="text-right">Name</Label>
-                <Input id="name" name="name" value={formData.name} onChange={handleInputChange} required />
-              </div>
-              <div>
-                <Label htmlFor="description" className="text-right pt-2">Description</Label>
-                <Textarea id="description" name="description" value={formData.description} onChange={handleInputChange} rows={3} required />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+            <ScrollArea className="max-h-[70vh] p-1 custom-scrollbar">
+              <div className="space-y-4 py-4 px-5">
                 <div>
-                  <Label htmlFor="price" className="text-right">Price (₹)</Label>
-                  <Input id="price" name="price" type="number" value={formData.price} onChange={handleInputChange} required min="0" />
+                  <Label htmlFor="name" className="text-right">Name</Label>
+                  <Input id="name" name="name" value={formData.name} onChange={handleInputChange} required />
                 </div>
                 <div>
-                  <Label htmlFor="duration" className="text-right">Duration</Label>
-                  <Input id="duration" name="duration" value={formData.duration} onChange={handleInputChange} placeholder="e.g., 60 mins" required />
+                  <Label htmlFor="description" className="text-right pt-2">Description</Label>
+                  <Textarea id="description" name="description" value={formData.description} onChange={handleInputChange} rows={3} required />
                 </div>
-              </div>
-              <div>
-                <Label htmlFor="features" className="text-right pt-2">Features</Label>
-                <Textarea id="features" name="features" value={formData.features} onChange={handleInputChange} placeholder="Comma-separated, e.g., Feature 1, Feature 2" rows={3} />
-              </div>
-              <div>
-                <Label htmlFor="imageUpload" className="text-right">Thumbnail</Label>
-                <Input id="imageUpload" name="imageUpload" type="file" accept="image/*" onChange={handleFileChange} />
-              </div>
-              {imagePreview && (
-                  <div className="flex justify-center">
-                      <Image src={imagePreview} alt="Thumbnail preview" width={200} height={150} className="rounded-md object-cover border" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="price" className="text-right">Price (₹)</Label>
+                    <Input id="price" name="price" type="number" value={formData.price} onChange={handleInputChange} required min="0" />
                   </div>
-              )}
-              <div>
-                <Label htmlFor="dataAiHint" className="text-right">AI Hint for Image</Label>
-                <Input id="dataAiHint" name="dataAiHint" value={formData.dataAiHint} onChange={handleInputChange} placeholder="e.g., meeting, study" />
-              </div>
-              <div className="flex items-center space-x-2 pt-2">
-                <Switch
-                  id="isBookable"
-                  checked={formData.isBookable}
-                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isBookable: checked }))}
-                />
-                <Label htmlFor="isBookable">Bookings Enabled</Label>
-              </div>
-               <div className="space-y-4 rounded-md border p-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="hasDetailsPage"
-                      checked={formData.hasDetailsPage}
-                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, hasDetailsPage: checked }))}
-                    />
-                    <Label htmlFor="hasDetailsPage" className="font-semibold">Enable "Know More" Details Page</Label>
+                  <div>
+                    <Label htmlFor="duration" className="text-right">Duration</Label>
+                    <Input id="duration" name="duration" value={formData.duration} onChange={handleInputChange} placeholder="e.g., 60 mins" required />
                   </div>
-                  {formData.hasDetailsPage && (
-                    <div className="space-y-4 pl-2 pt-2 border-l-2 border-primary/20 ml-2">
-                        <div>
-                            <Label htmlFor="howItWorks">How It Works</Label>
-                            <Textarea id="howItWorks" name="howItWorks" value={formData.howItWorks} onChange={handleInputChange} placeholder="Explain the process step-by-step..." rows={4} />
-                        </div>
-                         <div>
-                            <Label htmlFor="whatToExpect">What To Expect</Label>
-                            <Textarea id="whatToExpect" name="whatToExpect" value={formData.whatToExpect} onChange={handleInputChange} placeholder="Use bullet points (e.g., - Point 1) for clarity..." rows={4} />
-                        </div>
-                         <div>
-                            <Label htmlFor="howItWillHelp">How It Will Help</Label>
-                            <Textarea id="howItWillHelp" name="howItWillHelp" value={formData.howItWillHelp} onChange={handleInputChange} placeholder="Describe the benefits and outcomes..." rows={4} />
-                        </div>
+                </div>
+                <div>
+                  <Label htmlFor="features" className="text-right pt-2">Features</Label>
+                  <Textarea id="features" name="features" value={formData.features} onChange={handleInputChange} placeholder="Comma-separated, e.g., Feature 1, Feature 2" rows={3} />
+                </div>
+                <div>
+                  <Label htmlFor="imageUpload" className="text-right">Thumbnail Image</Label>
+                  <Input id="imageUpload" name="imageUpload" type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'thumbnail')} />
+                </div>
+                {thumbnailPreview && (
+                    <div className="flex justify-center">
+                        <Image src={thumbnailPreview} alt="Thumbnail preview" width={200} height={150} className="rounded-md object-cover border" />
                     </div>
-                  )}
-               </div>
-            </div>
+                )}
+                <div>
+                  <Label htmlFor="dataAiHint" className="text-right">AI Hint for Thumbnail</Label>
+                  <Input id="dataAiHint" name="dataAiHint" value={formData.dataAiHint} onChange={handleInputChange} placeholder="e.g., meeting, study" />
+                </div>
+                <div className="flex items-center space-x-2 pt-2">
+                  <Switch
+                    id="isBookable"
+                    checked={formData.isBookable}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isBookable: checked }))}
+                  />
+                  <Label htmlFor="isBookable">Bookings Enabled</Label>
+                </div>
+                <div className="space-y-4 rounded-md border p-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="hasDetailsPage"
+                        checked={formData.hasDetailsPage}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, hasDetailsPage: checked }))}
+                      />
+                      <Label htmlFor="hasDetailsPage" className="font-semibold">Enable "Know More" Details Page</Label>
+                    </div>
+                    {formData.hasDetailsPage && (
+                      <div className="space-y-4 pl-2 pt-2 border-l-2 border-primary/20 ml-2">
+                          <div>
+                              <Label htmlFor="bannerImageUpload">Details Page Banner Image</Label>
+                              <Input id="bannerImageUpload" name="bannerImageUpload" type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'banner')} />
+                          </div>
+                           {bannerPreview && (
+                              <div className="flex justify-center">
+                                  <Image src={bannerPreview} alt="Banner preview" width={300} height={150} className="rounded-md object-cover border" />
+                              </div>
+                          )}
+                          <div>
+                            <Label htmlFor="bannerImageDataAiHint">AI Hint for Banner</Label>
+                            <Input id="bannerImageDataAiHint" name="bannerImageDataAiHint" value={formData.bannerImageDataAiHint} onChange={handleInputChange} placeholder="e.g., professional, interview" />
+                          </div>
+                          <div>
+                              <Label htmlFor="howItWorks">How It Works</Label>
+                              <Textarea id="howItWorks" name="howItWorks" value={formData.howItWorks} onChange={handleInputChange} placeholder="Explain the process step-by-step..." rows={4} />
+                          </div>
+                          <div>
+                              <Label htmlFor="whatToExpect">What To Expect</Label>
+                              <Textarea id="whatToExpect" name="whatToExpect" value={formData.whatToExpect} onChange={handleInputChange} placeholder="Use bullet points (e.g., - Point 1) for clarity..." rows={4} />
+                          </div>
+                          <div>
+                              <Label htmlFor="howItWillHelp">How It Will Help</Label>
+                              <Textarea id="howItWillHelp" name="howItWillHelp" value={formData.howItWillHelp} onChange={handleInputChange} placeholder="Describe the benefits and outcomes..." rows={4} />
+                          </div>
+                      </div>
+                    )}
+                </div>
+              </div>
             </ScrollArea>
             <DialogFooter className="mt-4 px-6 pb-6">
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancel</Button>

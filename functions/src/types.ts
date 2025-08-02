@@ -48,7 +48,7 @@ export interface Service {
   price: number;
   duration: string;
   features: string[];
-  image?: string;
+  image?: string; // Thumbnail
   dataAiHint?: string;
   defaultForce?: 'Air Force' | 'Army' | 'Navy' | 'General';
   isBookable?: boolean;
@@ -56,6 +56,8 @@ export interface Service {
   howItWorks?: string;
   whatToExpect?: string;
   howItWillHelp?: string;
+  bannerImageUrl?: string; // New field for details page banner
+  bannerImageDataAiHint?: string; // New field
   createdAt?: firestore.FieldValue;
   updatedAt?: firestore.FieldValue;
 }
@@ -152,4 +154,14 @@ export interface HeroSectionData {
   heroImageUrl: string;
   heroDataAiHint?: string;
   updatedAt?: firestore.FieldValue;
+}
+
+export interface UserNotification {
+    id: string;
+    userId: string;
+    message: string;
+    href: string;
+    seen: boolean;
+    timestamp: firestore.FieldValue;
+    type: 'booking_update' | 'message_reply' | 'general';
 }

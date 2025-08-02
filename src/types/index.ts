@@ -8,14 +8,16 @@ export interface Service {
   price: number;
   duration: string; // e.g., "60 mins", "2 hours"
   features: string[];
-  image?: string;
+  image?: string; // This is the thumbnail
   dataAiHint?: string;
   defaultForce?: 'Air Force' | 'Army' | 'Navy' | 'General';
   isBookable?: boolean;
-  hasDetailsPage?: boolean; // New field
-  howItWorks?: string; // New field
-  whatToExpect?: string; // New field
-  howItWillHelp?: string; // New field
+  hasDetailsPage?: boolean;
+  howItWorks?: string;
+  whatToExpect?: string;
+  howItWillHelp?: string;
+  bannerImageUrl?: string; // New field for the details page banner
+  bannerImageDataAiHint?: string; // New field
   createdAt?: any; // Should be Firestore Timestamp
   updatedAt?: any; // Should be Firestore Timestamp
 }

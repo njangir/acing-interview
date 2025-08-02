@@ -54,7 +54,7 @@ export async function generateMetadata(
     openGraph: {
       title: service.name,
       description: service.description,
-      images: [service.image || 'https://placehold.co/1200x630.png', ...previousImages],
+      images: [service.bannerImageUrl || service.image || 'https://placehold.co/1200x630.png', ...previousImages],
     },
   }
 }
@@ -110,12 +110,12 @@ export default async function ServiceDetailsPage({ params }: Props) {
       <div className="container pb-12">
         <div className="relative h-64 md:h-96 w-full mb-12 rounded-lg overflow-hidden shadow-lg">
           <Image
-            src={service.image || 'https://placehold.co/1200x400.png'}
+            src={service.bannerImageUrl || service.image || 'https://placehold.co/1200x400.png'}
             alt={service.name}
             fill
             className="object-cover"
             priority
-            data-ai-hint={service.dataAiHint || 'service banner'}
+            data-ai-hint={service.bannerImageDataAiHint || service.dataAiHint || 'service banner'}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
           <div className="absolute bottom-6 left-6 text-white">
