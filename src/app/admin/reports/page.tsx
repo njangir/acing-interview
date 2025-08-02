@@ -129,7 +129,6 @@ export default function AdminReportsPage() {
       }
       setSkillRatingsData(initialRatings);
       setComments(selectedBookingDetails.userFeedback || '');
-      // Do not reset badge ID when selecting a booking; it might be set from history click
     } else {
       setSkillRatingsData({});
       setComments('');
@@ -154,9 +153,18 @@ export default function AdminReportsPage() {
     if (bookingToEdit) {
       setSelectedBookingId(bookingToEdit.id);
       
-      // Get the badge ID if a badge was assigned
       const assignedBadge = badges.find(b => b.name === historyEntry.badgeAssignedName);
       setSelectedBadgeId(assignedBadge ? assignedBadge.id : 'none');
+      
+      // Explicitly set the form state from the historical booking data
+      const initialRatings: Record<string, string> = {};
+      if (bookingToEdit.detailedFeedback) {
+        bookingToEdit.detailedFeedback.forEach(fb => {
+          initialRatings[fb.skill] = fb.rating;
+        });
+      }
+      setSkillRatingsData(initialRatings);
+      setComments(bookingToEdit.userFeedback || '');
 
     } else {
        toast({ title: "Booking Not Found", description: "The original booking for this feedback could not be found.", variant: "destructive" });
