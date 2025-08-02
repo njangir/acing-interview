@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -45,43 +45,44 @@ export default function AdminHeroSectionPage() {
   
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const heroDocRef = doc(db, 'siteContent', 'homePage');
 
   const form = useForm<HeroSectionFormValues>({
     resolver: zodResolver(heroSectionSchema),
   });
 
-  useEffect(() => {
-    const fetchHeroData = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const docSnap = await getDoc(heroDocRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data() as HeroSectionData;
-          setHeroData(data);
-          form.reset(data);
-          setImagePreview(data.heroImageUrl || null);
-        } else {
-            const defaultData: HeroSectionData = {
-                heroTitle: 'Crack Your SSB Interview with Expert Guidance',
-                heroSubtitle: 'Led by a 4-time SSB recommended professional. Get personalized mock interviews, in-depth feedback, and proven strategies to achieve your armed forces dream.',
-                heroCtaText: 'Book Your Interview Now',
-                heroImageUrl: 'https://placehold.co/600x450.png',
-                heroDataAiHint: 'interview coaching',
-            };
-            setHeroData(defaultData);
-            form.reset(defaultData);
-            setImagePreview(defaultData.heroImageUrl);
-        }
-      } catch (err) {
-        console.error("Error fetching hero section data:", err);
-        setError("Failed to load hero section data. Check Firestore permissions.");
+  const fetchHeroData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const heroDocRef = doc(db, 'siteContent', 'homePage');
+      const docSnap = await getDoc(heroDocRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data() as HeroSectionData;
+        setHeroData(data);
+        form.reset(data);
+        setImagePreview(data.heroImageUrl || null);
+      } else {
+          const defaultData: HeroSectionData = {
+              heroTitle: 'Crack Your SSB Interview with Expert Guidance',
+              heroSubtitle: 'Led by a 4-time SSB recommended professional. Get personalized mock interviews, in-depth feedback, and proven strategies to achieve your armed forces dream.',
+              heroCtaText: 'Book Your Interview Now',
+              heroImageUrl: 'https://placehold.co/600x450.png',
+              heroDataAiHint: 'interview coaching',
+          };
+          setHeroData(defaultData);
+          form.reset(defaultData);
+          setImagePreview(defaultData.heroImageUrl);
       }
-      setIsLoading(false);
-    };
+    } catch (err) {
+      console.error("Error fetching hero section data:", err);
+      setError("Failed to load hero section data. Check Firestore permissions.");
+    }
+    setIsLoading(false);
+  }, [form]);
+
+  useEffect(() => {
     fetchHeroData();
-  }, [form, heroDocRef]);
+  }, [fetchHeroData]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
