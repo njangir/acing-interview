@@ -15,10 +15,11 @@ import { useToast } from '@/hooks/use-toast';
 
 import { db, functions } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
-import { format } from 'date-fns';
+import { format, isBefore, startOfToday } from 'date-fns';
 import { httpsCallable } from 'firebase/functions';
 
 const getAvailableSlots = httpsCallable(functions, 'getAvailableSlots');
+const getGlobalAvailability = httpsCallable(functions, 'getAvailability');
 
 export default function SlotSelectionPage() {
   const params = useParams();
@@ -28,7 +29,7 @@ export default function SlotSelectionPage() {
   const { toast } = useToast();
 
   const [service, setService] = useState<Service | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,14 +37,20 @@ export default function SlotSelectionPage() {
   const [isServiceBookable, setIsServiceBookable] = useState(true);
   const [isFetchingSlots, setIsFetchingSlots] = useState(false);
   const [isProceeding, setIsProceeding] = useState(false);
-  const [firestoreSlots, setFirestoreSlots] = useState<Record<string, string[]>>({});
+  
+  // New state to hold all possible slots from admin settings
+  const [globalSlotsData, setGlobalSlotsData] = useState<Record<string, string[]>>({});
 
-  const fetchServiceDetails = useCallback(async () => {
+  const fetchInitialData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const serviceDocRef = doc(db, "services", serviceId);
-      const serviceSnap = await getDoc(serviceDocRef);
+      // Fetch service details and global availability concurrently
+      const [serviceSnap, availabilityResult]: [any, any] = await Promise.all([
+        getDoc(doc(db, "services", serviceId)),
+        getGlobalAvailability()
+      ]);
+      
       if (serviceSnap.exists()) {
         const serviceData = serviceSnap.data() as Service;
         setService({ id: serviceSnap.id, ...serviceData });
@@ -52,9 +59,14 @@ export default function SlotSelectionPage() {
         setError("Service not found.");
         setIsServiceBookable(false);
       }
+
+      if (availabilityResult.data.availability) {
+        setGlobalSlotsData(availabilityResult.data.availability);
+      }
+
     } catch (err) {
-      console.error("Error fetching service details:", err);
-      setError("Failed to load service details. Please try again.");
+      console.error("Error fetching initial data:", err);
+      setError("Failed to load service details or availability. Please try again.");
       setIsServiceBookable(false);
     } finally {
       setIsLoading(false);
@@ -71,26 +83,33 @@ export default function SlotSelectionPage() {
       return;
     }
 
-    fetchServiceDetails();
-  }, [serviceId, currentUser, router, loadingAuth, fetchServiceDetails]);
+    fetchInitialData();
+  }, [serviceId, currentUser, router, loadingAuth, fetchInitialData]);
 
   useEffect(() => {
     if (selectedDate) {
       const fetchAndFilterSlots = async () => {
         setIsFetchingSlots(true);
         setError(null);
+        setSelectedTime(null);
+        
         try {
           const dateString = format(selectedDate, 'yyyy-MM-dd');
           
-          const result: any = await getAvailableSlots({ dateString });
-
-          if (result.data.availableSlots) {
-             setAvailableTimes(result.data.availableSlots);
-          } else {
-             setAvailableTimes([]);
+          // Get all possible slots for the day from the already fetched global data
+          const allPossibleSlotsForDay = globalSlotsData[dateString] || [];
+          if(allPossibleSlotsForDay.length === 0) {
+            setAvailableTimes([]);
+            return;
           }
-          
-          setSelectedTime(null);
+
+          // Fetch only the BOOKED slots for this date from the backend
+          const result: any = await getAvailableSlots({ dateString });
+          const bookedTimes = new Set(result.data.bookedSlots || []);
+
+          // Filter out the booked times
+          const trulyAvailableSlots = allPossibleSlotsForDay.filter(time => !bookedTimes.has(time));
+          setAvailableTimes(trulyAvailableSlots);
 
         } catch (err: any) {
             console.error("Error fetching or filtering slots:", err);
@@ -106,7 +125,7 @@ export default function SlotSelectionPage() {
       setAvailableTimes([]);
       setSelectedTime(null);
     }
-  }, [selectedDate, serviceId]);
+  }, [selectedDate, globalSlotsData]);
 
   const handleProceed = async () => {
     if (!selectedDate || !selectedTime) {
@@ -156,6 +175,12 @@ export default function SlotSelectionPage() {
         });
         setIsProceeding(false);
     }
+  };
+  
+  const today = startOfToday();
+  const isDateDisabled = (date: Date) => {
+    const dateString = format(date, 'yyyy-MM-dd');
+    return isBefore(date, today) || !globalSlotsData[dateString] || globalSlotsData[dateString].length === 0;
   };
 
   if (isLoading || loadingAuth) {
@@ -232,11 +257,7 @@ export default function SlotSelectionPage() {
                 selected={selectedDate}
                 onSelect={setSelectedDate}
                 className="rounded-md border"
-                disabled={(date) => {
-                  const currentDayStart = new Date();
-                  currentDayStart.setHours(0,0,0,0);
-                  return date < currentDayStart;
-                }}
+                disabled={isDateDisabled}
               />
             </div>
             <div>
@@ -286,5 +307,3 @@ export default function SlotSelectionPage() {
     </>
   );
 }
-
-    

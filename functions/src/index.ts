@@ -341,26 +341,16 @@ exports.getAvailableSlots = functions.https.onCall(async (data: any, context: fu
 
     try {
         const firestore = getFirestore();
-
-        // Get all potentially available slots for the day from admin settings
-        const availabilityDoc = await firestore.collection('globalAvailability').doc(dateString).get();
-        const allPossibleSlots = availabilityDoc.exists ? availabilityDoc.data()?.timeSlots || [] : [];
-        if (allPossibleSlots.length === 0) {
-            return { availableSlots: [] };
-        }
-
+        
         // Query for bookings on the selected date that are not cancelled
         const bookingsQuery = firestore.collection("bookings")
             .where("date", "==", dateString)
             .where("status", "!=", "cancelled");
 
         const bookingsSnapshot = await bookingsQuery.get();
-        const bookedTimes = new Set(bookingsSnapshot.docs.map(doc => doc.data().time));
+        const bookedTimes = bookingsSnapshot.docs.map(doc => doc.data().time);
         
-        // Filter out the booked times from the available slots
-        const trulyAvailableSlots = allPossibleSlots.filter((time: string) => !bookedTimes.has(time));
-        
-        return { availableSlots: trulyAvailableSlots };
+        return { bookedSlots: bookedTimes };
 
     } catch (err: any) {
         logger.error("Error fetching available slots:", err);
@@ -495,7 +485,10 @@ exports.deleteBadge = functions.https.onCall(async (data: any, context: function
 
 // Availability
 exports.getAvailability = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
-    await ensureAdmin(context);
+    // This function can be called by any authenticated user to check which dates have slots.
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
+    }
     const firestore = getFirestore();
     const snapshot = await firestore.collection('globalAvailability').get();
     const availabilityData: Record<string, string[]> = {};
@@ -765,7 +758,8 @@ exports.getAdminTestimonialsPageData = functions.runWith({ secrets: ["RAZORPAY_K
 // New function to save hero section data
 exports.saveHeroSection = functions.https.onCall(async (data, context) => {
     await ensureAdmin(context);
-    const { heroData } = data as { heroData: HeroSectionData };
+    // The data is now nested under `heroData` key from the client call.
+    const heroData = data.heroData as HeroSectionData;
     
     if (!heroData) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing heroData payload.');
