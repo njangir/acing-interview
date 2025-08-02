@@ -313,6 +313,38 @@ exports.getAdminDashboardData = functions.runWith({ secrets: ["RAZORPAY_KEY_ID",
         throw new functions.https.HttpsError("internal", "Failed to fetch dashboard data.");
     }
 });
+exports.getAvailableSlots = functions.https.onCall(async (data, context) => {
+    var _a;
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
+    }
+    const { dateString } = data;
+    if (!dateString) {
+        throw new functions.https.HttpsError("invalid-argument", "The function must be called with a 'dateString'.");
+    }
+    try {
+        const firestore = (0, firestore_1.getFirestore)();
+        // Get all potentially available slots for the day from admin settings
+        const availabilityDoc = await firestore.collection('globalAvailability').doc(dateString).get();
+        const allPossibleSlots = availabilityDoc.exists ? ((_a = availabilityDoc.data()) === null || _a === void 0 ? void 0 : _a.timeSlots) || [] : [];
+        if (allPossibleSlots.length === 0) {
+            return { availableSlots: [] };
+        }
+        // Query for bookings on the selected date that are not cancelled
+        const bookingsQuery = firestore.collection("bookings")
+            .where("date", "==", dateString)
+            .where("status", "!=", "cancelled");
+        const bookingsSnapshot = await bookingsQuery.get();
+        const bookedTimes = new Set(bookingsSnapshot.docs.map(doc => doc.data().time));
+        // Filter out the booked times from the available slots
+        const trulyAvailableSlots = allPossibleSlots.filter((time) => !bookedTimes.has(time));
+        return { availableSlots: trulyAvailableSlots };
+    }
+    catch (err) {
+        logger.error("Error fetching available slots:", err);
+        throw new functions.https.HttpsError("internal", "Could not retrieve available slots.", err.message);
+    }
+});
 // New Admin Write Functions
 // Services
 exports.getServices = functions.https.onCall(async (data, context) => {
@@ -659,6 +691,7 @@ exports.getAdminTestimonialsPageData = functions.runWith({ secrets: ["RAZORPAY_K
 });
 // New function to save hero section data
 exports.saveHeroSection = functions.https.onCall(async (data, context) => {
+    var _a;
     await ensureAdmin(context);
     const { heroData } = data;
     if (!heroData) {
@@ -668,6 +701,7 @@ exports.saveHeroSection = functions.https.onCall(async (data, context) => {
     const heroDocRef = firestore.collection('siteContent').doc('homePage');
     try {
         await heroDocRef.set(Object.assign(Object.assign({}, heroData), { updatedAt: firestore_1.FieldValue.serverTimestamp() }), { merge: true });
+        logger.info("Hero section data successfully saved for user:", (_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid);
         return { success: true, message: "Hero section updated successfully." };
     }
     catch (error) {

@@ -25,6 +25,19 @@ import { db } from '@/lib/firebase';
 import type { HeroSectionData } from '@/types';
 
 const saveHeroSection = httpsCallable(functions, 'saveHeroSection');
+// We will reuse the 'uploadReport' function structure for this, as it handles file uploads.
+// In a real-world large scale app, you might create a more generic 'uploadFile' function.
+const uploadFile = httpsCallable(functions, 'uploadReport');
+
+
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+  });
+};
 
 const heroSectionSchema = z.object({
   heroTitle: z.string().min(10, "Title must be at least 10 characters."),
@@ -98,17 +111,28 @@ export default function AdminHeroSectionPage() {
 
   async function onSubmit(data: HeroSectionFormValues) {
     setIsSaving(true);
-    let finalImageUrl = heroData?.heroImageUrl || '';
+    let finalImageUrl = form.getValues('heroImageUrl') || heroData?.heroImageUrl || '';
 
     if (imageFile) {
+        console.log("New image file selected. Uploading via Cloud Function...");
         try {
-            const imageFileName = `hero_section_${Date.now()}_${imageFile.name.replace(/\s+/g, '_')}`;
-            const imageRef = storageRef(storage, `site_content/${imageFileName}`);
-            await uploadBytes(imageRef, imageFile);
-            finalImageUrl = await getDownloadURL(imageRef);
+            const fileDataUrl = await fileToBase64(imageFile);
+            const uploadResult: any = await uploadFile({
+                // The function expects a bookingId, we can use a generic identifier
+                bookingId: 'site_content_hero', 
+                fileName: imageFile.name,
+                fileDataUrl: fileDataUrl,
+            });
+            
+            if (!uploadResult.data.success) {
+                throw new Error(uploadResult.data.error || 'File upload failed on the server.');
+            }
+            finalImageUrl = uploadResult.data.downloadUrl;
+            console.log("Image uploaded successfully. New URL:", finalImageUrl);
+
         } catch (uploadError) {
-            console.error("Error uploading hero image:", uploadError);
-            toast({ title: "Image Upload Failed", description: "Could not upload the new hero image.", variant: "destructive" });
+            console.error("Error uploading hero image via Cloud Function:", uploadError);
+            toast({ title: "Image Upload Failed", description: "Could not upload the new hero image. Check function logs for details.", variant: "destructive" });
             setIsSaving(false);
             return;
         }
@@ -119,6 +143,7 @@ export default function AdminHeroSectionPage() {
         heroImageUrl: finalImageUrl,
     };
     
+    console.log("Attempting to save hero section data:", dataToSave);
     try {
       await saveHeroSection({ heroData: dataToSave });
       setHeroData(dataToSave);
@@ -127,8 +152,9 @@ export default function AdminHeroSectionPage() {
         title: "Hero Section Updated",
         description: "The homepage hero section has been successfully updated.",
       });
+      console.log("Hero section successfully saved to Firestore.");
     } catch (err) {
-      console.error("Error saving hero section:", err);
+      console.error("Error saving hero section to Firestore:", err);
       toast({ title: "Save Failed", description: "Could not save hero section data.", variant: "destructive" });
     } finally {
       setIsSaving(false);
