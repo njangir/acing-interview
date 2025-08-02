@@ -11,7 +11,11 @@ export interface Service {
   image?: string;
   dataAiHint?: string;
   defaultForce?: 'Air Force' | 'Army' | 'Navy' | 'General';
-  isBookable?: boolean; // New field
+  isBookable?: boolean;
+  hasDetailsPage?: boolean; // New field
+  howItWorks?: string; // New field
+  whatToExpect?: string; // New field
+  howItWillHelp?: string; // New field
   createdAt?: any; // Should be Firestore Timestamp
   updatedAt?: any; // Should be Firestore Timestamp
 }

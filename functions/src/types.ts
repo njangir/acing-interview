@@ -1,5 +1,4 @@
 
-
 import type { firestore } from 'firebase-admin';
 
 // This file contains shared types between frontend and backend.

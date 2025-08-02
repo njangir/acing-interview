@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import Image from 'next/image';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, Info } from 'lucide-react';
 
 interface ServiceCardProps {
   service: Service;
@@ -48,7 +48,14 @@ export function ServiceCard({ service }: ServiceCardProps) {
         </ul>
         <p className="mt-4 text-2xl font-bold text-primary">₹{service.price}</p>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="flex flex-col sm:flex-row gap-2">
+        {service.hasDetailsPage && (
+          <Button asChild variant="outline" className="w-full border-primary text-primary hover:bg-primary/10">
+            <Link href={`/service/${service.id}`}>
+              <Info className="mr-2 h-4 w-4"/> Know More
+            </Link>
+          </Button>
+        )}
         <Button asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={!isBookable}>
           <Link href={isBookable ? `/book/${service.id}/slots` : '#'}>
             {isBookable ? 'Book Now' : 'Currently Unavailable'}

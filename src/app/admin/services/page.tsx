@@ -19,10 +19,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import Image from 'next/image';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-import { db, storage, functions } from '@/lib/firebase'; 
+import { functions, storage } from '@/lib/firebase'; 
 import { httpsCallable } from 'firebase/functions';
-import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const getServices = httpsCallable(functions, 'getServices');
 const saveService = httpsCallable(functions, 'saveService');
@@ -40,6 +40,10 @@ const initialServiceFormState: Omit<Service, 'id' | 'features'> & { features: st
   dataAiHint: '',
   defaultForce: 'General',
   isBookable: true,
+  hasDetailsPage: false,
+  howItWorks: '',
+  whatToExpect: '',
+  howItWillHelp: '',
 };
 
 export default function AdminServicesPage() {
@@ -87,6 +91,10 @@ export default function AdminServicesPage() {
         dataAiHint: currentService.dataAiHint || '',
         defaultForce: currentService.defaultForce || 'General',
         isBookable: currentService.isBookable === undefined ? true : currentService.isBookable,
+        hasDetailsPage: currentService.hasDetailsPage || false,
+        howItWorks: currentService.howItWorks || '',
+        whatToExpect: currentService.whatToExpect || '',
+        howItWillHelp: currentService.howItWillHelp || '',
       });
       setImagePreview(currentService.image || null);
     } else {
@@ -309,7 +317,8 @@ export default function AdminServicesPage() {
                 {currentService ? `Update details for ${currentService.name}.` : 'Fill in the details for the new service.'}
               </DialogDesc>
             </DialogHeader>
-            <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto custom-scrollbar p-2">
+            <ScrollArea className="max-h-[70vh] p-1">
+            <div className="space-y-4 py-4 px-5">
               <div>
                 <Label htmlFor="name" className="text-right">Name</Label>
                 <Input id="name" name="name" value={formData.name} onChange={handleInputChange} required />
@@ -345,7 +354,7 @@ export default function AdminServicesPage() {
                 <Label htmlFor="dataAiHint" className="text-right">AI Hint for Image</Label>
                 <Input id="dataAiHint" name="dataAiHint" value={formData.dataAiHint} onChange={handleInputChange} placeholder="e.g., meeting, study" />
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 pt-2">
                 <Switch
                   id="isBookable"
                   checked={formData.isBookable}
@@ -353,8 +362,35 @@ export default function AdminServicesPage() {
                 />
                 <Label htmlFor="isBookable">Bookings Enabled</Label>
               </div>
+               <div className="space-y-4 rounded-md border p-4">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="hasDetailsPage"
+                      checked={formData.hasDetailsPage}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, hasDetailsPage: checked }))}
+                    />
+                    <Label htmlFor="hasDetailsPage" className="font-semibold">Enable "Know More" Details Page</Label>
+                  </div>
+                  {formData.hasDetailsPage && (
+                    <div className="space-y-4 pl-2 pt-2 border-l-2 border-primary/20 ml-2">
+                        <div>
+                            <Label htmlFor="howItWorks">How It Works</Label>
+                            <Textarea id="howItWorks" name="howItWorks" value={formData.howItWorks} onChange={handleInputChange} placeholder="Explain the process step-by-step..." rows={4} />
+                        </div>
+                         <div>
+                            <Label htmlFor="whatToExpect">What To Expect</Label>
+                            <Textarea id="whatToExpect" name="whatToExpect" value={formData.whatToExpect} onChange={handleInputChange} placeholder="Use bullet points (e.g., - Point 1) for clarity..." rows={4} />
+                        </div>
+                         <div>
+                            <Label htmlFor="howItWillHelp">How It Will Help</Label>
+                            <Textarea id="howItWillHelp" name="howItWillHelp" value={formData.howItWillHelp} onChange={handleInputChange} placeholder="Describe the benefits and outcomes..." rows={4} />
+                        </div>
+                    </div>
+                  )}
+               </div>
             </div>
-            <DialogFooter className="mt-4">
+            </ScrollArea>
+            <DialogFooter className="mt-4 px-6 pb-6">
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
