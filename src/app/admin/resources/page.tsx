@@ -276,7 +276,7 @@ export default function AdminResourcesPage() {
               ) : (
                 <div className="space-y-1">
                   <Label htmlFor="url">URL</Label>
-                  <Input id="url" name="url" value={formData.url} onChange={handleInputChange} placeholder={formData.type === 'video' ? "YouTube, Vimeo, etc." : "https://example.com"} required />
+                  <Input id="url" name="url" value={formData.url || ''} onChange={handleInputChange} placeholder={formData.type === 'video' ? "YouTube, Vimeo, etc." : "https://example.com"} required />
                 </div>
               )}
               <div className="space-y-1">
