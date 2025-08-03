@@ -393,5 +393,4 @@ export default function AdminBadgesPage() {
       </Dialog>
     </>
   );
-
-    
+}

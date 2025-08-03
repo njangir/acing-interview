@@ -10,7 +10,7 @@ import { PageHeader } from '@/components/core/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ArrowRight, BookUser, CheckCircle, HelpCircle, Sparkles, Testtube2, AlertTriangle } from 'lucide-react';
+import { ArrowRight, BookUser, CheckCircle, HelpCircle, Sparkles, TestTube2, AlertTriangle } from 'lucide-react';
 import { TestimonialCard } from '@/components/core/testimonial-card';
 import type { Metadata, ResolvingMetadata } from 'next';
 
@@ -134,7 +134,7 @@ export default async function ServiceDetailsPage({ params }: Props) {
                     </div>
                 </Section>
                 
-                <Section icon={Testtube2} title="What to Expect">
+                <Section icon={TestTube2} title="What to Expect">
                     <ul className="space-y-2 text-muted-foreground">
                         {whatToExpectItems.map((item, index) => (
                             <li key={index} className="flex items-start">

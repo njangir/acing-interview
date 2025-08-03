@@ -51,7 +51,7 @@ export default function SlotSelectionPage() {
       
       if (serviceSnap.exists()) {
         const serviceData = serviceSnap.data() as Service;
-        setService({ id: serviceSnap.id, ...serviceData });
+        setService({ ...serviceData, id: serviceSnap.id });
         setIsServiceBookable(serviceData.isBookable === undefined ? true : serviceData.isBookable);
       } else {
         setError("Service not found.");

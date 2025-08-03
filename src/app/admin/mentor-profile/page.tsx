@@ -115,6 +115,7 @@ export default function AdminMentorProfilePage() {
       const profileToSave: MentorProfileData = {
           ...data,
           imageUrl: finalImageUrl,
+          dataAiHint: data.dataAiHint || '',
       };
       
       await saveMentorProfile({ profile: profileToSave });

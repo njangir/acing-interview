@@ -155,16 +155,6 @@ export default function ProfilePage() {
 
       setUserProfile(updatedProfileData);
 
-      const updatedAuthUser = {
-        ...currentUser,
-        name: updatedProfileData.name,
-        imageUrl: updatedProfileData.imageUrl,
-      };
-      
-      const auth = await import('@/hooks/use-auth');
-      auth.useAuth.setState({ currentUser: updatedAuthUser });
-
-
       toast({
         title: "Profile Updated",
         description: "Your profile information has been successfully updated.",
@@ -405,3 +395,4 @@ export default function ProfilePage() {
       </div>
     </>
   );
+}
