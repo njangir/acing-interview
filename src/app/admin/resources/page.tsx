@@ -281,7 +281,7 @@ export default function AdminResourcesPage() {
               )}
               <div className="space-y-1">
                 <Label htmlFor="description">Description</Label>
-                <Textarea id="description" name="description" value={formData.description} onChange={handleInputChange} />
+                <Textarea id="description" name="description" value={formData.description || ''} onChange={handleInputChange} />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="serviceCategory">Link to Service (Category)</Label>
