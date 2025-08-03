@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { PageHeader } from "@/components/core/page-header";
 import { BookingCard } from "@/components/core/booking-card";
 import type { Booking } from '@/types';
@@ -32,11 +33,20 @@ const getBookingDateTime = (bookingDate: string, bookingTime: string): Date => {
 
 export default function MyBookingsPage() {
   const { currentUser, loadingAuth } = useAuth();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [userBookingsData, setUserBookingsData] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('upcoming');
   
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'past') {
+      setActiveTab('past');
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (loadingAuth) {
@@ -141,7 +151,7 @@ export default function MyBookingsPage() {
         title="My Bookings"
         description="View your scheduled sessions and access past booking details."
       />
-      <Tabs defaultValue="upcoming" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 md:w-[400px] mb-6">
           <TabsTrigger value="upcoming">Upcoming ({upcomingBookings.length})</TabsTrigger>
           <TabsTrigger value="past">Past ({pastBookings.length})</TabsTrigger>
