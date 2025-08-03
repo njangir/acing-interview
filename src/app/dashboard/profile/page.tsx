@@ -40,7 +40,7 @@ type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
 export default function ProfilePage() {
   const { toast } = useToast();
-  const { currentUser, login: updateAuthContextUser, loadingAuth } = useAuth();
+  const { currentUser, loadingAuth } = useAuth();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [selectedAvatarForForm, setSelectedAvatarForForm] = useState<string | undefined>(undefined);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
@@ -128,15 +128,6 @@ export default function ProfilePage() {
 
     setIsSaving(true);
     
-    // PRODUCTION TODO: If phone number has changed, trigger OTP verification flow.
-    // if (data.phone !== userProfile.phone) {
-    //   // 1. Show OTP modal/UI section.
-    //   // 2. const verifier = await setupRecaptcha('recaptcha-container-profile');
-    //   // 3. const confirmationResult = await sendOtp(data.phone, verifier);
-    //   // 4. Get OTP from user, then: await verifyOtp(confirmationResult, otpFromUser);
-    //   // 5. If successful, proceed with saving the rest of the profile.
-    // }
-
     const updatedProfileData: UserProfile = {
       ...userProfile, 
       name: data.name,

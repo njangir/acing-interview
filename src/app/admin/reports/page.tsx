@@ -355,7 +355,7 @@ export default function AdminReportsPage() {
                 <Label htmlFor="reportFile">Report PDF File</Label>
                 <Input id="reportFile" type="file" accept=".pdf" onChange={handleFileChange} />
                 {reportFile && <p className="text-xs text-muted-foreground">Selected: {reportFile.name}</p>}
-                {!reportFile && selectedBookingDetails?.reportUrl && <p className="text-xs text-muted-foreground">Current report: <a href={selectedBookingDetails.reportUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">{selectedBookingDetails.reportUrl.split('%2F').pop()?.split('?')[0]}</a> (Upload new to replace)</p>}
+                {!reportFile && selectedBookingDetails?.reportUrl && <p className="text-xs text-muted-foreground">Current report: <a href={selectedBookingDetails.reportUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">{selectedBookingDetails.reportUrl.split('%2F').pop()?.split('?')[0].split('%2F').pop()}</a> (Upload new to replace)</p>}
                 </div>
 
                 {selectedBookingId && (
@@ -463,7 +463,7 @@ export default function AdminReportsPage() {
                                                     {(entry as any).userFeedback && (
                                                         <div>
                                                             <h4 className="font-semibold text-primary mb-1">Overall Comments:</h4>
-                                                            <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded-md">{(entry as any).userFeedback}</p>
+                                                            <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded-md whitespace-pre-wrap">{(entry as any).userFeedback}</p>
                                                         </div>
                                                     )}
                                                     {(entry as any).detailedFeedback && (entry as any).detailedFeedback.length > 0 && (
