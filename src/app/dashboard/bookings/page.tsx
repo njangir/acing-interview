@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { PageHeader } from "@/components/core/page-header";
 import { BookingCard } from "@/components/core/booking-card";
@@ -14,6 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Shield, Loader2, AlertTriangle } from 'lucide-react';
 import { parse } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { useState, useEffect, useMemo } from 'react';
 
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
@@ -31,7 +32,7 @@ const getBookingDateTime = (bookingDate: string, bookingTime: string): Date => {
   return dateObj;
 };
 
-export default function MyBookingsPage() {
+function BookingsClientPage() {
   const { currentUser, loadingAuth } = useAuth();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -188,4 +189,21 @@ export default function MyBookingsPage() {
       </Tabs>
     </>
   );
+}
+
+function LoadingFallback() {
+    return (
+        <div className="container py-12 flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+          <p className="text-muted-foreground">Loading your bookings...</p>
+        </div>
+    );
+}
+
+export default function MyBookingsPage() {
+    return (
+        <Suspense fallback={<LoadingFallback />}>
+            <BookingsClientPage />
+        </Suspense>
+    );
 }
