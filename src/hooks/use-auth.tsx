@@ -11,6 +11,7 @@ import { useToast } from './use-toast';
 
 
 interface AuthContextUser {
+  displayName: string;
   uid: string;
   email: string;
   name: string;
