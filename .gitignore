@@ -44,3 +44,5 @@ next-env.d.ts
 firebase-debug.log
 firestore-debug.log
 node_modules
+functions/lib/index.js
+functions/lib/index.js.map
