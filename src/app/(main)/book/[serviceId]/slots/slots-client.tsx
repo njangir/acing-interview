@@ -84,10 +84,10 @@ export default function SlotsClient() {
     setIsFetchingSlots(true);
     setError(null);
     try {
-      const dateStr = format(date, 'yyyy-MM-dd');
+      const dateString = format(date, 'yyyy-MM-dd');
       const result: any = await getAvailableSlots({
         serviceId: service.id,
-        date: dateStr
+        dateString: dateString
       });
 
       if (result.data && result.data.availableSlots) {
@@ -95,9 +95,9 @@ export default function SlotsClient() {
       } else {
         setAvailableTimes([]);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching available slots:", err);
-      setError("Failed to load available time slots. Please try again.");
+      setError(err.message || "Failed to load available time slots. Please try again.");
       setAvailableTimes([]);
     } finally {
       setIsFetchingSlots(false);
@@ -348,7 +348,7 @@ export default function SlotsClient() {
               <p><strong>Service:</strong> {service.name}</p>
               <p><strong>Date:</strong> {format(selectedDate, 'EEEE, MMMM d, yyyy')}</p>
               <p><strong>Time:</strong> {selectedTime}</p>
-              <p><strong>Price:</strong> ₹{service.price}</p>
+              <p><strong>Price:</strong> ₹${service.price}</p>
             </CardContent>
             <CardContent>
               <Button 

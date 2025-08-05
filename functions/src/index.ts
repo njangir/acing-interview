@@ -256,11 +256,7 @@ exports.onBookingUpdate = functions.firestore.document("bookings/{bookingId}").o
   }
 
   if (before.status !== 'completed' && after.status === 'completed') {
-    return createNotification(after.uid, `Feedback for '${serviceName}' is available.`, '/dashboard/bookings');
-  }
-
-  if (!before.reportUrl && after.reportUrl) {
-    return createNotification(after.uid, `Feedback report for '${serviceName}' is now available.`, '/dashboard/bookings');
+    return createNotification(after.uid, `Feedback for '${serviceName}' is available.`, '/dashboard/bookings?tab=past');
   }
   return null;
 });
