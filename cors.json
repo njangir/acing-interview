@@ -1,6 +1,9 @@
 [
   {
-    "origin": ["*"],
+    "origin": [
+      "https://afinterviewace.com",
+      "https://studio--armed-forces-interview-ace.us-central1.hosted.app"
+    ],
     "method": ["GET", "PUT", "POST", "DELETE"],
     "responseHeader": ["Content-Type", "Authorization"],
     "maxAgeSeconds": 3600

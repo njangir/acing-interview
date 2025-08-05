@@ -1,4 +1,3 @@
-
 import * as functions from "firebase-functions";
 import * as logger from "firebase-functions/logger";
 import { initializeApp } from "firebase-admin/app";
@@ -726,7 +725,7 @@ exports.getAdminReportsPageData = functions.runWith({ secrets: ["RAZORPAY_KEY_ID
         const [bookingsSnapshot, badgesSnapshot, historySnapshot] = await Promise.all([
             bookingsQuery.get(),
             badgesQuery.get(),
-            historyQuery.get(),
+            historyQuery.get()
         ]);
         logger.info(`Fetched ${bookingsSnapshot.docs.length} completed bookings.`);
         logger.info(`Fetched ${badgesSnapshot.docs.length} badges.`);
@@ -795,7 +794,80 @@ exports.saveHeroSection = functions.https.onCall(async (data, context) => {
     }
 });
 
+// Upload file to Firebase Storage
+exports.uploadFile = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
+    }
+
+    const { fileName, fileDataUrl, folder = 'uploads' } = data as { 
+        fileName: string; 
+        fileDataUrl: string; 
+        folder?: string; 
+    };
+
+    if (!fileName || !fileDataUrl) {
+        throw new functions.https.HttpsError("invalid-argument", "fileName and fileDataUrl are required.");
+    }
+
+    try {
+        // Extract base64 data from data URL
+        const base64Data = fileDataUrl.split(',')[1];
+        if (!base64Data) {
+            throw new functions.https.HttpsError("invalid-argument", "Invalid file data URL format.");
+        }
+
+        const buffer = Buffer.from(base64Data, 'base64');
+        const storage = getStorage();
+        const bucket = storage.bucket();
+        
+        // Generate unique filename
+        const timestamp = Date.now();
+        const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const uniqueFileName = `${folder}/${timestamp}_${sanitizedFileName}`;
+        
+        const file = bucket.file(uniqueFileName);
+        
+        // Upload the file
+        await file.save(buffer, {
+            metadata: {
+                contentType: getContentType(fileName),
+            },
+        });
+
+        // Make the file publicly accessible
+        await file.makePublic();
+
+        // Return the public URL
+        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${uniqueFileName}`;
+        
+        logger.info(`File uploaded successfully: ${publicUrl}`);
+        return { downloadURL: publicUrl };
+        
+    } catch (error) {
+        logger.error("Error uploading file:", error);
+        throw new functions.https.HttpsError("internal", "Failed to upload file.");
+    }
+});
+
+// Helper function to determine content type
+function getContentType(fileName: string): string {
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    switch (extension) {
+        case 'jpg':
+        case 'jpeg':
+            return 'image/jpeg';
+        case 'png':
+            return 'image/png';
+        case 'gif':
+            return 'image/gif';
+        case 'webp':
+            return 'image/webp';
+        case 'pdf':
+            return 'application/pdf';
+        default:
+            return 'application/octet-stream';
+    }
+}
 
 // Add more admin write functions below as needed
-
-    

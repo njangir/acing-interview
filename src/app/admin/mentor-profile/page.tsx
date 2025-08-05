@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -20,10 +19,10 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 import { functions, storage } from '@/lib/firebase';
 import { httpsCallable } from 'firebase/functions';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const getMentorProfile = httpsCallable(functions, 'getMentorProfile');
 const saveMentorProfile = httpsCallable(functions, 'saveMentorProfile');
+const uploadFile = httpsCallable(functions, 'uploadFile');
 
 const mentorProfileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -99,10 +98,22 @@ export default function AdminMentorProfilePage() {
 
     if (imageFile) {
         try {
-            const imageFileName = `mentor_profile_${Date.now()}_${imageFile.name.replace(/\s+/g, '_')}`;
-            const imageRef = storageRef(storage, `mentor_profiles/${imageFileName}`);
-            await uploadBytes(imageRef, imageFile);
-            finalImageUrl = await getDownloadURL(imageRef);
+            // Convert file to base64 data URL
+            const fileDataUrl = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(imageFile);
+            });
+
+            // Use cloud function for upload
+            const result = await uploadFile({
+                fileName: imageFile.name,
+                fileDataUrl: fileDataUrl,
+                folder: 'mentor_profiles'
+            });
+            
+            finalImageUrl = (result.data as any).downloadURL;
         } catch (uploadError) {
             console.error("Error uploading mentor profile image:", uploadError);
             toast({ title: "Image Upload Failed", description: "Could not upload the new profile image.", variant: "destructive" });
