@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from '@/components/ui/badge';
 import type { Service } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Edit, Trash2, Loader2, AlertTriangle } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Loader2, AlertTriangle, GripVertical } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import Image from 'next/image';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -38,22 +38,18 @@ const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
-const initialServiceFormState: Omit<Service, 'id' | 'features'> & { features: string } = {
+const initialServiceFormState: Omit<Service, 'id' | 'features' | 'detailSections'> & { features: string; detailSections: { title: string; content: string }[] } = {
   name: '',
   description: '',
   price: 0,
   duration: '',
   features: '',
+  detailSections: [],
   image: '',
   dataAiHint: '',
-  bannerImageUrl: '',
-  bannerImageDataAiHint: '',
   defaultForce: 'General',
   isBookable: true,
   hasDetailsPage: false,
-  howItWorks: '',
-  whatToExpect: '',
-  howItWillHelp: '',
 };
 
 export default function AdminServicesPage() {
@@ -64,14 +60,11 @@ export default function AdminServicesPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentService, setCurrentService] = useState<Service | null>(null);
-  const [formData, setFormData] = useState<Omit<Service, 'id' | 'features'> & { features: string }>(initialServiceFormState);
+  const [formData, setFormData] = useState(initialServiceFormState);
   
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
   const [selectedThumbnailFile, setSelectedThumbnailFile] = useState<File | null>(null);
   
-  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
-  const [selectedBannerFile, setSelectedBannerFile] = useState<File | null>(null);
-
   const [isSubmitting, setIsSubmitting] = useState(false);
 
 
@@ -102,26 +95,19 @@ export default function AdminServicesPage() {
         price: currentService.price,
         duration: currentService.duration,
         features: currentService.features.join(', '),
+        detailSections: currentService.detailSections || [],
         image: currentService.image || '',
         dataAiHint: currentService.dataAiHint || '',
-        bannerImageUrl: currentService.bannerImageUrl || '',
-        bannerImageDataAiHint: currentService.bannerImageDataAiHint || '',
         defaultForce: currentService.defaultForce || 'General',
         isBookable: currentService.isBookable === undefined ? true : currentService.isBookable,
         hasDetailsPage: currentService.hasDetailsPage || false,
-        howItWorks: currentService.howItWorks || '',
-        whatToExpect: currentService.whatToExpect || '',
-        howItWillHelp: currentService.howItWillHelp || '',
       });
       setThumbnailPreview(currentService.image || null);
-      setBannerPreview(currentService.bannerImageUrl || null);
     } else {
       setFormData(initialServiceFormState);
       setThumbnailPreview(null);
-      setBannerPreview(null);
     }
     setSelectedThumbnailFile(null); 
-    setSelectedBannerFile(null);
   }, [currentService, isModalOpen]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -129,25 +115,33 @@ export default function AdminServicesPage() {
     setFormData(prev => ({ ...prev, [name]: name === 'price' ? parseFloat(value) || 0 : value }));
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'thumbnail' | 'banner') => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (type === 'thumbnail') {
-        setSelectedThumbnailFile(file);
-        setThumbnailPreview(URL.createObjectURL(file));
-      } else {
-        setSelectedBannerFile(file);
-        setBannerPreview(URL.createObjectURL(file));
-      }
+      setSelectedThumbnailFile(file);
+      setThumbnailPreview(URL.createObjectURL(file));
     } else {
-       if (type === 'thumbnail') {
-        setSelectedThumbnailFile(null);
-        setThumbnailPreview(currentService?.image || null);
-      } else {
-        setSelectedBannerFile(null);
-        setBannerPreview(currentService?.bannerImageUrl || null);
-      }
+      setSelectedThumbnailFile(null);
+      setThumbnailPreview(currentService?.image || null);
     }
+  };
+  
+  const handleSectionChange = (index: number, field: 'title' | 'content', value: string) => {
+    const newSections = [...formData.detailSections];
+    newSections[index][field] = value;
+    setFormData(prev => ({...prev, detailSections: newSections}));
+  };
+
+  const addSection = () => {
+    setFormData(prev => ({
+      ...prev,
+      detailSections: [...prev.detailSections, { title: '', content: '' }]
+    }));
+  };
+  
+  const removeSection = (index: number) => {
+    const newSections = formData.detailSections.filter((_, i) => i !== index);
+    setFormData(prev => ({...prev, detailSections: newSections}));
   };
 
   const handleEdit = (service: Service) => {
@@ -179,16 +173,11 @@ export default function AdminServicesPage() {
     setIsSubmitting(true);
 
     let finalThumbnailUrl = formData.image;
-    let finalBannerUrl = formData.bannerImageUrl;
 
     try {
       if (selectedThumbnailFile) {
         console.log("Uploading thumbnail...");
         finalThumbnailUrl = await uploadImageViaFunction(selectedThumbnailFile, 'thumbnails');
-      }
-      if (selectedBannerFile) {
-        console.log("Uploading banner...");
-        finalBannerUrl = await uploadImageViaFunction(selectedBannerFile, 'banners');
       }
     } catch (uploadError: any) {
         console.error("Error uploading image:", uploadError);
@@ -202,12 +191,18 @@ export default function AdminServicesPage() {
       features: formData.features.split(',').map(f => f.trim()).filter(f => f),
       image: finalThumbnailUrl || 'https://placehold.co/600x400.png',
       dataAiHint: formData.dataAiHint || 'service related',
-      bannerImageUrl: finalBannerUrl || '',
-      bannerImageDataAiHint: formData.bannerImageDataAiHint || '',
       price: Number(formData.price),
       isBookable: formData.isBookable,
+      detailSections: formData.detailSections,
       id: currentService?.id
     };
+    
+    // Remove properties that are no longer on the Service type
+    delete (serviceToSave as any).howItWorks;
+    delete (serviceToSave as any).whatToExpect;
+    delete (serviceToSave as any).howItWillHelp;
+    delete (serviceToSave as any).bannerImageUrl;
+    delete (serviceToSave as any).bannerImageDataAiHint;
 
     try {
       await saveService({ service: serviceToSave });
@@ -393,7 +388,7 @@ export default function AdminServicesPage() {
                   </div>
                   <div>
                     <Label htmlFor="imageUpload">Thumbnail Image</Label>
-                    <Input id="imageUpload" name="imageUpload" type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'thumbnail')} />
+                    <Input id="imageUpload" name="imageUpload" type="file" accept="image/*" onChange={(e) => handleFileChange(e)} />
                   </div>
                   {thumbnailPreview && (
                       <div className="flex justify-center">
@@ -423,31 +418,40 @@ export default function AdminServicesPage() {
                       </div>
                       {formData.hasDetailsPage && (
                         <div className="space-y-4 pl-2 pt-2 border-l-2 border-primary/20 ml-2">
-                            <div>
-                                <Label htmlFor="bannerImageUpload">Details Page Banner Image</Label>
-                                <Input id="bannerImageUpload" name="bannerImageUpload" type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'banner')} />
-                            </div>
-                            {bannerPreview && (
-                                <div className="flex justify-center">
-                                    <Image src={bannerPreview} alt="Banner preview" width={300} height={150} className="rounded-md object-cover border" />
-                                </div>
-                            )}
-                            <div>
-                              <Label htmlFor="bannerImageDataAiHint">AI Hint for Banner</Label>
-                              <Input id="bannerImageDataAiHint" name="bannerImageDataAiHint" value={formData.bannerImageDataAiHint} onChange={handleInputChange} placeholder="e.g., professional, interview" />
-                            </div>
-                            <div>
-                                <Label htmlFor="howItWorks">How It Works</Label>
-                                <Textarea id="howItWorks" name="howItWorks" value={formData.howItWorks} onChange={handleInputChange} placeholder="Explain the process step-by-step..." rows={4} />
-                            </div>
-                            <div>
-                                <Label htmlFor="whatToExpect">What To Expect</Label>
-                                <Textarea id="whatToExpect" name="whatToExpect" value={formData.whatToExpect} onChange={handleInputChange} placeholder="Use bullet points (e.g., - Point 1) for clarity..." rows={4} />
-                            </div>
-                            <div>
-                                <Label htmlFor="howItWillHelp">How It Will Help</Label>
-                                <Textarea id="howItWillHelp" name="howItWillHelp" value={formData.howItWillHelp} onChange={handleInputChange} placeholder="Describe the benefits and outcomes..." rows={4} />
-                            </div>
+                            <h3 className="font-medium">Dynamic Content Sections</h3>
+                            {formData.detailSections.map((section, index) => (
+                              <div key={index} className="space-y-2 border p-3 rounded-md relative">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute top-1 right-1 h-6 w-6"
+                                    onClick={() => removeSection(index)}
+                                  >
+                                      <Trash2 className="h-4 w-4 text-destructive"/>
+                                  </Button>
+                                  <div>
+                                    <Label>Section {index + 1} Title</Label>
+                                    <Input
+                                      value={section.title}
+                                      onChange={(e) => handleSectionChange(index, 'title', e.target.value)}
+                                      placeholder="e.g., How It Works"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label>Section {index + 1} Content</Label>
+                                    <Textarea
+                                      value={section.content}
+                                      onChange={(e) => handleSectionChange(index, 'content', e.target.value)}
+                                      placeholder="Use new lines for bullet points..."
+                                      rows={5}
+                                    />
+                                  </div>
+                              </div>
+                            ))}
+                            <Button type="button" variant="outline" size="sm" onClick={addSection}>
+                                <PlusCircle className="mr-2 h-4 w-4"/> Add Section
+                            </Button>
                         </div>
                       )}
                   </div>

@@ -255,10 +255,7 @@ exports.onBookingUpdate = functions.firestore.document("bookings/{bookingId}").o
         return createNotification(after.uid, `Session for '${serviceName}' was cancelled.`, '/dashboard/bookings');
     }
     if (before.status !== 'completed' && after.status === 'completed') {
-        return createNotification(after.uid, `Feedback for '${serviceName}' is available.`, '/dashboard/bookings');
-    }
-    if (!before.reportUrl && after.reportUrl) {
-        return createNotification(after.uid, `Feedback report for '${serviceName}' is now available.`, '/dashboard/bookings');
+        return createNotification(after.uid, `Feedback for '${serviceName}' is available.`, '/dashboard/bookings?tab=past');
     }
     return null;
 });
@@ -365,7 +362,8 @@ exports.saveService = functions.https.onCall(async (data, context) => {
         await serviceRef.update(Object.assign(Object.assign({}, serviceWithoutId), { updatedAt: firestore_1.FieldValue.serverTimestamp() }));
     }
     else {
-        await firestore.collection('services').add(Object.assign(Object.assign({}, service), { createdAt: firestore_1.FieldValue.serverTimestamp(), updatedAt: firestore_1.FieldValue.serverTimestamp() }));
+        const { id } = service, serviceWithoutId = __rest(service, ["id"]);
+        await firestore.collection('services').add(Object.assign(Object.assign({}, serviceWithoutId), { createdAt: firestore_1.FieldValue.serverTimestamp(), updatedAt: firestore_1.FieldValue.serverTimestamp() }));
     }
     return { success: true };
 });
@@ -453,7 +451,8 @@ exports.saveBadge = functions.https.onCall(async (data, context) => {
         await badgeRef.update(Object.assign(Object.assign({}, badgeWithoutId), { updatedAt: firestore_1.FieldValue.serverTimestamp() }));
     }
     else {
-        await firestore.collection('badges').add(Object.assign(Object.assign({}, badge), { createdAt: firestore_1.FieldValue.serverTimestamp(), updatedAt: firestore_1.FieldValue.serverTimestamp() }));
+        const { id } = badge, badgeWithoutId = __rest(badge, ["id"]);
+        await firestore.collection('badges').add(Object.assign(Object.assign({}, badgeWithoutId), { createdAt: firestore_1.FieldValue.serverTimestamp(), updatedAt: firestore_1.FieldValue.serverTimestamp() }));
     }
     return { success: true };
 });
@@ -602,7 +601,11 @@ exports.uploadReport = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPA
     const base64Data = match[2];
     const buffer = Buffer.from(base64Data, 'base64');
     const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.]/g, '_');
-    const folder = bookingId.startsWith('site_content') ? 'site_content' : 'feedback_reports';
+    // Determine folder based on a prefix in bookingId, or default to feedback_reports
+    const folder = bookingId.startsWith('services_thumbnails') ? 'services/thumbnails' :
+        bookingId.startsWith('services_banners') ? 'services/banners' :
+            bookingId.startsWith('site_content_') ? 'site_content' :
+                'feedback_reports';
     const filePath = `${folder}/${bookingId}_${Date.now()}_${sanitizedFileName}`;
     const file = bucket.file(filePath);
     try {
@@ -659,7 +662,7 @@ exports.getAdminReportsPageData = functions.runWith({ secrets: ["RAZORPAY_KEY_ID
         const [bookingsSnapshot, badgesSnapshot, historySnapshot] = await Promise.all([
             bookingsQuery.get(),
             badgesQuery.get(),
-            historyQuery.get(),
+            historyQuery.get()
         ]);
         logger.info(`Fetched ${bookingsSnapshot.docs.length} completed bookings.`);
         logger.info(`Fetched ${badgesSnapshot.docs.length} badges.`);
@@ -718,5 +721,66 @@ exports.saveHeroSection = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('internal', 'Failed to save hero section data.');
     }
 });
+// Upload file to Firebase Storage
+exports.uploadFile = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
+    }
+    const { fileName, fileDataUrl, folder = 'uploads' } = data;
+    if (!fileName || !fileDataUrl) {
+        throw new functions.https.HttpsError("invalid-argument", "fileName and fileDataUrl are required.");
+    }
+    try {
+        // Extract base64 data from data URL
+        const base64Data = fileDataUrl.split(',')[1];
+        if (!base64Data) {
+            throw new functions.https.HttpsError("invalid-argument", "Invalid file data URL format.");
+        }
+        const buffer = Buffer.from(base64Data, 'base64');
+        const storage = (0, storage_1.getStorage)();
+        const bucket = storage.bucket();
+        // Generate unique filename
+        const timestamp = Date.now();
+        const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const uniqueFileName = `${folder}/${timestamp}_${sanitizedFileName}`;
+        const file = bucket.file(uniqueFileName);
+        // Upload the file
+        await file.save(buffer, {
+            metadata: {
+                contentType: getContentType(fileName),
+            },
+        });
+        // Make the file publicly accessible
+        await file.makePublic();
+        // Return the public URL
+        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${uniqueFileName}`;
+        logger.info(`File uploaded successfully: ${publicUrl}`);
+        return { downloadURL: publicUrl };
+    }
+    catch (error) {
+        logger.error("Error uploading file:", error);
+        throw new functions.https.HttpsError("internal", "Failed to upload file.");
+    }
+});
+// Helper function to determine content type
+function getContentType(fileName) {
+    var _a;
+    const extension = (_a = fileName.split('.').pop()) === null || _a === void 0 ? void 0 : _a.toLowerCase();
+    switch (extension) {
+        case 'jpg':
+        case 'jpeg':
+            return 'image/jpeg';
+        case 'png':
+            return 'image/png';
+        case 'gif':
+            return 'image/gif';
+        case 'webp':
+            return 'image/webp';
+        case 'pdf':
+            return 'application/pdf';
+        default:
+            return 'application/octet-stream';
+    }
+}
 // Add more admin write functions below as needed
 //# sourceMappingURL=index.js.map

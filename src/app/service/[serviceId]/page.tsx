@@ -10,9 +10,10 @@ import { PageHeader } from '@/components/core/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ArrowRight, BookUser, CheckCircle, HelpCircle, Sparkles, TestTube2, AlertTriangle } from 'lucide-react';
+import { ArrowRight, BookUser, CheckCircle, HelpCircle, Sparkles, TestTube2, AlertTriangle, MessageSquareQuestion } from 'lucide-react';
 import { TestimonialCard } from '@/components/core/testimonial-card';
 import type { Metadata, ResolvingMetadata } from 'next';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 
 type Props = {
@@ -34,6 +35,25 @@ async function getServiceDetails(serviceId: string): Promise<Service | null> {
     }
 }
 
+const FAQ_ITEMS = [
+  {
+    question: "How do I book this service?",
+    answer: "You can book this service by clicking on any of the 'Book Your Session' buttons on this page. You will be taken to a calendar to select an available date and time slot.",
+  },
+  {
+    question: "What happens after I book?",
+    answer: "After booking, you will receive a confirmation email. If you've paid, your slot is confirmed. If you chose 'Pay Later', your slot is tentative and requires admin approval. In both cases, a meeting link for the session will be shared with you via email and on your dashboard before the scheduled time.",
+  },
+  {
+    question: "Can I get a refund if I cancel?",
+    answer: "Yes, you can request a refund up to 2 hours before your scheduled session time directly from your user dashboard. Please refer to our Terms & Conditions for the full policy.",
+  },
+  {
+    question: "How is the feedback provided?",
+    answer: "For mock interviews and similar services, you will receive a detailed PDF feedback report uploaded to your dashboard after the session is marked as complete. You will also receive skill ratings and comments from your mentor.",
+  }
+];
+
 export async function generateMetadata(
   { params }: Props,
   parent: ResolvingMetadata
@@ -45,6 +65,37 @@ export async function generateMetadata(
       title: 'Service Not Found',
     }
   }
+  
+  const serviceSchema = {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    "serviceType": service.name,
+    "name": service.name,
+    "description": service.description,
+    "image": service.image,
+    "provider": {
+        "@type": "Organization",
+        "name": "Armed Forces Interview Ace"
+    },
+    "offers": {
+        "@type": "Offer",
+        "price": service.price,
+        "priceCurrency": "INR"
+    }
+  };
+  
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": FAQ_ITEMS.map(item => ({
+        "@type": "Question",
+        "name": item.question,
+        "acceptedAnswer": {
+            "@type": "Answer",
+            "text": item.answer
+        }
+    }))
+  };
 
   const previousImages = (await parent).openGraph?.images || []
 
@@ -54,8 +105,18 @@ export async function generateMetadata(
     openGraph: {
       title: service.name,
       description: service.description,
-      images: [service.bannerImageUrl || service.image || 'https://placehold.co/1200x630.png', ...previousImages],
+      images: [service.image || 'https://placehold.co/1200x630.png', ...previousImages],
     },
+    other: {
+        "script-service": {
+            type: 'application/ld+json',
+            json: serviceSchema
+        },
+        "script-faq": {
+            type: 'application/ld+json',
+            json: faqSchema
+        },
+    }
   }
 }
 
@@ -97,10 +158,6 @@ export default async function ServiceDetailsPage({ params }: Props) {
     // Non-critical error, the page can still render without testimonials.
   }
 
-  const whatToExpectItems = service.whatToExpect?.split('-').map(item => item.trim()).filter(item => item) || [];
-  const howItWillHelpItems = service.howItWillHelp?.split('-').map(item => item.trim()).filter(item => item) || [];
-
-
   return (
     <>
       <PageHeader
@@ -110,71 +167,75 @@ export default async function ServiceDetailsPage({ params }: Props) {
       <div className="container pb-12">
         <div className="relative h-64 md:h-96 w-full mb-12 rounded-lg overflow-hidden shadow-lg">
           <Image
-            src={service.bannerImageUrl || service.image || 'https://placehold.co/1200x400.png'}
+            src={service.image || 'https://placehold.co/1200x400.png'}
             alt={service.name}
             fill
             className="object-cover"
             priority
-            data-ai-hint={service.bannerImageDataAiHint || service.dataAiHint || 'service banner'}
+            data-ai-hint={service.dataAiHint || 'service banner'}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-          <div className="absolute bottom-6 left-6 text-white">
-            <h2 className="text-2xl font-bold">Duration: {service.duration}</h2>
-            <p className="text-3xl font-extrabold text-accent">₹{service.price}</p>
+          <div className="absolute bottom-6 left-6 text-white max-w-xl">
+            <h2 className="text-xl md:text-2xl font-bold">Duration: {service.duration}</h2>
+            <p className="text-2xl md:text-3xl font-extrabold text-accent">₹{service.price}</p>
+             <Button asChild size="lg" className="mt-4 bg-accent hover:bg-accent/90 text-accent-foreground shadow-md">
+                <Link href={`/book/${service.id}/slots`}>Book Your Session Now</Link>
+            </Button>
           </div>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-12 items-start">
             <div className="lg:col-span-2 space-y-12">
                 
-                <Section icon={HelpCircle} title="How It Works">
-                    <p className="text-muted-foreground whitespace-pre-wrap">{service.howItWorks}</p>
-                    <div className="flex justify-center mt-6">
-                        <Image src="https://placehold.co/500x300.png" alt="How it works illustration" width={500} height={300} className="rounded-lg border" data-ai-hint="process illustration"/>
-                    </div>
-                </Section>
+                {service.detailSections && service.detailSections.map((section, index) => (
+                    <Section key={index} title={section.title}>
+                        <div className="text-muted-foreground whitespace-pre-wrap space-y-2">
+                            {section.content.split('\n').map((line, i) => {
+                                const trimmedLine = line.trim();
+                                if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
+                                    return (
+                                        <div key={i} className="flex items-start">
+                                            <CheckCircle className="h-5 w-5 mr-3 mt-1 text-green-500 flex-shrink-0" />
+                                            <span>{trimmedLine.substring(2)}</span>
+                                        </div>
+                                    )
+                                }
+                                return <p key={i}>{line}</p>
+                            })}
+                        </div>
+                    </Section>
+                ))}
                 
-                <Section icon={TestTube2} title="What to Expect">
-                    <ul className="space-y-2 text-muted-foreground">
-                        {whatToExpectItems.map((item, index) => (
-                            <li key={index} className="flex items-start">
-                                <CheckCircle className="h-5 w-5 mr-3 mt-1 text-green-500 flex-shrink-0" />
-                                <span>{item}</span>
-                            </li>
-                        ))}
-                    </ul>
-                     {whatToExpectItems.length === 0 && <p className="text-muted-foreground">Detailed expectations will be provided upon booking.</p>}
-                </Section>
-
-                <Section icon={Sparkles} title="How It Will Help">
-                    <ul className="space-y-2 text-muted-foreground">
-                        {howItWillHelpItems.map((item, index) => (
-                            <li key={index} className="flex items-start">
-                                <CheckCircle className="h-5 w-5 mr-3 mt-1 text-green-500 flex-shrink-0" />
-                                <span>{item}</span>
-                            </li>
-                        ))}
-                    </ul>
-                     {howItWillHelpItems.length === 0 && <p className="text-muted-foreground">This service is designed to provide targeted improvements for your interview performance.</p>}
-                </Section>
-
             </div>
 
             <aside className="lg:col-span-1 sticky top-24">
                 <Card className="shadow-lg">
                     <CardHeader>
-                        <CardTitle className="font-headline text-2xl text-primary">Ready to Begin?</CardTitle>
-                        <CardDescription>Take the next step in your preparation.</CardDescription>
+                        <CardTitle className="font-headline text-2xl text-primary">Service Features</CardTitle>
+                        <CardDescription>What's included in this service.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <Button asChild size="lg" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                            <Link href={`/book/${service.id}/slots`}>Book Your Session Now</Link>
-                        </Button>
+                         <ul className="space-y-2 text-muted-foreground">
+                            {service.features.map((feature, index) => (
+                                <li key={index} className="flex items-start">
+                                    <CheckCircle className="h-5 w-5 mr-3 mt-1 text-accent flex-shrink-0" />
+                                    <span>{feature}</span>
+                                </li>
+                            ))}
+                        </ul>
                     </CardContent>
                 </Card>
             </aside>
         </div>
         
+        <div className="mt-20 text-center">
+            <h2 className="text-2xl font-bold text-primary mb-2">Ready to Take the Next Step?</h2>
+            <p className="text-muted-foreground mb-6">Invest in your future and get the expert guidance you need to succeed.</p>
+            <Button asChild size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg transform hover:scale-105 transition-transform duration-300">
+                <Link href={`/book/${service.id}/slots`}>Book Your Session Today</Link>
+            </Button>
+        </div>
+
         {testimonials.length > 0 && (
             <div className="mt-20">
                 <h2 className="text-3xl font-bold text-center mb-12 font-headline text-primary">
@@ -187,17 +248,37 @@ export default async function ServiceDetailsPage({ params }: Props) {
                 </div>
             </div>
         )}
+        
+        <div className="mt-20 max-w-3xl mx-auto">
+             <h2 className="text-3xl font-bold text-center mb-12 font-headline text-primary flex items-center justify-center">
+                <MessageSquareQuestion className="h-8 w-8 mr-3 text-accent"/>
+                Frequently Asked Questions
+            </h2>
+            <Card className="shadow-lg">
+              <CardContent className="p-6">
+                <Accordion type="single" collapsible className="w-full">
+                  {FAQ_ITEMS.map((item, index) => (
+                    <AccordionItem value={`item-${index}`} key={index}>
+                      <AccordionTrigger className="text-left hover:text-accent">{item.question}</AccordionTrigger>
+                      <AccordionContent className="text-muted-foreground">
+                        {item.answer}
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              </CardContent>
+            </Card>
+        </div>
 
       </div>
     </>
   );
 }
 
-function Section({ icon: Icon, title, children }: { icon: React.ElementType, title: string, children: React.ReactNode }) {
+function Section({ title, children }: { title: string, children: React.ReactNode }) {
     return (
         <section>
             <h3 className="text-2xl font-bold font-headline text-primary mb-4 flex items-center">
-                <Icon className="h-7 w-7 mr-3 text-accent" />
                 {title}
             </h3>
             {children}

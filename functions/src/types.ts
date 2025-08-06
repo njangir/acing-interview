@@ -53,11 +53,7 @@ export interface Service {
   defaultForce?: 'Air Force' | 'Army' | 'Navy' | 'General';
   isBookable?: boolean;
   hasDetailsPage?: boolean;
-  howItWorks?: string;
-  whatToExpect?: string;
-  howItWillHelp?: string;
-  bannerImageUrl?: string; // New field for details page banner
-  bannerImageDataAiHint?: string; // New field
+  detailSections?: { title: string; content: string }[];
   createdAt?: firestore.FieldValue;
   updatedAt?: firestore.FieldValue;
 }
@@ -165,5 +161,3 @@ export interface UserNotification {
     timestamp: firestore.FieldValue;
     type: 'booking_update' | 'message_reply' | 'general';
 }
-
-    
