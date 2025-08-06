@@ -386,7 +386,6 @@ exports.saveService = functions.https.onCall(async (data: any, context: function
   // Sanitize data before saving
   const serviceToSave: Partial<Service> = {
     ...service,
-    // Ensure detailSections is an array of objects with title and content
     detailSections: Array.isArray(service.detailSections) ? service.detailSections.map(s => {
         if (s.type === 'text') {
             const textSection = s as Extract<ServiceSection, {type: 'text'}>;
@@ -400,13 +399,6 @@ exports.saveService = functions.https.onCall(async (data: any, context: function
     }).filter((s): s is ServiceSection => s !== null) : []
   };
   
-  // Remove fields that are no longer part of the model to avoid polluting the DB
-  delete (serviceToSave as any).howItWorks;
-  delete (serviceToSave as any).whatToExpect;
-  delete (serviceToSave as any).howItWillHelp;
-  delete (serviceToSave as any).bannerImageUrl;
-  delete (serviceToSave as any).bannerImageDataAiHint;
-
   if (serviceToSave.id) {
     const serviceRef = firestore.collection('services').doc(serviceToSave.id);
     const { id, ...serviceWithoutId } = serviceToSave;
@@ -682,8 +674,7 @@ exports.uploadReport = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPA
     
     const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.]/g, '_');
     // Determine folder based on a prefix in bookingId, or default to feedback_reports
-    const folder = bookingId.startsWith('services_thumbnails') ? 'services/thumbnails' :
-                   bookingId.startsWith('services_banners') ? 'services/banners' :
+    const folder = bookingId.startsWith('services_') ? 'services' :
                    bookingId.startsWith('site_content_') ? 'site_content' : 
                    bookingId.startsWith('blog_') ? 'blog' :
                    'feedback_reports';
