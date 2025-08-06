@@ -396,8 +396,8 @@ exports.saveService = functions.https.onCall(async (data: any, context: function
             const imageSection = s as Extract<ServiceSection, {type: 'image'}>;
             return { type: 'image', title: imageSection.title || "", imageUrl: imageSection.imageUrl || "", imageHint: imageSection.imageHint || "" };
         }
-        return s; // Should not happen with proper client-side validation
-    }).filter(Boolean) as ServiceSection[] : []
+        return null;
+    }).filter((s): s is ServiceSection => s !== null) : []
   };
   
   // Remove fields that are no longer part of the model to avoid polluting the DB
@@ -937,3 +937,5 @@ exports.deleteBlogPost = functions.https.onCall(async (data: any, context: funct
 });
 
 // Add more admin write functions below as needed
+
+    
