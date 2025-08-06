@@ -140,48 +140,51 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center">
-        <Link href="/" className="mr-6 flex items-center space-x-2">
-          <IndianFlagIcon />
-          <Logo />
-        </Link>
-        <nav className="hidden lg:flex gap-6 items-center">
-          {mainSiteNavItems.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                "text-sm font-medium text-foreground/70 transition-colors hover:text-foreground",
-                pathname === link.href && "text-primary font-semibold"
-              )}
-            >
-              {link.label}
+      <div className="container flex h-16 items-center justify-between">
+        <div className="flex items-center gap-6">
+            <Link href="/" className="flex items-center space-x-2">
+            <IndianFlagIcon />
+            <Logo />
             </Link>
-          ))}
-          {isLoggedIn && !isAdmin && (
-             <Link
-              href="/dashboard"
-              className={cn(
-                "text-sm font-medium text-foreground/70 transition-colors hover:text-foreground",
-                (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) && "text-primary font-semibold"
-              )}
-            >
-              Dashboard
-            </Link>
-          )}
-           {isAdmin && (
-             <Link
-              href="/admin"
-              className={cn(
-                "text-sm font-medium text-foreground/70 transition-colors hover:text-foreground",
-                (pathname === '/admin' || pathname.startsWith('/admin/')) && "text-primary font-semibold"
-              )}
-            >
-              Admin Panel
-            </Link>
-           )}
-        </nav>
-        <div className="flex flex-1 items-center justify-end space-x-2">
+            <nav className="hidden lg:flex gap-6 items-center">
+            {mainSiteNavItems.map((link) => (
+                <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                    "text-sm font-medium text-foreground/70 transition-colors hover:text-foreground",
+                    pathname === link.href && "text-primary font-semibold"
+                )}
+                >
+                {link.label}
+                </Link>
+            ))}
+            {isLoggedIn && !isAdmin && (
+                <Link
+                href="/dashboard"
+                className={cn(
+                    "text-sm font-medium text-foreground/70 transition-colors hover:text-foreground",
+                    (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) && "text-primary font-semibold"
+                )}
+                >
+                Dashboard
+                </Link>
+            )}
+            {isAdmin && (
+                <Link
+                href="/admin"
+                className={cn(
+                    "text-sm font-medium text-foreground/70 transition-colors hover:text-foreground",
+                    (pathname === '/admin' || pathname.startsWith('/admin/')) && "text-primary font-semibold"
+                )}
+                >
+                Admin Panel
+                </Link>
+            )}
+            </nav>
+        </div>
+
+        <div className="flex items-center justify-end space-x-2">
           {isLoggedIn ? (
             <>
               {currentUser && !isAdmin && (
@@ -244,10 +247,10 @@ export function Header() {
             </>
           ) : (
             <>
-              <Button asChild variant="ghost" size="sm">
+              <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
                 <Link href="/login">
-                  <LogIn className="mr-0 md:mr-2 h-4 w-4" />
-                  <span className="hidden md:inline">Log In</span>
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Log In
                 </Link>
               </Button>
               <Button asChild size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
@@ -258,8 +261,8 @@ export function Header() {
               </Button>
             </>
           )}
-        </div>
-        {isMounted && (
+
+           {isMounted && (
             <div className="lg:hidden ml-2">
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetTrigger asChild>
@@ -351,6 +354,7 @@ export function Header() {
             </Sheet>
             </div>
         )}
+        </div>
       </div>
     </header>
   );
