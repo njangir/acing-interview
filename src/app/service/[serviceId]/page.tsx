@@ -10,7 +10,7 @@ import { PageHeader } from '@/components/core/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ArrowRight, BookUser, CheckCircle, HelpCircle, Sparkles, TestTube2, AlertTriangle, MessageSquareQuestion } from 'lucide-react';
+import { ArrowRight, BookUser, CheckCircle, HelpCircle, Sparkles, TestTube2, AlertTriangle, MessageSquareQuote } from 'lucide-react';
 import { TestimonialCard } from '@/components/core/testimonial-card';
 import type { Metadata, ResolvingMetadata } from 'next';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -269,7 +269,7 @@ export default async function ServiceDetailsPage({ params }: Props) {
         
         <div className="mt-20 max-w-3xl mx-auto">
              <h2 className="text-3xl font-bold text-center mb-12 font-headline text-primary flex items-center justify-center">
-                <MessageSquareQuestion className="h-8 w-8 mr-3 text-accent"/>
+                <MessageSquareQuote className="h-8 w-8 mr-3 text-accent"/>
                 Frequently Asked Questions
             </h2>
             <Card className="shadow-lg">

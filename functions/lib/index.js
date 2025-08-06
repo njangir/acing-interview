@@ -361,10 +361,12 @@ exports.saveService = functions.https.onCall(async (data, context) => {
         // Ensure detailSections is an array of objects with title and content
         detailSections: Array.isArray(service.detailSections) ? service.detailSections.map(s => {
             if (s.type === 'text') {
-                return { type: 'text', title: s.title || "", content: s.content || "" };
+                const textSection = s;
+                return { type: 'text', title: textSection.title || "", content: textSection.content || "" };
             }
             if (s.type === 'image') {
-                return { type: 'image', title: s.title || "", imageUrl: s.imageUrl || "", imageHint: s.imageHint || "" };
+                const imageSection = s;
+                return { type: 'image', title: imageSection.title || "", imageUrl: imageSection.imageUrl || "", imageHint: imageSection.imageHint || "" };
             }
             return s; // Should not happen with proper client-side validation
         }).filter(Boolean) : [] });
