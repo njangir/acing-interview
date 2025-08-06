@@ -238,22 +238,22 @@ export function Header() {
               )}
               {currentUser && <span className="text-sm text-muted-foreground hidden sm:inline">{isAdmin ? 'Admin' : 'OC'} {currentUser.name.split(' ')[0]}</span>}
               <Button variant="outline" size="sm" onClick={logout}>
-                <LogOut className="mr-0 sm:mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Log Out</span>
+                <LogOut className="mr-0 md:mr-2 h-4 w-4" />
+                <span className="hidden md:inline">Log Out</span>
               </Button>
             </>
           ) : (
             <>
               <Button asChild variant="ghost" size="sm">
                 <Link href="/login">
-                  <LogIn className="mr-0 sm:mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Log In</span>
+                  <LogIn className="mr-0 md:mr-2 h-4 w-4" />
+                  <span className="hidden md:inline">Log In</span>
                 </Link>
               </Button>
               <Button asChild size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
                 <Link href="/signup">
-                  <UserPlus className="mr-0 sm:mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Sign Up</span>
+                  <UserPlus className="mr-0 md:mr-2 h-4 w-4" />
+                  <span className="hidden md:inline">Sign Up</span>
                 </Link>
               </Button>
             </>
