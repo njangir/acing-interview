@@ -1,4 +1,3 @@
-
 "use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -16,12 +15,33 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
 };
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
@@ -37,6 +57,7 @@ const storage_1 = require("firebase-admin/storage");
 (0, app_1.initializeApp)();
 // Helper function to check for admin role
 const ensureAdmin = async (context) => {
+    var _a;
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
     }
@@ -46,7 +67,7 @@ const ensureAdmin = async (context) => {
     if (!userProfileDoc.exists) {
         throw new functions.https.HttpsError("permission-denied", "User profile not found.");
     }
-    const roles = userProfileDoc.data()?.roles || [];
+    const roles = ((_a = userProfileDoc.data()) === null || _a === void 0 ? void 0 : _a.roles) || [];
     if (!roles.includes("admin")) {
         throw new functions.https.HttpsError("permission-denied", "You must be an admin to perform this action.");
     }
@@ -164,6 +185,7 @@ exports.verifyPayment = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORP
     }
 });
 exports.processRefund = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data, context) => {
+    var _a;
     await ensureAdmin(context);
     const { bookingId } = data;
     if (!bookingId) {
@@ -198,7 +220,7 @@ exports.processRefund = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORP
     }
     catch (error) {
         logger.error(`Error processing refund for booking ${bookingId} with payment ${booking.transactionId}:`, error);
-        const errorMessage = error.error?.description || "An internal error occurred with the payment provider.";
+        const errorMessage = ((_a = error.error) === null || _a === void 0 ? void 0 : _a.description) || "An internal error occurred with the payment provider.";
         throw new functions.https.HttpsError("internal", errorMessage, error);
     }
 });
@@ -249,21 +271,21 @@ exports.exportBookingsReport = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", 
     await ensureAdmin(context);
     const firestore = (0, firestore_1.getFirestore)();
     const bookingsSnap = await firestore.collection("bookings").get();
-    const bookingsData = bookingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const bookingsData = bookingsSnap.docs.map(doc => (Object.assign({ id: doc.id }, doc.data())));
     return { data: bookingsData };
 });
 exports.exportUsersReport = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data, context) => {
     await ensureAdmin(context);
     const firestore = (0, firestore_1.getFirestore)();
     const usersSnap = await firestore.collection("userProfiles").get();
-    const usersData = usersSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+    const usersData = usersSnap.docs.map(doc => (Object.assign({ uid: doc.id }, doc.data())));
     return { data: usersData };
 });
 exports.exportServicesReport = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data, context) => {
     await ensureAdmin(context);
     const firestore = (0, firestore_1.getFirestore)();
     const servicesSnap = await firestore.collection("services").get();
-    const servicesData = servicesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const servicesData = servicesSnap.docs.map((doc) => (Object.assign({ id: doc.id }, doc.data())));
     return { data: servicesData };
 });
 exports.getAdminDashboardData = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"] }).https.onCall(async (data, context) => {
@@ -278,9 +300,9 @@ exports.getAdminDashboardData = functions.runWith({ secrets: ["RAZORPAY_KEY_ID",
             servicesQuery.get(),
             messagesQuery.get()
         ]);
-        const bookings = bookingsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        const services = servicesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        const messages = messagesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        const bookings = bookingsSnapshot.docs.map((doc) => (Object.assign({ id: doc.id }, doc.data())));
+        const services = servicesSnapshot.docs.map((doc) => (Object.assign({ id: doc.id }, doc.data())));
+        const messages = messagesSnapshot.docs.map((doc) => (Object.assign({ id: doc.id }, doc.data())));
         return { bookings, services, messages };
     }
     catch (error) {
@@ -289,6 +311,7 @@ exports.getAdminDashboardData = functions.runWith({ secrets: ["RAZORPAY_KEY_ID",
     }
 });
 exports.getAvailableSlots = functions.https.onCall(async (data, context) => {
+    var _a;
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
     }
@@ -301,7 +324,7 @@ exports.getAvailableSlots = functions.https.onCall(async (data, context) => {
         // 1. Get all possible slots for the day from the already fetched global data
         const availabilityDocRef = firestore.collection('globalAvailability').doc(dateString);
         const availabilitySnap = await availabilityDocRef.get();
-        const allPossibleSlotsForDay = availabilitySnap.exists ? availabilitySnap.data()?.timeSlots || [] : [];
+        const allPossibleSlotsForDay = availabilitySnap.exists ? ((_a = availabilitySnap.data()) === null || _a === void 0 ? void 0 : _a.timeSlots) || [] : [];
         if (allPossibleSlotsForDay.length === 0) {
             return { availableSlots: [] };
         }
@@ -326,7 +349,7 @@ exports.getServices = functions.https.onCall(async (data, context) => {
     await ensureAdmin(context);
     const firestore = (0, firestore_1.getFirestore)();
     const servicesSnap = await firestore.collection("services").orderBy('name', 'asc').get();
-    const servicesData = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const servicesData = servicesSnap.docs.map(doc => (Object.assign({ id: doc.id }, doc.data())));
     return { services: servicesData };
 });
 exports.saveService = functions.https.onCall(async (data, context) => {
@@ -334,8 +357,7 @@ exports.saveService = functions.https.onCall(async (data, context) => {
     const { service } = data;
     const firestore = (0, firestore_1.getFirestore)();
     // Sanitize data before saving
-    const serviceToSave = {
-        ...service,
+    const serviceToSave = Object.assign(Object.assign({}, service), { 
         // Ensure detailSections is an array of objects with title and content
         detailSections: Array.isArray(service.detailSections) ? service.detailSections.map(s => {
             if (s.type === 'text') {
@@ -345,8 +367,7 @@ exports.saveService = functions.https.onCall(async (data, context) => {
                 return { type: 'image', title: s.title || "", imageUrl: s.imageUrl || "", imageHint: s.imageHint || "" };
             }
             return s; // Should not happen with proper client-side validation
-        }).filter(Boolean) : []
-    };
+        }).filter(Boolean) : [] });
     // Remove fields that are no longer part of the model to avoid polluting the DB
     delete serviceToSave.howItWorks;
     delete serviceToSave.whatToExpect;
@@ -355,12 +376,12 @@ exports.saveService = functions.https.onCall(async (data, context) => {
     delete serviceToSave.bannerImageDataAiHint;
     if (serviceToSave.id) {
         const serviceRef = firestore.collection('services').doc(serviceToSave.id);
-        const { id, ...serviceWithoutId } = serviceToSave;
-        await serviceRef.update({ ...serviceWithoutId, updatedAt: firestore_1.FieldValue.serverTimestamp() });
+        const { id } = serviceToSave, serviceWithoutId = __rest(serviceToSave, ["id"]);
+        await serviceRef.update(Object.assign(Object.assign({}, serviceWithoutId), { updatedAt: firestore_1.FieldValue.serverTimestamp() }));
     }
     else {
-        const { id, ...serviceWithoutId } = serviceToSave;
-        await firestore.collection('services').add({ ...serviceWithoutId, createdAt: firestore_1.FieldValue.serverTimestamp(), updatedAt: firestore_1.FieldValue.serverTimestamp() });
+        const { id } = serviceToSave, serviceWithoutId = __rest(serviceToSave, ["id"]);
+        await firestore.collection('services').add(Object.assign(Object.assign({}, serviceWithoutId), { createdAt: firestore_1.FieldValue.serverTimestamp(), updatedAt: firestore_1.FieldValue.serverTimestamp() }));
     }
     return { success: true };
 });
@@ -384,8 +405,8 @@ exports.getResourcesAndServices = functions.https.onCall(async (data, context) =
     const firestore = (0, firestore_1.getFirestore)();
     const resourcesSnap = await firestore.collection("resources").orderBy('title', 'asc').get();
     const servicesSnap = await firestore.collection("services").orderBy('name', 'asc').get();
-    const resourcesData = resourcesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    const servicesData = servicesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const resourcesData = resourcesSnap.docs.map((doc) => (Object.assign({ id: doc.id }, doc.data())));
+    const servicesData = servicesSnap.docs.map((doc) => (Object.assign({ id: doc.id }, doc.data())));
     return { resources: resourcesData, services: servicesData };
 });
 exports.saveResource = functions.https.onCall(async (data, context) => {
@@ -394,11 +415,11 @@ exports.saveResource = functions.https.onCall(async (data, context) => {
     const firestore = (0, firestore_1.getFirestore)();
     if (resource.id) {
         const resourceRef = firestore.collection('resources').doc(resource.id);
-        const { id, ...resourceWithoutId } = resource;
-        await resourceRef.update({ ...resourceWithoutId, updatedAt: firestore_1.FieldValue.serverTimestamp() });
+        const { id } = resource, resourceWithoutId = __rest(resource, ["id"]);
+        await resourceRef.update(Object.assign(Object.assign({}, resourceWithoutId), { updatedAt: firestore_1.FieldValue.serverTimestamp() }));
     }
     else {
-        await firestore.collection('resources').add({ ...resource, createdAt: firestore_1.FieldValue.serverTimestamp(), updatedAt: firestore_1.FieldValue.serverTimestamp() });
+        await firestore.collection('resources').add(Object.assign(Object.assign({}, resource), { createdAt: firestore_1.FieldValue.serverTimestamp(), updatedAt: firestore_1.FieldValue.serverTimestamp() }));
     }
     return { success: true };
 });
@@ -435,7 +456,7 @@ exports.getBadges = functions.https.onCall(async (data, context) => {
     await ensureAdmin(context);
     const firestore = (0, firestore_1.getFirestore)();
     const badgesSnap = await firestore.collection('badges').orderBy('name', 'asc').get();
-    const badgesData = badgesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const badgesData = badgesSnap.docs.map((doc) => (Object.assign({ id: doc.id }, doc.data())));
     return { badges: badgesData };
 });
 exports.saveBadge = functions.https.onCall(async (data, context) => {
@@ -444,12 +465,12 @@ exports.saveBadge = functions.https.onCall(async (data, context) => {
     const firestore = (0, firestore_1.getFirestore)();
     if (badge.id) {
         const badgeRef = firestore.collection('badges').doc(badge.id);
-        const { id, ...badgeWithoutId } = badge;
-        await badgeRef.update({ ...badgeWithoutId, updatedAt: firestore_1.FieldValue.serverTimestamp() });
+        const { id } = badge, badgeWithoutId = __rest(badge, ["id"]);
+        await badgeRef.update(Object.assign(Object.assign({}, badgeWithoutId), { updatedAt: firestore_1.FieldValue.serverTimestamp() }));
     }
     else {
-        const { id, ...badgeWithoutId } = badge;
-        await firestore.collection('badges').add({ ...badgeWithoutId, createdAt: firestore_1.FieldValue.serverTimestamp(), updatedAt: firestore_1.FieldValue.serverTimestamp() });
+        const { id } = badge, badgeWithoutId = __rest(badge, ["id"]);
+        await firestore.collection('badges').add(Object.assign(Object.assign({}, badgeWithoutId), { createdAt: firestore_1.FieldValue.serverTimestamp(), updatedAt: firestore_1.FieldValue.serverTimestamp() }));
     }
     return { success: true };
 });
@@ -501,7 +522,7 @@ exports.saveMentorProfile = functions.https.onCall(async (data, context) => {
     const { profile } = data;
     const firestore = (0, firestore_1.getFirestore)();
     const profileRef = firestore.collection('siteProfiles').doc('mainMentor');
-    await profileRef.set({ ...profile, updatedAt: firestore_1.FieldValue.serverTimestamp() }, { merge: true });
+    await profileRef.set(Object.assign(Object.assign({}, profile), { updatedAt: firestore_1.FieldValue.serverTimestamp() }), { merge: true });
     return { success: true };
 });
 // Messages
@@ -511,13 +532,7 @@ exports.getMessages = functions.https.onCall(async (data, context) => {
     const messagesSnap = await firestore.collection('userMessages').orderBy('timestamp', 'desc').get();
     const messagesData = messagesSnap.docs.map((doc) => {
         const docData = doc.data();
-        return {
-            id: doc.id,
-            ...docData,
-            timestamp: docData.timestamp.toDate().toISOString(),
-            createdAt: docData.createdAt.toDate().toISOString(),
-            updatedAt: docData.updatedAt.toDate().toISOString()
-        };
+        return Object.assign(Object.assign({ id: doc.id }, docData), { timestamp: docData.timestamp.toDate().toISOString(), createdAt: docData.createdAt.toDate().toISOString(), updatedAt: docData.updatedAt.toDate().toISOString() });
     });
     return { messages: messagesData };
 });
@@ -642,9 +657,9 @@ exports.getAdminBookingsPageData = functions.runWith({ secrets: ["RAZORPAY_KEY_I
             bookingsQuery.get(),
             usersQuery.get(),
         ]);
-        const services = servicesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        const bookings = bookingsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        const users = usersSnapshot.docs.map((doc) => ({ uid: doc.id, ...doc.data() }));
+        const services = servicesSnapshot.docs.map((doc) => (Object.assign({ id: doc.id }, doc.data())));
+        const bookings = bookingsSnapshot.docs.map((doc) => (Object.assign({ id: doc.id }, doc.data())));
+        const users = usersSnapshot.docs.map((doc) => (Object.assign({ uid: doc.id }, doc.data())));
         return { services, bookings, users };
     }
     catch (error) {
@@ -671,9 +686,9 @@ exports.getAdminReportsPageData = functions.runWith({ secrets: ["RAZORPAY_KEY_ID
         logger.info(`Fetched ${bookingsSnapshot.docs.length} completed bookings.`);
         logger.info(`Fetched ${badgesSnapshot.docs.length} badges.`);
         logger.info(`Fetched ${historySnapshot.docs.length} history entries.`);
-        const completedBookings = bookingsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        const badges = badgesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        const history = historySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        const completedBookings = bookingsSnapshot.docs.map((doc) => (Object.assign({ id: doc.id }, doc.data())));
+        const badges = badgesSnapshot.docs.map((doc) => (Object.assign({ id: doc.id }, doc.data())));
+        const history = historySnapshot.docs.map((doc) => (Object.assign({ id: doc.id }, doc.data())));
         logger.info("Data processing complete. Returning data to client.");
         return { completedBookings, badges, history };
     }
@@ -694,9 +709,9 @@ exports.getAdminTestimonialsPageData = functions.runWith({ secrets: ["RAZORPAY_K
             servicesQuery.get(),
             bookingsQuery.get(),
         ]);
-        const testimonials = testimonialsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        const services = servicesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        const bookings = bookingsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        const testimonials = testimonialsSnapshot.docs.map((doc) => (Object.assign({ id: doc.id }, doc.data())));
+        const services = servicesSnapshot.docs.map((doc) => (Object.assign({ id: doc.id }, doc.data())));
+        const bookings = bookingsSnapshot.docs.map((doc) => (Object.assign({ id: doc.id }, doc.data())));
         return { testimonials, services, bookings };
     }
     catch (error) {
@@ -706,6 +721,7 @@ exports.getAdminTestimonialsPageData = functions.runWith({ secrets: ["RAZORPAY_K
 });
 // New function to save hero section data
 exports.saveHeroSection = functions.https.onCall(async (data, context) => {
+    var _a;
     await ensureAdmin(context);
     // The data is now nested under `heroData` key from the client call.
     const heroData = data.heroData;
@@ -715,11 +731,8 @@ exports.saveHeroSection = functions.https.onCall(async (data, context) => {
     const firestore = (0, firestore_1.getFirestore)();
     const heroDocRef = firestore.collection('siteContent').doc('homePage');
     try {
-        await heroDocRef.set({
-            ...heroData,
-            updatedAt: firestore_1.FieldValue.serverTimestamp()
-        }, { merge: true });
-        logger.info("Hero section data successfully saved for user:", context.auth?.uid);
+        await heroDocRef.set(Object.assign(Object.assign({}, heroData), { updatedAt: firestore_1.FieldValue.serverTimestamp() }), { merge: true });
+        logger.info("Hero section data successfully saved for user:", (_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid);
         return { success: true, message: "Hero section updated successfully." };
     }
     catch (error) {
@@ -770,7 +783,8 @@ exports.uploadFile = functions.https.onCall(async (data, context) => {
 });
 // Helper function to determine content type
 function getContentType(fileName) {
-    const extension = fileName.split('.').pop()?.toLowerCase();
+    var _a;
+    const extension = (_a = fileName.split('.').pop()) === null || _a === void 0 ? void 0 : _a.toLowerCase();
     switch (extension) {
         case 'jpg':
         case 'jpeg':
@@ -792,7 +806,7 @@ exports.getBlogPosts = functions.https.onCall(async (data, context) => {
     await ensureAdmin(context);
     const firestore = (0, firestore_1.getFirestore)();
     const postsSnap = await firestore.collection("blogPosts").orderBy('publicationDate', 'desc').get();
-    const postsData = postsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const postsData = postsSnap.docs.map(doc => (Object.assign({ id: doc.id }, doc.data())));
     return { posts: postsData };
 });
 exports.saveBlogPost = functions.https.onCall(async (data, context) => {
@@ -801,17 +815,12 @@ exports.saveBlogPost = functions.https.onCall(async (data, context) => {
     const firestore = (0, firestore_1.getFirestore)();
     if (post.id) {
         const postRef = firestore.collection('blogPosts').doc(post.id);
-        const { id, ...postWithoutId } = post;
-        await postRef.update({ ...postWithoutId, updatedAt: firestore_1.FieldValue.serverTimestamp() });
+        const { id } = post, postWithoutId = __rest(post, ["id"]);
+        await postRef.update(Object.assign(Object.assign({}, postWithoutId), { updatedAt: firestore_1.FieldValue.serverTimestamp() }));
     }
     else {
-        const { id, ...postWithoutId } = post;
-        await firestore.collection('blogPosts').add({
-            ...postWithoutId,
-            publicationDate: firestore_1.FieldValue.serverTimestamp(),
-            createdAt: firestore_1.FieldValue.serverTimestamp(),
-            updatedAt: firestore_1.FieldValue.serverTimestamp()
-        });
+        const { id } = post, postWithoutId = __rest(post, ["id"]);
+        await firestore.collection('blogPosts').add(Object.assign(Object.assign({}, postWithoutId), { publicationDate: firestore_1.FieldValue.serverTimestamp(), createdAt: firestore_1.FieldValue.serverTimestamp(), updatedAt: firestore_1.FieldValue.serverTimestamp() }));
     }
     return { success: true };
 });
@@ -823,3 +832,4 @@ exports.deleteBlogPost = functions.https.onCall(async (data, context) => {
     return { success: true };
 });
 // Add more admin write functions below as needed
+//# sourceMappingURL=index.js.map

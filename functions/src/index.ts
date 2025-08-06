@@ -5,7 +5,7 @@ import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import Razorpay from "razorpay";
 import crypto from "crypto";
-import type { Booking, UserMessage, Service, Resource, Badge, UserProfile, MentorProfileData, Testimonial, FeedbackSubmissionHistoryEntry, HeroSectionData, UserNotification, BlogPost } from "./types";
+import type { Booking, UserMessage, Service, Resource, Badge, UserProfile, MentorProfileData, Testimonial, FeedbackSubmissionHistoryEntry, HeroSectionData, UserNotification, BlogPost, ServiceSection } from "./types";
 import { getStorage } from "firebase-admin/storage";
 
 initializeApp();
@@ -389,13 +389,15 @@ exports.saveService = functions.https.onCall(async (data: any, context: function
     // Ensure detailSections is an array of objects with title and content
     detailSections: Array.isArray(service.detailSections) ? service.detailSections.map(s => {
         if (s.type === 'text') {
-            return { type: 'text', title: s.title || "", content: s.content || "" };
+            const textSection = s as Extract<ServiceSection, {type: 'text'}>;
+            return { type: 'text', title: textSection.title || "", content: textSection.content || "" };
         }
         if (s.type === 'image') {
-            return { type: 'image', title: s.title || "", imageUrl: s.imageUrl || "", imageHint: s.imageHint || "" };
+            const imageSection = s as Extract<ServiceSection, {type: 'image'}>;
+            return { type: 'image', title: imageSection.title || "", imageUrl: imageSection.imageUrl || "", imageHint: imageSection.imageHint || "" };
         }
         return s; // Should not happen with proper client-side validation
-    }).filter(Boolean) : []
+    }).filter(Boolean) as ServiceSection[] : []
   };
   
   // Remove fields that are no longer part of the model to avoid polluting the DB
