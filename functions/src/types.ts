@@ -41,6 +41,18 @@ export interface UserMessage {
   updatedAt?: firestore.FieldValue;
 }
 
+export type ServiceSection = {
+  type: 'text';
+  title: string;
+  content: string; 
+} | {
+  type: 'image';
+  imageUrl: string;
+  imageHint?: string;
+  title: string;
+};
+
+
 export interface Service {
   id: string;
   name: string;
@@ -53,7 +65,7 @@ export interface Service {
   defaultForce?: 'Air Force' | 'Army' | 'Navy' | 'General';
   isBookable?: boolean;
   hasDetailsPage?: boolean;
-  detailSections?: { title: string; content: string }[];
+  detailSections?: ServiceSection[];
   createdAt?: firestore.FieldValue;
   updatedAt?: firestore.FieldValue;
 }
@@ -160,4 +172,31 @@ export interface UserNotification {
     seen: boolean;
     timestamp: firestore.FieldValue;
     type: 'booking_update' | 'message_reply' | 'general';
+}
+
+export type BlogPostSection = {
+  type: 'text';
+  title: string;
+  content: string;
+} | {
+  type: 'image';
+  imageUrl: string;
+  imageHint?: string;
+  title: string; // Title for image section for alt text and context
+};
+
+
+export interface BlogPost {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  author: string;
+  publicationDate: firestore.FieldValue;
+  bannerImageUrl: string;
+  bannerImageDataAiHint?: string;
+  sections: BlogPostSection[];
+  status: 'published' | 'draft';
+  createdAt?: firestore.FieldValue;
+  updatedAt?: firestore.FieldValue;
 }

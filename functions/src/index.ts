@@ -5,7 +5,7 @@ import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import Razorpay from "razorpay";
 import crypto from "crypto";
-import type { Booking, UserMessage, Service, Resource, Badge, UserProfile, MentorProfileData, Testimonial, FeedbackSubmissionHistoryEntry, HeroSectionData, UserNotification } from "./types";
+import type { Booking, UserMessage, Service, Resource, Badge, UserProfile, MentorProfileData, Testimonial, FeedbackSubmissionHistoryEntry, HeroSectionData, UserNotification, BlogPost } from "./types";
 import { getStorage } from "firebase-admin/storage";
 
 initializeApp();
@@ -387,10 +387,15 @@ exports.saveService = functions.https.onCall(async (data: any, context: function
   const serviceToSave: Partial<Service> = {
     ...service,
     // Ensure detailSections is an array of objects with title and content
-    detailSections: Array.isArray(service.detailSections) ? service.detailSections.map(s => ({
-        title: s.title || "",
-        content: s.content || ""
-    })) : []
+    detailSections: Array.isArray(service.detailSections) ? service.detailSections.map(s => {
+        if (s.type === 'text') {
+            return { type: 'text', title: s.title || "", content: s.content || "" };
+        }
+        if (s.type === 'image') {
+            return { type: 'image', title: s.title || "", imageUrl: s.imageUrl || "", imageHint: s.imageHint || "" };
+        }
+        return s; // Should not happen with proper client-side validation
+    }).filter(Boolean) : []
   };
   
   // Remove fields that are no longer part of the model to avoid polluting the DB
@@ -678,6 +683,7 @@ exports.uploadReport = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPA
     const folder = bookingId.startsWith('services_thumbnails') ? 'services/thumbnails' :
                    bookingId.startsWith('services_banners') ? 'services/banners' :
                    bookingId.startsWith('site_content_') ? 'site_content' : 
+                   bookingId.startsWith('blog_') ? 'blog' :
                    'feedback_reports';
     const filePath = `${folder}/${bookingId}_${Date.now()}_${sanitizedFileName}`;
     const file = bucket.file(filePath);
@@ -888,5 +894,44 @@ function getContentType(fileName: string): string {
             return 'application/octet-stream';
     }
 }
+
+
+// Blog Post Functions
+exports.getBlogPosts = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+    await ensureAdmin(context);
+    const firestore = getFirestore();
+    const postsSnap = await firestore.collection("blogPosts").orderBy('publicationDate', 'desc').get();
+    const postsData = postsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return { posts: postsData };
+});
+
+exports.saveBlogPost = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+    await ensureAdmin(context);
+    const { post } = data as { post: BlogPost };
+    const firestore = getFirestore();
+    
+    if (post.id) {
+        const postRef = firestore.collection('blogPosts').doc(post.id);
+        const { id, ...postWithoutId } = post;
+        await postRef.update({ ...postWithoutId, updatedAt: FieldValue.serverTimestamp() });
+    } else {
+        const { id, ...postWithoutId } = post;
+        await firestore.collection('blogPosts').add({
+            ...postWithoutId,
+            publicationDate: FieldValue.serverTimestamp(),
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp()
+        });
+    }
+    return { success: true };
+});
+
+exports.deleteBlogPost = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
+    await ensureAdmin(context);
+    const { postId } = data as { postId: string };
+    const firestore = getFirestore();
+    await firestore.collection('blogPosts').doc(postId).delete();
+    return { success: true };
+});
 
 // Add more admin write functions below as needed
