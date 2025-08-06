@@ -1,3 +1,4 @@
+
 import * as functions from "firebase-functions";
 import * as logger from "firebase-functions/logger";
 import { initializeApp } from "firebase-admin/app";
@@ -381,12 +382,30 @@ exports.saveService = functions.https.onCall(async (data: any, context: function
   await ensureAdmin(context);
   const { service } = data as { service: Service };
   const firestore = getFirestore();
-  if (service.id) {
-    const serviceRef = firestore.collection('services').doc(service.id);
-    const { id, ...serviceWithoutId } = service;
+  
+  // Sanitize data before saving
+  const serviceToSave: Partial<Service> = {
+    ...service,
+    // Ensure detailSections is an array of objects with title and content
+    detailSections: Array.isArray(service.detailSections) ? service.detailSections.map(s => ({
+        title: s.title || "",
+        content: s.content || ""
+    })) : []
+  };
+  
+  // Remove fields that are no longer part of the model to avoid polluting the DB
+  delete (serviceToSave as any).howItWorks;
+  delete (serviceToSave as any).whatToExpect;
+  delete (serviceToSave as any).howItWillHelp;
+  delete (serviceToSave as any).bannerImageUrl;
+  delete (serviceToSave as any).bannerImageDataAiHint;
+
+  if (serviceToSave.id) {
+    const serviceRef = firestore.collection('services').doc(serviceToSave.id);
+    const { id, ...serviceWithoutId } = serviceToSave;
     await serviceRef.update({ ...serviceWithoutId, updatedAt: FieldValue.serverTimestamp() });
   } else {
-    const { id, ...serviceWithoutId } = service;
+    const { id, ...serviceWithoutId } = serviceToSave;
     await firestore.collection('services').add({ ...serviceWithoutId, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
   }
   return { success: true };
