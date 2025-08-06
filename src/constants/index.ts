@@ -1,6 +1,6 @@
 
 import type { Badge } from '@/types';
-import { Shield, FileText, CalendarDays, Users, ListChecks, Edit3, UploadCloud, BookCopy, MessageSquare, UserCog, CalendarPlus, MailQuestion, MessagesSquare, Award, Edit2Icon, DownloadCloud, LayoutDashboard } from 'lucide-react';
+import { Shield, FileText, CalendarDays, Users, ListChecks, Edit3, UploadCloud, BookCopy, MessageSquare, UserCog, CalendarPlus, MailQuestion, MessagesSquare, Award, Edit2Icon, DownloadCloud, LayoutDashboard, Rss } from 'lucide-react';
 import { getFutureDate } from '@/lib/utils';
 
 export const PREDEFINED_AVATARS: {id: string, url: string, hint: string}[] = [
@@ -26,6 +26,7 @@ export const ADMIN_DASHBOARD_NAV_LINKS = [
   { href: '/admin/bookings', label: 'Booking Requests', icon: ListChecks },
   { href: '/admin/slots', label: 'Manage Slots', icon: CalendarPlus },
   { href: '/admin/services', label: 'Manage Services', icon: Edit3 },
+  { href: '/admin/blog', label: 'Manage Blog', icon: Rss },
   { href: '/admin/hero-section', label: 'Manage Hero', icon: LayoutDashboard },
   { href: '/admin/reports', label: 'Upload Report & Feedback', icon: UploadCloud },
   { href: '/admin/resources', label: 'Manage Resources', icon: BookCopy },
@@ -128,5 +129,3 @@ export const SKILL_RATING_VALUES: Record<string, number> = {
 
 export const MAX_SKILL_RATING_VALUE = 7;
 export const TARGET_SKILL_RATING_VALUE = 4;
-
-    

@@ -1,32 +1,59 @@
 
 import type { LucideIcon } from 'lucide-react';
 
+export type ServiceSection = {
+  type: 'text';
+  title: string;
+  content: string; // Will be parsed as markdown
+} | {
+  type: 'image';
+  imageUrl: string;
+  imageHint?: string;
+};
+
 export interface Service {
   id: string;
   name: string;
   description: string;
   price: number;
-  duration: string; // e.g., "60 mins", "2 hours"
+  duration: string; 
   features: string[];
-  image?: string; // This is the thumbnail
+  image?: string;
   dataAiHint?: string;
   defaultForce?: 'Air Force' | 'Army' | 'Navy' | 'General';
   isBookable?: boolean;
   hasDetailsPage?: boolean;
-  detailSections?: { title: string; content: string }[];
-  createdAt?: any; // Should be Firestore Timestamp
-  updatedAt?: any; // Should be Firestore Timestamp
+  detailSections?: ServiceSection[];
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export type BlogPostSection = ServiceSection;
+
+export interface BlogPost {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  author: string;
+  publicationDate: any; // ISO string
+  bannerImageUrl: string;
+  bannerImageDataAiHint?: string;
+  sections: BlogPostSection[];
+  status: 'published' | 'draft';
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 export interface Testimonial {
   id: string;
-  uid: string; // Link to user's auth UID
+  uid: string; 
   name: string;
   userEmail?: string;
-  batch?: string; // Existing field
+  batch?: string; 
   story: string;
-  imageUrl?: string; // This will now primarily be a fallback for the avatar
-  dataAiHint?: string; // For the avatar image
+  imageUrl?: string; 
+  dataAiHint?: string; 
   serviceTaken: string;
   serviceId?: string;
   submissionStatus?: 'aspirant' | 'selected_cleared';
@@ -34,19 +61,19 @@ export interface Testimonial {
   selectedForce?: 'Army' | 'Navy' | 'Air Force';
   interviewLocation?: string;
   numberOfAttempts?: number;
-  bodyImageUrl?: string; // New field for image within the testimonial body
-  bodyImageDataAiHint?: string; // New field for AI hint for body image
-  createdAt?: any; // ISO string for dates
-  updatedAt?: any; // ISO string for dates
+  bodyImageUrl?: string; 
+  bodyImageDataAiHint?: string; 
+  createdAt?: any; 
+  updatedAt?: any;
 }
 
 export interface Booking {
   id:string;
-  uid: string; // Link to user's auth UID
+  uid: string; 
   serviceName: string;
   serviceId: string;
-  date: string; // YYYY-MM-DD
-  time: string; // e.g., 10:00 AM
+  date: string; 
+  time: string; 
   userName: string;
   userEmail: string;
   meetingLink: string;
@@ -91,15 +118,15 @@ export interface MentorProfileData {
 
 export interface UserMessage {
   id: string;
-  uid: string; // Link to user's auth UID
-  userName: string; // Name of the user who initiated or is part of the conversation
-  userEmail: string; // Email of the user, used as a conversation key
+  uid: string; 
+  userName: string; 
+  userEmail: string; 
   subject: string;
   messageBody: string;
-  timestamp: any; // Keep as Date object for sorting
-  status: 'new' | 'read' | 'replied' | 'closed'; // Status can apply to individual message or conversation
-  senderType: 'user' | 'admin'; // Who sent THIS specific message
-  adminName?: string; // Name of admin if senderType is 'admin'
+  timestamp: any; 
+  status: 'new' | 'read' | 'replied' | 'closed'; 
+  senderType: 'user' | 'admin'; 
+  adminName?: string; 
   createdAt?: any;
   updatedAt?: any;
 }
@@ -112,8 +139,8 @@ export interface Badge {
   rankName: string;
   imageUrl: string;
   dataAiHint: string;
-  createdAt?: any; // Added for production readiness
-  updatedAt?: any; // Added for production readiness
+  createdAt?: any; 
+  updatedAt?: any; 
 }
 
 export interface UserProfile {
@@ -124,7 +151,7 @@ export interface UserProfile {
   imageUrl?: string;
   roles?: ('user' | 'admin')[];
   awardedBadgeIds?: string[];
-  awardedBadges?: Badge[]; // For frontend display, may be populated after fetching details from awardedBadgeIds
+  awardedBadges?: Badge[]; 
   gender?: 'Male' | 'Female' | 'Other' | 'Prefer not to say';
   targetOrganization?: 'Army' | 'Navy' | 'Air Force' | 'Other';
   createdAt?: any;
@@ -143,8 +170,8 @@ export interface UserNotification {
 
 
 export interface FeedbackSubmissionHistoryEntry {
-  id: string; // Unique ID for the history entry
-  submissionDate: any; // ISO date string
+  id: string; 
+  submissionDate: any; 
   bookingId: string;
   userName: string;
   serviceName: string;

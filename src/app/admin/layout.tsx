@@ -1,8 +1,7 @@
 
 'use client';
 
-import { useEffect, useState }
-from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { AdminNav } from '@/components/layout/admin-nav';
@@ -10,6 +9,7 @@ import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
 import { Card } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function AdminLayout({
   children,
@@ -57,11 +57,13 @@ export default function AdminLayout({
       <Header />
       <div className="container flex-1 items-start py-8 md:grid md:grid-cols-[220px_minmax(0,1fr)] md:gap-6 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-10">
         <aside className="fixed top-16 z-30 -ml-2 hidden h-[calc(100vh-4rem)] w-full shrink-0 md:sticky md:block">
-          <Card className="h-full p-4 bg-card shadow-sm">
-             <h2 className="mb-4 px-2 text-lg font-semibold tracking-tight font-headline text-primary">
+          <Card className="h-full bg-card shadow-sm flex flex-col">
+             <h2 className="mb-4 p-4 pb-0 text-lg font-semibold tracking-tight font-headline text-primary">
                 Admin Panel
               </h2>
-            <AdminNav />
+             <ScrollArea className="flex-grow p-4 pt-0 custom-scrollbar">
+                <AdminNav />
+             </ScrollArea>
           </Card>
         </aside>
         <main className="w-full overflow-hidden">
