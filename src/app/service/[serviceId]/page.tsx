@@ -3,7 +3,7 @@ import { getDoc, getDocs, doc, collection, query, where, orderBy, limit } from '
 import { db } from '@/lib/firebase';
 import type { Service, Testimonial } from '@/types';
 import { notFound, redirect } from 'next/navigation';
-
+import ReactMarkdown from 'react-markdown';
 import Image from 'next/image';
 import Link from 'next/link';
 import { PageHeader } from '@/components/core/page-header';
@@ -187,24 +187,42 @@ export default async function ServiceDetailsPage({ params }: Props) {
         <div className="grid lg:grid-cols-3 gap-12 items-start">
             <div className="lg:col-span-2 space-y-12">
                 
-                {service.detailSections && service.detailSections.map((section, index) => (
-                    <Section key={index} title={section.title}>
-                        <div className="text-muted-foreground whitespace-pre-wrap space-y-2">
-                            {section.content.split('\n').map((line, i) => {
-                                const trimmedLine = line.trim();
-                                if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
-                                    return (
-                                        <div key={i} className="flex items-start">
-                                            <CheckCircle className="h-5 w-5 mr-3 mt-1 text-green-500 flex-shrink-0" />
-                                            <span>{trimmedLine.substring(2)}</span>
-                                        </div>
-                                    )
-                                }
-                                return <p key={i}>{line}</p>
-                            })}
-                        </div>
-                    </Section>
-                ))}
+                {service.detailSections && service.detailSections.map((section, index) => {
+                     if (section.type === 'text') {
+                        return (
+                            <section key={index} className="prose prose-lg dark:prose-invert max-w-none">
+                                <h2 className="text-2xl font-bold text-primary mb-4">{section.title}</h2>
+                                <ReactMarkdown
+                                    components={{
+                                        a: ({node, ...props}) => <a className="text-accent hover:underline" {...props} />,
+                                        ul: ({node, ...props}) => <ul className="list-disc pl-5 space-y-2" {...props} />,
+                                        ol: ({node, ...props}) => <ol className="list-decimal pl-5 space-y-2" {...props} />,
+                                        strong: ({node, ...props}) => <strong className="font-bold" {...props} />,
+                                    }}
+                                >
+                                    {section.content}
+                                </ReactMarkdown>
+                            </section>
+                        )
+                    }
+                    if (section.type === 'image') {
+                        return (
+                             <section key={index} className="mb-8">
+                                {section.title && <h2 className="text-2xl font-bold text-primary mb-4">{section.title}</h2>}
+                                <div className="relative aspect-video w-full rounded-lg overflow-hidden border">
+                                    <Image
+                                    src={section.imageUrl}
+                                    alt={section.title || 'Service section image'}
+                                    fill
+                                    className="object-contain"
+                                    data-ai-hint={section.imageHint || 'service content'}
+                                    />
+                                </div>
+                            </section>
+                        )
+                    }
+                    return null;
+                })}
                 
             </div>
 
@@ -273,17 +291,6 @@ export default async function ServiceDetailsPage({ params }: Props) {
       </div>
     </>
   );
-}
-
-function Section({ title, children }: { title: string, children: React.ReactNode }) {
-    return (
-        <section>
-            <h3 className="text-2xl font-bold font-headline text-primary mb-4 flex items-center">
-                {title}
-            </h3>
-            {children}
-        </section>
-    );
 }
 
 // Fallback component for when a service is not found

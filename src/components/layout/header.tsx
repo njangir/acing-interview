@@ -8,7 +8,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Menu, LogIn, UserPlus, ShieldCheck, LayoutDashboard, LogOut, Home, Briefcase, UserCircle, BookCheck, Award, MessageSquare, Bell, X as XIcon } from 'lucide-react';
+import { Menu, LogIn, UserPlus, ShieldCheck, LayoutDashboard, LogOut, Home, Briefcase, UserCircle, BookCheck, Award, MessageSquare, Bell, X as XIcon, Rss } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Logo } from '@/components/icons/logo';
 import { useAuth } from '@/hooks/use-auth';
@@ -27,6 +27,7 @@ const mainSiteNavItems: Array<{ href: string; label: string; icon: LucideIcon }>
   { href: '/services', label: 'Services', icon: Briefcase },
   { href: '/mentor', label: 'Mentor', icon: Award },
   { href: '/testimonials', label: 'Testimonials', icon: MessageSquare },
+  { href: '/blog', label: 'Blog', icon: Rss },
 ];
 
 

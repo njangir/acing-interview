@@ -12,9 +12,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from "@/components/ui/switch";
 import { Badge } from '@/components/ui/badge';
-import type { Service } from '@/types';
+import type { Service, ServiceSection } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Edit, Trash2, Loader2, AlertTriangle, GripVertical } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Loader2, AlertTriangle, GripVertical, Image as ImageIcon, FileText } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import Image from 'next/image';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -38,7 +38,7 @@ const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
-const initialServiceFormState: Omit<Service, 'id' | 'features' | 'detailSections'> & { features: string; detailSections: { title: string; content: string }[] } = {
+const initialServiceFormState: Omit<Service, 'id' | 'features' | 'detailSections'> & { features: string; detailSections: ServiceSection[] } = {
   name: '',
   description: '',
   price: 0,
@@ -126,17 +126,30 @@ export default function AdminServicesPage() {
     }
   };
   
-  const handleSectionChange = (index: number, field: 'title' | 'content', value: string) => {
+  const handleSectionChange = (index: number, field: keyof ServiceSection, value: string) => {
     const newSections = [...formData.detailSections];
-    newSections[index][field] = value;
+    const section = newSections[index];
+    (section as any)[field] = value;
     setFormData(prev => ({...prev, detailSections: newSections}));
   };
 
-  const addSection = () => {
-    setFormData(prev => ({
-      ...prev,
-      detailSections: [...prev.detailSections, { title: '', content: '' }]
-    }));
+  const addSection = (type: 'text' | 'image') => {
+    if (type === 'text') {
+        setFormData(prev => ({...prev, detailSections: [...prev.detailSections, { type: 'text', title: '', content: '' }]}));
+    } else {
+        setFormData(prev => ({...prev, detailSections: [...prev.detailSections, { type: 'image', title: '', imageUrl: '', imageHint: '' }]}));
+    }
+  };
+  
+  const handleSectionImageUpload = async (index: number, file: File) => {
+    if (!file) return;
+    try {
+        const downloadUrl = await uploadImageViaFunction(file, 'service_sections');
+        handleSectionChange(index, 'imageUrl', downloadUrl);
+        toast({ title: "Image Uploaded", description: "Section image has been uploaded successfully." });
+    } catch(err) {
+        toast({ title: "Upload Failed", description: "Could not upload the image for the section.", variant: "destructive"});
+    }
   };
   
   const removeSection = (index: number) => {
@@ -197,7 +210,6 @@ export default function AdminServicesPage() {
       id: currentService?.id
     };
     
-    // Remove properties that are no longer on the Service type
     delete (serviceToSave as any).howItWorks;
     delete (serviceToSave as any).whatToExpect;
     delete (serviceToSave as any).howItWillHelp;
@@ -361,8 +373,8 @@ export default function AdminServicesPage() {
                 {currentService ? `Update details for ${currentService.name}.` : 'Fill in the details for the new service.'}
               </DialogDesc>
             </DialogHeader>
-            <div className="p-6">
-              <ScrollArea className="max-h-[60vh] pr-6 custom-scrollbar">
+            <div className="p-1">
+              <ScrollArea className="max-h-[70vh] p-6 pr-6 custom-scrollbar">
                 <div className="space-y-4">
                   <div>
                     <Label htmlFor="name">Name</Label>
@@ -421,44 +433,30 @@ export default function AdminServicesPage() {
                             <h3 className="font-medium">Dynamic Content Sections</h3>
                             {formData.detailSections.map((section, index) => (
                               <div key={index} className="space-y-2 border p-3 rounded-md relative">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="absolute top-1 right-1 h-6 w-6"
-                                    onClick={() => removeSection(index)}
-                                  >
-                                      <Trash2 className="h-4 w-4 text-destructive"/>
-                                  </Button>
-                                  <div>
-                                    <Label>Section {index + 1} Title</Label>
-                                    <Input
-                                      value={section.title}
-                                      onChange={(e) => handleSectionChange(index, 'title', e.target.value)}
-                                      placeholder="e.g., How It Works"
-                                    />
-                                  </div>
-                                  <div>
-                                    <Label>Section {index + 1} Content</Label>
-                                    <Textarea
-                                      value={section.content}
-                                      onChange={(e) => handleSectionChange(index, 'content', e.target.value)}
-                                      placeholder="Use new lines for bullet points..."
-                                      rows={5}
-                                    />
-                                  </div>
+                                  <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={() => removeSection(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                  <Label>Section {index + 1}: {section.type === 'text' ? 'Text' : 'Image'}</Label>
+                                  <Input value={section.title} onChange={(e) => handleSectionChange(index, 'title', e.target.value)} placeholder="Section Title (e.g., Introduction)" />
+                                  {section.type === 'text' ? (
+                                    <Textarea value={section.content} onChange={(e) => handleSectionChange(index, 'content', e.target.value)} placeholder="Use Markdown for formatting: **bold**, *italic*, [link](url)" rows={5} />
+                                  ) : (
+                                    <div>
+                                      <Input type="file" accept="image/*" onChange={(e) => { if(e.target.files?.[0]) handleSectionImageUpload(index, e.target.files[0])}}/>
+                                      {section.imageUrl && <Image src={section.imageUrl} alt="Section image" width={150} height={100} className="mt-2 rounded-md border" />}
+                                    </div>
+                                  )}
                               </div>
                             ))}
-                            <Button type="button" variant="outline" size="sm" onClick={addSection}>
-                                <PlusCircle className="mr-2 h-4 w-4"/> Add Section
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button type="button" variant="outline" size="sm" onClick={() => addSection('text')}><FileText className="mr-2 h-4 w-4"/> Add Text Section</Button>
+                                <Button type="button" variant="outline" size="sm" onClick={() => addSection('image')}><ImageIcon className="mr-2 h-4 w-4"/> Add Image Section</Button>
+                            </div>
                         </div>
                       )}
                   </div>
                 </div>
               </ScrollArea>
             </div>
-            <DialogFooter>
+            <DialogFooter className="border-t pt-6 mt-6">
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

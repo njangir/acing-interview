@@ -4,11 +4,12 @@ import type { LucideIcon } from 'lucide-react';
 export type ServiceSection = {
   type: 'text';
   title: string;
-  content: string; // Will be parsed as markdown
+  content: string; 
 } | {
   type: 'image';
   imageUrl: string;
   imageHint?: string;
+  title: string;
 };
 
 export interface Service {
@@ -28,7 +29,17 @@ export interface Service {
   updatedAt?: any;
 }
 
-export type BlogPostSection = ServiceSection;
+export type BlogPostSection = {
+  type: 'text';
+  title: string;
+  content: string;
+} | {
+  type: 'image';
+  imageUrl: string;
+  imageHint?: string;
+  title: string; // Title for image section for alt text and context
+};
+
 
 export interface BlogPost {
   id: string;
