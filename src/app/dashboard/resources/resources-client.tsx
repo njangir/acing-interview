@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -61,24 +62,24 @@ export default function ResourcesClient() {
         const servicesData = servicesSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate?.() || new Date(),
-          updatedAt: doc.data().updatedAt?.toDate?.() || new Date(),
         })) as Service[];
         setAllServices(servicesData);
 
         // Fetch resources for accessible services
-        const resourcesCol = collection(db, "resources");
-        const resourcesQuery = query(resourcesCol, where("serviceId", "in", accessibleServiceIds));
-        const resourcesSnapshot = await getDocs(resourcesQuery);
-        
-        const resourcesData = resourcesSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate?.() || new Date(),
-          updatedAt: doc.data().updatedAt?.toDate?.() || new Date(),
-        })) as ResourceType[];
-
-        setAllFetchedResources(resourcesData);
+        if (accessibleServiceIds.length > 0) {
+            const resourcesCol = collection(db, "resources");
+            const resourcesQuery = query(resourcesCol, where("serviceCategory", "in", accessibleServiceIds));
+            const resourcesSnapshot = await getDocs(resourcesQuery);
+            
+            const resourcesData = resourcesSnapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data(),
+            })) as ResourceType[];
+    
+            setAllFetchedResources(resourcesData);
+        } else {
+            setAllFetchedResources([]);
+        }
       } catch (err) {
         console.error('Error fetching resources:', err);
         setError('Failed to load resources. Please try again.');
@@ -95,7 +96,7 @@ export default function ResourcesClient() {
     if (selectedCategory === 'all') {
       return allFetchedResources;
     }
-    return allFetchedResources.filter(resource => resource.serviceId === selectedCategory);
+    return allFetchedResources.filter(resource => resource.serviceCategory === selectedCategory);
   }, [allFetchedResources, selectedCategory]);
 
   // Get accessible services for the dropdown
@@ -170,7 +171,7 @@ export default function ResourcesClient() {
               <SelectItem value="all">All Resources</SelectItem>
               {accessibleServices.map((service) => (
                 <SelectItem key={service.id} value={service.id}>
-                  {service.title}
+                  {service.name}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -379,35 +379,34 @@ exports.getServices = functions.https.onCall(async(data: any, context: functions
 });
 
 exports.saveService = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
-  await ensureAdmin(context);
-  const { service } = data as { service: Service };
-  const firestore = getFirestore();
-  
-  // Sanitize data before saving
-  const serviceToSave: Partial<Service> = {
-    ...service,
-    detailSections: Array.isArray(service.detailSections) ? service.detailSections.map(s => {
-        if (s.type === 'text') {
-            const textSection = s as Extract<ServiceSection, {type: 'text'}>;
-            return { type: 'text', title: textSection.title || "", content: textSection.content || "" };
-        }
-        if (s.type === 'image') {
-            const imageSection = s as Extract<ServiceSection, {type: 'image'}>;
-            return { type: 'image', title: imageSection.title || "", imageUrl: imageSection.imageUrl || "", imageHint: imageSection.imageHint || "" };
-        }
-        return null;
-    }).filter((s): s is ServiceSection => s !== null) : []
-  };
-  
-  if (serviceToSave.id) {
-    const serviceRef = firestore.collection('services').doc(serviceToSave.id);
-    const { id, ...serviceWithoutId } = serviceToSave;
-    await serviceRef.update({ ...serviceWithoutId, updatedAt: FieldValue.serverTimestamp() });
-  } else {
-    const { id, ...serviceWithoutId } = serviceToSave;
-    await firestore.collection('services').add({ ...serviceWithoutId, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
-  }
-  return { success: true };
+    await ensureAdmin(context);
+    const { service } = data as { service: Service };
+    const firestore = getFirestore();
+
+    const serviceToSave: Partial<Service> = {
+        ...service,
+        detailSections: Array.isArray(service.detailSections) ? service.detailSections.map(s => {
+            if (s.type === 'text') {
+                const textSection = s as Extract<ServiceSection, { type: 'text' }>;
+                return { type: 'text', title: textSection.title || "", content: textSection.content || "" };
+            }
+            if (s.type === 'image') {
+                const imageSection = s as Extract<ServiceSection, { type: 'image' }>;
+                return { type: 'image', title: imageSection.title || "", imageUrl: imageSection.imageUrl || "", imageHint: imageSection.imageHint || '' };
+            }
+            return null;
+        }).filter((s): s is ServiceSection => s !== null) : [],
+    };
+
+    if (serviceToSave.id) {
+        const serviceRef = firestore.collection('services').doc(serviceToSave.id);
+        const { id, ...serviceWithoutId } = serviceToSave;
+        await serviceRef.update({ ...serviceWithoutId, updatedAt: FieldValue.serverTimestamp() });
+    } else {
+        const { id, ...serviceWithoutId } = serviceToSave;
+        await firestore.collection('services').add({ ...serviceWithoutId, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    }
+    return { success: true };
 });
 
 exports.deleteService = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {

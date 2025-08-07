@@ -48,7 +48,7 @@ export type ServiceSection = {
 } | {
   type: 'image';
   imageUrl: string;
-  imageHint?: string;
+  imageHint: string;
   title: string;
 };
 
