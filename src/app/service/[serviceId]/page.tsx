@@ -15,6 +15,7 @@ import { TestimonialCard } from '@/components/core/testimonial-card';
 import type { Metadata, ResolvingMetadata } from 'next';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
+export const dynamic = 'force-dynamic';
 
 type Props = {
   params: { serviceId: string }
