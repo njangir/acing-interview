@@ -39,6 +39,15 @@ const mentorProfileSchema = z.object({
 
 type MentorProfileFormValues = z.infer<typeof mentorProfileSchema>;
 
+const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
 export default function AdminMentorProfilePage() {
   const { toast } = useToast();
   const [editableProfile, setEditableProfile] = useState<MentorProfileData | null>(null);
@@ -98,22 +107,17 @@ export default function AdminMentorProfilePage() {
 
     if (imageFile) {
         try {
-            // Convert file to base64 data URL
-            const fileDataUrl = await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result as string);
-                reader.onerror = reject;
-                reader.readAsDataURL(imageFile);
-            });
-
-            // Use cloud function for upload
-            const result = await uploadFile({
+            const fileDataUrl = await fileToBase64(imageFile);
+            
+            // Use cloud function for upload and pass old URL for deletion
+            const result: any = await uploadFile({
                 fileName: imageFile.name,
                 fileDataUrl: fileDataUrl,
-                folder: 'mentor_profiles'
+                folder: 'mentor_profiles',
+                oldFileUrl: editableProfile?.imageUrl, // Pass old URL here
             });
             
-            finalImageUrl = (result.data as any).downloadURL;
+            finalImageUrl = result.data.downloadURL;
         } catch (uploadError) {
             console.error("Error uploading mentor profile image:", uploadError);
             toast({ title: "Image Upload Failed", description: "Could not upload the new profile image.", variant: "destructive" });

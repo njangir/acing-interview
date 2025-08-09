@@ -817,15 +817,35 @@ exports.uploadFile = functions.https.onCall(async (data: any, context: functions
         throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
     }
 
-    const { fileName, fileDataUrl, folder = 'uploads' } = data as { 
+    const { fileName, fileDataUrl, folder = 'uploads', oldFileUrl } = data as { 
         fileName: string; 
         fileDataUrl: string; 
-        folder?: string; 
+        folder?: string;
+        oldFileUrl?: string;
     };
 
     if (!fileName || !fileDataUrl) {
         throw new functions.https.HttpsError("invalid-argument", "fileName and fileDataUrl are required.");
     }
+
+    const storage = getStorage();
+    const bucket = storage.bucket();
+
+    // Delete the old file if a URL is provided
+    if (oldFileUrl && oldFileUrl.includes(bucket.name)) {
+        try {
+            const oldFilePath = decodeURIComponent(oldFileUrl.split('/o/')[1].split('?')[0]);
+            await bucket.file(oldFilePath).delete();
+            logger.info(`Successfully deleted old file: ${oldFilePath}`);
+        } catch (deleteError: any) {
+            if (deleteError.code === 404) {
+                logger.warn(`Old file not found, skipping deletion: ${oldFileUrl}`);
+            } else {
+                logger.error(`Failed to delete old file, but proceeding with upload: ${oldFileUrl}`, deleteError);
+            }
+        }
+    }
+
 
     try {
         // Extract base64 data from data URL
@@ -835,8 +855,6 @@ exports.uploadFile = functions.https.onCall(async (data: any, context: functions
         }
 
         const buffer = Buffer.from(base64Data, 'base64');
-        const storage = getStorage();
-        const bucket = storage.bucket();
         
         // Generate unique filename
         const timestamp = Date.now();
