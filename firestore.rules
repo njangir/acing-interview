@@ -2,94 +2,23 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper Functions
+    
     function isAdmin() {
-      return exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid)) &&
+      return exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid)) && 
              get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.roles.hasAny(['admin']);
     }
-    
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
 
-    // Collection Rules
-    match /userProfiles/{userId} {
-      // Users can read/write their own profile. Admins can read/write any profile.
-      allow read, write: if isOwner(userId) || isAdmin();
+    match /blogPosts/{postId} {
+      // Allow public read for published posts
+      allow read: if resource.data.status == 'published';
       
-      match /notifications/{notificationId} {
-        // Users can manage their own notifications.
-        allow read, update, delete: if isOwner(userId);
-        // Only backend functions can create notifications.
-        allow create: if false; 
-      }
-    }
-
-    match /services/{serviceId} {
-      // Publicly readable. Writable only by admins.
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /bookings/{bookingId} {
-      // Users can read/create/update their own bookings.
-      allow read, create, update: if isOwner(request.resource.data.uid) || isOwner(resource.data.uid);
-      // Admins can read/write/delete any booking.
+      // Allow full access for admins
       allow read, write, delete: if isAdmin();
     }
 
-    match /globalAvailability/{dateString} {
-      // Publicly readable for anyone to see slots. Writable only by admins.
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-    
-    match /siteContent/{docId} {
-      // Publicly readable for homepage. Writable only by admins.
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /testimonials/{testimonialId} {
-      // Users can create their own. Admins can update status. Public can read approved.
-      allow create: if isOwner(request.resource.data.uid);
-      allow update: if isAdmin();
-      allow read: if resource.data.status == 'approved' || isAdmin() || isOwner(resource.data.uid);
-    }
-    
-    match /resources/{resourceId} {
-       // Users with entitlements can read. Admins can write.
-       // NOTE: This is a simplified rule. For production, checking entitlements might be better
-       // done via a backend function that filters results based on a user's purchased services.
-      allow read: if request.auth != null;
-      allow write: if isAdmin();
-    }
-
-    match /userMessages/{messageId} {
-      // Users can create messages (senderType: 'user').
-      allow create: if isOwner(request.resource.data.uid) && request.resource.data.senderType == 'user';
-      // Users can read messages in their own thread. Admins can read all.
-      allow read: if isOwner(resource.data.uid) || isAdmin();
-      // Admins can update/create replies.
-      allow update, write: if isAdmin();
-    }
-    
-    match /badges/{badgeId} {
-      // Publicly readable. Writable only by admins.
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /feedbackSubmissions/{submissionId} {
-      // Writable/readable only by admins.
-      allow read, write: if isAdmin();
-    }
-    
-    match /siteProfiles/{profileId} {
-      // Publicly readable. Writable only by admins.
-      allow read: if true;
-      allow write: if isAdmin();
+    // Default deny all other collections until rules are defined
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
