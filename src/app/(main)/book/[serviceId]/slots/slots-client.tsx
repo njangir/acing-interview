@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -14,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 
 import { db, functions } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
-import { format, isBefore, startOfToday } from 'date-fns';
+import { format, isBefore, startOfToday, addDays } from 'date-fns';
 import { httpsCallable } from 'firebase/functions';
 
 const getAvailableSlots = httpsCallable(functions, 'getAvailableSlots');
@@ -287,7 +288,7 @@ export default function SlotsClient() {
                 selected={selectedDate}
                 onSelect={handleDateSelect}
                 disabled={(date) => 
-                  isBefore(date, startOfToday()) || 
+                  isBefore(date, addDays(startOfToday(), 1)) || 
                   !availableDates.some(availableDate => 
                     format(availableDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
                   )
