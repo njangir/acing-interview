@@ -53,8 +53,8 @@ export default async function HomePage() {
     <>
       {/* Hero Section */}
       <section className="py-16 md:py-24 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
-        <div className="container grid md:grid-cols-2 gap-8 items-center">
-          <div className="space-y-6">
+        <div className="container flex flex-col md:flex-row gap-8 items-center">
+          <div className="md:w-1/2 space-y-6">
             <h1 className="text-4xl md:text-5xl font-bold font-headline animate-subtle-appear" style={{ animationDelay: '0.1s' }}>
               {heroData.heroTitle}
             </h1>
@@ -67,13 +67,14 @@ export default async function HomePage() {
               </Button>
             </div>
           </div>
-          <div className="hidden md:block relative animate-subtle-appear group overflow-hidden rounded-lg shadow-2xl h-[40vh]" style={{ animationDelay: '0.2s' }}>
+          <div className="md:w-1/2 animate-subtle-appear group" style={{ animationDelay: '0.2s' }}>
             <Image
               src={heroData.heroImageUrl}
               alt="SSB Interview Preparation"
-              fill
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              className="rounded-lg transition-transform duration-300 group-hover:scale-105 object-cover"
+              width={600}
+              height={450}
+              className="rounded-lg shadow-2xl w-full h-auto transition-transform duration-300 group-hover:scale-105 object-cover"
+              style={{ maxHeight: '40vh' }}
               data-ai-hint={heroData.heroDataAiHint}
               priority
             />
