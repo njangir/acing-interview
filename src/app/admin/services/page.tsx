@@ -377,7 +377,7 @@ export default function AdminServicesPage() {
               </DialogDesc>
             </DialogHeader>
             <div className="p-1">
-              <ScrollArea className="max-h-[70vh] p-6 pr-6 custom-scrollbar">
+              <ScrollArea className="max-h-[70vh] p-4 pr-6 custom-scrollbar">
                 <div className="space-y-4">
                   <div>
                     <Label htmlFor="name">Name</Label>
