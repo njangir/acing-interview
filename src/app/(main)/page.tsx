@@ -67,12 +67,13 @@ export default async function HomePage() {
               </Button>
             </div>
           </div>
-          <div className="hidden md:block relative animate-subtle-appear group overflow-hidden rounded-lg shadow-2xl max-h-[40vh]" style={{ animationDelay: '0.2s' }}>
+          <div className="hidden md:block relative animate-subtle-appear group overflow-hidden rounded-lg shadow-2xl h-[40vh]" style={{ animationDelay: '0.2s' }}>
             <Image
               src={heroData.heroImageUrl}
               alt="SSB Interview Preparation"
               fill
-              className="rounded-lg transition-transform duration-300 group-hover:scale-105 w-full h-full object-contain"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              className="rounded-lg transition-transform duration-300 group-hover:scale-105 object-contain"
               data-ai-hint={heroData.heroDataAiHint}
               priority
             />
