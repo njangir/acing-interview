@@ -67,7 +67,7 @@ export default async function HomePage() {
               </Button>
             </div>
           </div>
-          <div className="hidden md:block md:w-1/3 animate-subtle-appear group" style={{ animationDelay: '0.2s' }}>
+          <div className="hidden md:block md:w-1/3 animate-subtle-appear group">
             <Image
               src={heroData.heroImageUrl}
               alt="SSB Interview Preparation"

@@ -61,7 +61,7 @@ export async function generateMetadata(
   { params }: Props,
   parent: ResolvingMetadata
 ): Promise<Metadata> {
-  const service = await getServiceDetails(params.serviceId);
+  const service = await getServiceDetails(params.slug);
 
   if (!service) {
     return {

@@ -24,7 +24,7 @@ const FAQ_ITEMS = [
   },
   {
     question: "How do I book a session?",
-    answer: "You can book a session by navigating to the 'Book Interview' page, selecting your desired service, choosing an available slot, providing your details, and completing the payment (or choosing 'Pay Later' where applicable).",
+    answer: "You can book a session by navigating to the 'Book Interview' page, selecting your desired service, choosing an available date and time slot, providing your details, and completing the payment (or choosing 'Pay Later' where applicable).",
   },
   {
     question: "What is the 'Pay Later' option?",
