@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -17,7 +18,7 @@ import type { MentorProfileData } from '@/types';
 import { UserCog, Loader2, AlertTriangle, Upload } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-import { functions, storage } from '@/lib/firebase';
+import { functions } from '@/lib/firebase';
 import { httpsCallable } from 'firebase/functions';
 
 const getMentorProfile = httpsCallable(functions, 'getMentorProfile');

@@ -27,7 +27,7 @@ const getServices = httpsCallable(functions, 'getServices');
 const saveService = httpsCallable(functions, 'saveService');
 const deleteService = httpsCallable(functions, 'deleteService');
 const toggleServiceBookable = httpsCallable(functions, 'toggleServiceBookable');
-const uploadFile = httpsCallable(functions, 'uploadReport'); // Reusing the function
+const uploadFile = httpsCallable(functions, 'uploadFile');
 
 const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -172,15 +172,15 @@ export default function AdminServicesPage() {
   const uploadImageViaFunction = async (file: File, folder: string): Promise<string> => {
     const fileDataUrl = await fileToBase64(file);
     const result: any = await uploadFile({
-      bookingId: `services_${folder}`, // Generic identifier
       fileName: file.name,
       fileDataUrl: fileDataUrl,
+      folder: folder,
     });
 
-    if (!result.data.success) {
+    if (!result.data.downloadURL) {
       throw new Error(result.data.error || 'File upload failed on the server.');
     }
-    return result.data.downloadUrl;
+    return result.data.downloadURL;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -192,7 +192,7 @@ export default function AdminServicesPage() {
     try {
       if (selectedThumbnailFile) {
         console.log("Uploading thumbnail...");
-        finalThumbnailUrl = await uploadImageViaFunction(selectedThumbnailFile, 'thumbnails');
+        finalThumbnailUrl = await uploadImageViaFunction(selectedThumbnailFile, 'service_thumbnails');
       }
     } catch (uploadError: any) {
         console.error("Error uploading image:", uploadError);

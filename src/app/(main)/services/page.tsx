@@ -1,4 +1,5 @@
 
+
 import { getDocs, collection, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { PageHeader } from "@/components/core/page-header";
@@ -7,6 +8,8 @@ import type { Service } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
 import type { Metadata } from 'next';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Our Services',
