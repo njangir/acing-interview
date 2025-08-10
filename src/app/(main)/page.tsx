@@ -54,7 +54,7 @@ export default async function HomePage() {
       {/* Hero Section */}
       <section className="py-16 md:py-24 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
         <div className="container flex flex-col md:flex-row gap-8 items-center">
-          <div className="md:w-1/2 space-y-6">
+          <div className="md:w-2/3 space-y-6">
             <h1 className="text-4xl md:text-5xl font-bold font-headline animate-subtle-appear" style={{ animationDelay: '0.1s' }}>
               {heroData.heroTitle}
             </h1>
@@ -67,7 +67,7 @@ export default async function HomePage() {
               </Button>
             </div>
           </div>
-          <div className="md:w-1/2 animate-subtle-appear group" style={{ animationDelay: '0.2s' }}>
+          <div className="md:w-1/3 animate-subtle-appear group" style={{ animationDelay: '0.2s' }}>
             <Image
               src={heroData.heroImageUrl}
               alt="SSB Interview Preparation"
