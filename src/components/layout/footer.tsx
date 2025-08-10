@@ -34,12 +34,12 @@ export function Footer() {
           </div>
           <div>
             <h3 className="text-lg font-semibold mb-4 font-headline">Contact Us</h3>
-            <p className="text-sm text-muted-foreground">Email: info@afinterviewace.com</p>
-            <p className="text-sm text-muted-foreground">Phone: +91 12345 67890</p>
-            {isLoggedIn && (
+            <p className="text-sm text-muted-foreground">Email: <a href="mailto:info@afinterviewace.com">info@afinterviewace.com</a></p>
+            {isLoggedIn && (<>
+              <p className="text-sm text-muted-foreground">Phone: +91 7023230034</p>
               <p className="text-sm text-muted-foreground mt-2">
                 <Link href="/dashboard/contact" className="hover:text-foreground">Send us a message</Link>
-              </p>
+              </p></>
             )}
           </div>
         </div>

@@ -3,6 +3,9 @@
 # To allow all robots to crawl the entire site, use the following:
 User-agent: *
 Allow: /
+Disallow: /admin/
+Disallow: /*?token=
+Disallow: /*?auth=
 
 # Point to the sitemap
 Sitemap: https://afinterviewace.com/sitemap.xml

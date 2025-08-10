@@ -4,12 +4,12 @@ import { Shield, FileText, CalendarDays, Users, ListChecks, Edit3, UploadCloud, 
 import { getFutureDate } from '@/lib/utils';
 
 export const PREDEFINED_AVATARS: {id: string, url: string, hint: string}[] = [
-  { id: 'avatar1', url: 'https://placehold.co/100x100/EBF4FF/76A9FA?text=U1', hint: 'abstract user icon blue' },
-  { id: 'avatar2', url: 'https://placehold.co/100x100/FFF0EB/FA9F76?text=U2', hint: 'abstract user icon orange' },
-  { id: 'avatar3', url: 'https://placehold.co/100x100/EBFFF2/76FA91?text=U3', hint: 'abstract user icon green' },
-  { id: 'avatar4', url: 'https://placehold.co/100x100/F9EBFF/C576FA?text=U4', hint: 'abstract user icon purple' },
-  { id: 'avatar5', url: 'https://placehold.co/100x100/FFFDEB/F5E66B?text=U5', hint: 'abstract user icon yellow' },
-  { id: 'avatar6', url: 'https://placehold.co/100x100/FFEBEE/FA7689?text=U6', hint: 'abstract user icon red' },
+  { id: 'avatar1', url: '/avatars/av1.png', hint: 'abstract user icon blue' },
+  { id: 'avatar2', url: '/avatars/av2.png', hint: 'abstract user icon orange' },
+  { id: 'avatar3', url: '/avatars/av3.png', hint: 'abstract user icon green' },
+  { id: 'avatar4', url: '/avatars/av4.png', hint: 'abstract user icon purple' },
+  { id: 'avatar5', url: '/avatars/av5.png', hint: 'abstract user icon yellow' },
+  { id: 'avatar6', url: '/avatars/av6.png', hint: 'abstract user icon red' },
 ];
 
 export const DASHBOARD_NAV_LINKS = [
