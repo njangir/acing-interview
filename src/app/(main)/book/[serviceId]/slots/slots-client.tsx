@@ -348,7 +348,7 @@ export default function SlotsClient() {
               <p><strong>Service:</strong> {service.name}</p>
               <p><strong>Date:</strong> {format(selectedDate, 'EEEE, MMMM d, yyyy')}</p>
               <p><strong>Time:</strong> {selectedTime}</p>
-              <p><strong>Price:</strong> ₹${service.price}</p>
+              <p><strong>Price:</strong> ₹{service.price}</p>
             </CardContent>
             <CardContent>
               <Button 

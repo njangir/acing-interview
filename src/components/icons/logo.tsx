@@ -14,6 +14,9 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
           <stop offset="0%" style={{ stopColor: 'hsl(var(--saffron))', stopOpacity: 1 }} />
           <stop offset="100%" style={{ stopColor: 'hsl(var(--india-green))', stopOpacity: 1 }} />
         </linearGradient>
+        <filter id="drop-shadow" x="-0.1" y="-0.1" width="1.2" height="1.2">
+          <feDropShadow dx="0.5" dy="0.5" stdDeviation="0.5" floodColor="rgba(0,0,0,0.3)" />
+        </filter>
       </defs>
       <text
         x="50%"
@@ -24,6 +27,7 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
         fontSize="28"
         fontWeight="bold"
         fill="url(#logoGradient)"
+        filter="url(#drop-shadow)"
       >
         AF Interview Ace
       </text>

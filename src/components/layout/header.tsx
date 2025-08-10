@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, orderBy, Timestamp, doc, updateDoc, writeBatch } from 'firebase/firestore';
-import { IndianFlagIcon } from '../icons/indian-flag-icon';
+import { IndianAirForceRoundelIcon } from '../icons/indian-air-force-roundel-icon';
 
 
 const mainSiteNavItems: Array<{ href: string; label: string; icon: LucideIcon }> = [
@@ -143,7 +143,7 @@ export function Header() {
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-6">
             <Link href="/" className="flex items-center space-x-2">
-            <IndianFlagIcon />
+            <IndianAirForceRoundelIcon />
             <Logo />
             </Link>
             <nav className="hidden lg:flex gap-6 items-center">
