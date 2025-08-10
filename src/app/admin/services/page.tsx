@@ -368,16 +368,15 @@ export default function AdminServicesPage() {
       </Card>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-2xl flex flex-col max-h-[calc(100vh-4rem)]">
-          <DialogHeader className="p-6 pb-4 border-b flex-shrink-0">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0 px-6 py-4 border-b">
             <DialogTitle>{currentService ? 'Edit Service' : 'Add New Service'}</DialogTitle>
             <DialogDesc>
               {currentService ? `Update details for ${currentService.name}.` : 'Fill in the details for the new service.'}
             </DialogDesc>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="flex-grow overflow-y-auto flex flex-col">
-            <ScrollArea className="flex-grow custom-scrollbar">
-              <div className="p-6 space-y-4">
+          <ScrollArea className="flex-1 px-6">
+            <form id="service-form" onSubmit={handleSubmit} className="py-4 space-y-4">
                 <div>
                   <Label htmlFor="name">Name</Label>
                   <Input id="name" name="name" value={formData.name} onChange={handleInputChange} required />
@@ -459,16 +458,15 @@ export default function AdminServicesPage() {
                       </div>
                     )}
                 </div>
-              </div>
-            </ScrollArea>
-            <DialogFooter className="p-6 pt-4 border-t flex-shrink-0">
-              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSubmitting ? (currentService ? 'Saving...' : 'Adding...') : (currentService ? 'Save Changes' : 'Add Service')}
-              </Button>
-            </DialogFooter>
-          </form>
+            </form>
+          </ScrollArea>
+          <DialogFooter className="flex-shrink-0 px-6 py-4 border-t">
+            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
+            <Button type="submit" form="service-form" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting ? (currentService ? 'Saving...' : 'Adding...') : (currentService ? 'Save Changes' : 'Add Service')}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
