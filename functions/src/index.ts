@@ -670,11 +670,7 @@ exports.uploadReport = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPA
     const buffer = Buffer.from(base64Data, 'base64');
     
     const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.]/g, '_');
-    // Determine folder based on a prefix in bookingId, or default to feedback_reports
-    const folder = bookingId.startsWith('services_') ? 'services' :
-                   bookingId.startsWith('site_content_') ? 'site_content' : 
-                   bookingId.startsWith('blog_') ? 'blog' :
-                   'feedback_reports';
+    const folder = 'feedback_reports';
     const filePath = `${folder}/${bookingId}_${Date.now()}_${sanitizedFileName}`;
     const file = bucket.file(filePath);
 
@@ -682,12 +678,11 @@ exports.uploadReport = functions.runWith({ secrets: ["RAZORPAY_KEY_ID", "RAZORPA
         await file.save(buffer, {
             metadata: { 
                 contentType,
-                cacheControl: 'public, max-age=31536000',
+                cacheControl: 'private, max-age=0',
             },
-            public: true, 
+            public: false, // Ensure file is private
         });
         
-        // This is the correct public URL format for Next/Image whitelisting.
         const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media`;
         
         logger.info(`File uploaded successfully for booking ${bookingId}: ${downloadUrl}`);
@@ -814,6 +809,9 @@ exports.uploadFile = functions.https.onCall(async (data: any, context: functions
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
     }
+    
+    // Only admins should be able to call this generic upload function
+    await ensureAdmin(context);
 
     const { fileName, fileDataUrl, folder = 'uploads', oldFileUrl } = data as { 
         fileName: string; 
@@ -866,10 +864,12 @@ exports.uploadFile = functions.https.onCall(async (data: any, context: functions
             metadata: {
                 contentType: getContentType(fileName),
             },
+            public: true, // This makes the file public
         });
 
-        // Make the file publicly accessible
-        await file.makePublic();
+        // Make the file publicly accessible - this is often needed for images displayed on the site
+        // For private files like reports, this should be false and access handled by rules/signed URLs
+        // await file.makePublic();
 
         // Return the public URL
         const publicUrl = `https://storage.googleapis.com/${bucket.name}/${uniqueFileName}`;
@@ -947,4 +947,5 @@ exports.deleteBlogPost = functions.https.onCall(async (data: any, context: funct
     
 
     
+
 

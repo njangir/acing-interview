@@ -1,104 +1,65 @@
 rules_version = '2';
 
-// The default service is firebase.storage
 service firebase.storage {
-  // Define the storage bucket for the rules
   match /b/{bucket}/o {
-
-    // Helper function to check if a user has an 'admin' role in their Firestore profile.
-    function isAdmin() {
-      return exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.roles.hasAny(['admin']);
-    }
-
-    // Default rule: Disallow all reads and writes unless explicitly allowed.
-    // This is the default behavior, so it's not strictly necessary to state,
-    // but serves as a good reminder.
+    
+    // Default deny all reads and writes
     match /{allPaths=**} {
       allow read, write: if false;
     }
 
-    // User Profile Images: Allow users to manage their own avatar.
-    // Path: /user_avatars/{userId}/{imageName}
-    match /user_avatars/{userId}/{imageName} {
-      // Anyone can view a user's profile picture.
-      allow read: if true;
-      // Only the authenticated user can upload/update/delete their own profile picture.
-      allow write: if request.auth != null && request.auth.uid == userId;
-    }
-        // Site Content (e.g., hero image): Admin-only write, public reads
-    match /site_content/{allPaths=**} {
-      allow read;
-      allow write: if request.auth != null && request.auth.token.isAdmin == true;
-    }
-// Services: Publicly readable images, admin-only writes
-    // This rule allows anyone to read images from the 'services' folder and all its subfolders.
-    // Only authenticated admins can write (upload, update, delete) files here.
+    // --- Publicly Readable Assets ---
+    
+    // Service thumbnails, site content (hero images), blog images are public
     match /services/{allPaths=**} {
-      allow read;
-      allow write: if request.auth != null && request.auth.token.isAdmin == true;
+      allow read: if true;
+      allow write: if request.auth != null && get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.roles.hasAny(['admin']);
+    }
+    match /site_content/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.roles.hasAny(['admin']);
+    }
+     match /blog/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.roles.hasAny(['admin']);
     }
 
-    // Feedback Reports: Admin writes, user-specific reads
-    // Admins can upload any file.
-    // Users can only read files where the filename contains their UID.
-    match /feedback_reports/{fileName} {
-      allow read: if request.auth != null && request.auth.uid == fileName.split('_')[0];
-      allow write: if request.auth != null && request.auth.token.isAdmin == true;
-    }
+    // --- User Specific, but Publicly Readable Avatars ---
 
-    // User Profile Images: User-specific writes, public reads
-    // Users can upload/update their own profile picture. The path must contain their UID.
-    // Anyone can read profile pictures.
-    match /user_profiles/{userId}/{fileName} {
-      allow read;
+    // User-uploaded profile images (if you implement this feature)
+    // Path could be for example: users/{uid}/profile.jpg
+    match /users/{userId}/{fileName} {
+      allow read: if true;
       allow write: if request.auth != null && request.auth.uid == userId;
     }
-    // Testimonial Body Images: User-specific writes, public reads
-    // Users can upload an image for their testimonial submission.
-    // Anyone can read these images.
-    match /testimonials_body_images/{fileName} {
-      allow read;
-      allow write: if request.auth != null && request.auth.uid == fileName.split('_')[0];
+    
+    // Mentor profile images are publicly readable, but only admin writable
+    match /mentor_profiles/{fileName} {
+        allow read: if true;
+        allow write: if request.auth != null && get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.roles.hasAny(['admin']);
     }
 
-     // Mentor Profile Images: Admin-only write, public reads
-    match /mentor_profiles/{allPaths=**} {
-      allow read;
-      allow write: if request.auth != null && request.auth.token.isAdmin == true;
+    // --- Private Files ---
+
+    // Feedback reports are private.
+    // Format: feedback_reports/{bookingId}_...
+    // Only readable by the user associated with the booking or an admin.
+    // Only writable by an admin.
+    match /feedback_reports/{fileName} {
+      allow read: if request.auth != null && 
+                   (get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.roles.hasAny(['admin']) ||
+                    get(/databases/$(database)/documents/bookings/$(fileName.split('_')[0])).data.uid == request.auth.uid);
+      allow write: if request.auth != null &&
+                    get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.roles.hasAny(['admin']);
     }
-    
-    // Blog Images: Admin-only write, public reads
-    match /blog/{allPaths=**} {
-      allow read;
-      allow write: if request.auth != null && request.auth.token.isAdmin == true;
-    }
-    
-        // Resources (Documents): Admin-only write, authenticated user reads
-    // Admins can upload resources.
-    // Any authenticated user can download/read resources. Access control is managed at the Firestore level.
+
+    // General resource documents are private.
+    // Readable by any authenticated user (app logic will filter which ones they see).
+    // Writable only by admins.
     match /resources/{fileName} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.token.isAdmin == true;
+      allow write: if request.auth != null &&
+                    get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.roles.hasAny(['admin']);
     }
-    
-    // Feedback Reports: Highly restricted.
-    // Path: /feedback_reports/{bookingId}/{fileName}
-    //match /feedback_reports/{bookingId}/{fileName} {
-      // Allow read access only to the user who owns the booking or an admin.
-      // This rule checks the 'uid' field of the corresponding booking document in Firestore.
-      //allow read: if request.auth != null && (isAdmin() || get(/databases/$(database)/documents/bookings/$(bookingId)).data.uid == request.auth.uid);
-      // Allow write access only to admins.
-      //allow write: if request.auth != null && isAdmin();
-    //}
-
-    // Testimonial Body Images: Publicly readable, writable by the user.
-    // Path: /testimonials_body_images/{userId}/{imageName}
-    //match /testimonials_body_images/{userId}/{imageName} {
-      // Anyone can view testimonial images once they are approved and displayed.
-      //allow read: if true;
-      // The user can upload an image for their own testimonial submission.
-      //allow write: if request.auth != null && request.auth.uid == userId;
-    //}
   }
 }

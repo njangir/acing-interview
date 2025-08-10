@@ -118,7 +118,7 @@ export default function AdminHeroSectionPage() {
                 fileName: imageFile.name,
                 fileDataUrl: fileDataUrl,
                 folder: 'site_content',
-                oldFileUrl: heroData?.heroImageUrl
+                oldFileUrl: heroData?.heroImageUrl?.includes('firebasestorage.googleapis.com') ? heroData.heroImageUrl : undefined
             });
             
             if (!uploadResult.data.downloadURL) {

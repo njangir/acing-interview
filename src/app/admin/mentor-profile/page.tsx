@@ -109,12 +109,11 @@ export default function AdminMentorProfilePage() {
         try {
             const fileDataUrl = await fileToBase64(imageFile);
             
-            // Use cloud function for upload and pass old URL for deletion
             const result: any = await uploadFile({
                 fileName: imageFile.name,
                 fileDataUrl: fileDataUrl,
                 folder: 'mentor_profiles',
-                oldFileUrl: editableProfile?.imageUrl, // Pass old URL here
+                oldFileUrl: editableProfile?.imageUrl?.includes('firebasestorage.googleapis.com') ? editableProfile.imageUrl : undefined,
             });
             
             finalImageUrl = result.data.downloadURL;
