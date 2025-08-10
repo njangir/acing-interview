@@ -368,102 +368,100 @@ export default function AdminServicesPage() {
       </Card>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <form onSubmit={handleSubmit}>
-            <DialogHeader>
-              <DialogTitle>{currentService ? 'Edit Service' : 'Add New Service'}</DialogTitle>
-              <DialogDesc>
-                {currentService ? `Update details for ${currentService.name}.` : 'Fill in the details for the new service.'}
-              </DialogDesc>
-            </DialogHeader>
-            <div className="p-1">
-              <ScrollArea className="max-h-[70vh] p-4 pr-6 custom-scrollbar">
-                <div className="space-y-4">
+        <DialogContent className="sm:max-w-2xl flex flex-col max-h-[calc(100vh-4rem)]">
+          <DialogHeader className="p-6 pb-4 border-b flex-shrink-0">
+            <DialogTitle>{currentService ? 'Edit Service' : 'Add New Service'}</DialogTitle>
+            <DialogDesc>
+              {currentService ? `Update details for ${currentService.name}.` : 'Fill in the details for the new service.'}
+            </DialogDesc>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="flex-grow overflow-y-auto flex flex-col">
+            <ScrollArea className="flex-grow custom-scrollbar">
+              <div className="p-6 space-y-4">
+                <div>
+                  <Label htmlFor="name">Name</Label>
+                  <Input id="name" name="name" value={formData.name} onChange={handleInputChange} required />
+                </div>
+                <div>
+                  <Label htmlFor="slug">URL Slug</Label>
+                  <Input id="slug" name="slug" value={formData.slug} onChange={handleInputChange} placeholder="e.g., ssb-mock-interview" />
+                </div>
+                <div>
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea id="description" name="description" value={formData.description} onChange={handleInputChange} rows={3} required />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="name">Name</Label>
-                    <Input id="name" name="name" value={formData.name} onChange={handleInputChange} required />
-                  </div>
-                  <div>
-                    <Label htmlFor="slug">URL Slug</Label>
-                    <Input id="slug" name="slug" value={formData.slug} onChange={handleInputChange} placeholder="e.g., ssb-mock-interview" />
-                  </div>
-                  <div>
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea id="description" name="description" value={formData.description} onChange={handleInputChange} rows={3} required />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="price">Price (₹)</Label>
-                      <Input id="price" name="price" type="number" value={formData.price} onChange={handleInputChange} required min="0" />
-                    </div>
-                    <div>
-                      <Label htmlFor="duration">Duration</Label>
-                      <Input id="duration" name="duration" value={formData.duration} onChange={handleInputChange} placeholder="e.g., 60 mins" required />
-                    </div>
+                    <Label htmlFor="price">Price (₹)</Label>
+                    <Input id="price" name="price" type="number" value={formData.price} onChange={handleInputChange} required min="0" />
                   </div>
                   <div>
-                    <Label htmlFor="features">Features</Label>
-                    <Textarea id="features" name="features" value={formData.features} onChange={handleInputChange} placeholder="Comma-separated, e.g., Feature 1, Feature 2" rows={3} />
-                  </div>
-                  <div>
-                    <Label htmlFor="imageUpload">Thumbnail Image</Label>
-                    <Input id="imageUpload" name="imageUpload" type="file" accept="image/*" onChange={(e) => handleFileChange(e)} />
-                  </div>
-                  {thumbnailPreview && (
-                      <div className="flex justify-center">
-                          <Image src={thumbnailPreview} alt="Thumbnail preview" width={200} height={150} className="rounded-md object-cover border" />
-                      </div>
-                  )}
-                  <div>
-                    <Label htmlFor="dataAiHint">AI Hint for Thumbnail</Label>
-                    <Input id="dataAiHint" name="dataAiHint" value={formData.dataAiHint} onChange={handleInputChange} placeholder="e.g., meeting, study" />
-                  </div>
-                  <div className="flex items-center space-x-2 pt-2">
-                    <Switch
-                      id="isBookable"
-                      checked={formData.isBookable}
-                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isBookable: checked }))}
-                    />
-                    <Label htmlFor="isBookable">Bookings Enabled</Label>
-                  </div>
-                  <div className="space-y-4 rounded-md border p-4">
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="hasDetailsPage"
-                          checked={formData.hasDetailsPage}
-                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, hasDetailsPage: checked }))}
-                        />
-                        <Label htmlFor="hasDetailsPage" className="font-semibold">Enable "Know More" Details Page</Label>
-                      </div>
-                      {formData.hasDetailsPage && (
-                        <div className="space-y-4 pl-2 pt-2 border-l-2 border-primary/20 ml-2">
-                            <h3 className="font-medium">Dynamic Content Sections</h3>
-                            {formData.detailSections.map((section, index) => (
-                              <div key={index} className="space-y-2 border p-3 rounded-md relative">
-                                  <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={() => removeSection(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                                  <Label>Section {index + 1}: {section.type === 'text' ? 'Text' : 'Image'}</Label>
-                                  <Input value={section.title} onChange={(e) => handleSectionChange(index, 'title', e.target.value)} placeholder="Section Title (e.g., Introduction)" />
-                                  {section.type === 'text' ? (
-                                    <Textarea value={section.content} onChange={(e) => handleSectionChange(index, 'content', e.target.value)} placeholder="Use Markdown for formatting: **bold**, *italic*, [link](url)" rows={5} />
-                                  ) : (
-                                    <div>
-                                      <Input type="file" accept="image/*" onChange={(e) => { if(e.target.files?.[0]) handleSectionImageUpload(index, e.target.files[0])}}/>
-                                      {section.imageUrl && <Image src={section.imageUrl} alt="Section image" width={150} height={100} className="mt-2 rounded-md border" />}
-                                    </div>
-                                  )}
-                              </div>
-                            ))}
-                            <div className="flex gap-2">
-                                <Button type="button" variant="outline" size="sm" onClick={() => addSection('text')}><FileText className="mr-2 h-4 w-4"/> Add Text Section</Button>
-                                <Button type="button" variant="outline" size="sm" onClick={() => addSection('image')}><ImageIcon className="mr-2 h-4 w-4"/> Add Image Section</Button>
-                            </div>
-                        </div>
-                      )}
+                    <Label htmlFor="duration">Duration</Label>
+                    <Input id="duration" name="duration" value={formData.duration} onChange={handleInputChange} placeholder="e.g., 60 mins" required />
                   </div>
                 </div>
-              </ScrollArea>
-            </div>
-            <DialogFooter className="border-t pt-6 mt-6">
+                <div>
+                  <Label htmlFor="features">Features</Label>
+                  <Textarea id="features" name="features" value={formData.features} onChange={handleInputChange} placeholder="Comma-separated, e.g., Feature 1, Feature 2" rows={3} />
+                </div>
+                <div>
+                  <Label htmlFor="imageUpload">Thumbnail Image</Label>
+                  <Input id="imageUpload" name="imageUpload" type="file" accept="image/*" onChange={(e) => handleFileChange(e)} />
+                </div>
+                {thumbnailPreview && (
+                    <div className="flex justify-center">
+                        <Image src={thumbnailPreview} alt="Thumbnail preview" width={200} height={150} className="rounded-md object-cover border" />
+                    </div>
+                )}
+                <div>
+                  <Label htmlFor="dataAiHint">AI Hint for Thumbnail</Label>
+                  <Input id="dataAiHint" name="dataAiHint" value={formData.dataAiHint} onChange={handleInputChange} placeholder="e.g., meeting, study" />
+                </div>
+                <div className="flex items-center space-x-2 pt-2">
+                  <Switch
+                    id="isBookable"
+                    checked={formData.isBookable}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isBookable: checked }))}
+                  />
+                  <Label htmlFor="isBookable">Bookings Enabled</Label>
+                </div>
+                <div className="space-y-4 rounded-md border p-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="hasDetailsPage"
+                        checked={formData.hasDetailsPage}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, hasDetailsPage: checked }))}
+                      />
+                      <Label htmlFor="hasDetailsPage" className="font-semibold">Enable "Know More" Details Page</Label>
+                    </div>
+                    {formData.hasDetailsPage && (
+                      <div className="space-y-4 pl-2 pt-2 border-l-2 border-primary/20 ml-2">
+                          <h3 className="font-medium">Dynamic Content Sections</h3>
+                          {formData.detailSections.map((section, index) => (
+                            <div key={index} className="space-y-2 border p-3 rounded-md relative">
+                                <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={() => removeSection(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                <Label>Section {index + 1}: {section.type === 'text' ? 'Text' : 'Image'}</Label>
+                                <Input value={section.title} onChange={(e) => handleSectionChange(index, 'title', e.target.value)} placeholder="Section Title (e.g., Introduction)" />
+                                {section.type === 'text' ? (
+                                  <Textarea value={section.content} onChange={(e) => handleSectionChange(index, 'content', e.target.value)} placeholder="Use Markdown for formatting: **bold**, *italic*, [link](url)" rows={5} />
+                                ) : (
+                                  <div>
+                                    <Input type="file" accept="image/*" onChange={(e) => { if(e.target.files?.[0]) handleSectionImageUpload(index, e.target.files[0])}}/>
+                                    {section.imageUrl && <Image src={section.imageUrl} alt="Section image" width={150} height={100} className="mt-2 rounded-md border" />}
+                                  </div>
+                                )}
+                            </div>
+                          ))}
+                          <div className="flex gap-2">
+                              <Button type="button" variant="outline" size="sm" onClick={() => addSection('text')}><FileText className="mr-2 h-4 w-4"/> Add Text Section</Button>
+                              <Button type="button" variant="outline" size="sm" onClick={() => addSection('image')}><ImageIcon className="mr-2 h-4 w-4"/> Add Image Section</Button>
+                          </div>
+                      </div>
+                    )}
+                </div>
+              </div>
+            </ScrollArea>
+            <DialogFooter className="p-6 pt-4 border-t flex-shrink-0">
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
