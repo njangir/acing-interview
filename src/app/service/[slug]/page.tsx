@@ -61,7 +61,7 @@ export async function generateMetadata(
   { params }: Props,
   parent: ResolvingMetadata
 ): Promise<Metadata> {
-  const service = await getServiceDetails(params.slug);
+  const service = await getServiceDetails(params.serviceId);
 
   if (!service) {
     return {
@@ -125,16 +125,16 @@ export async function generateMetadata(
 
 export default async function ServiceDetailsPage({ params }: Props) {
   const { slug } = params;
-  const service = await getServiceDetails(slug);
+  const service = await getServiceDetails(params.slug);
 
   if (!service) {
-    console.warn(`Service with slug ${slug} not found.`);
+    console.warn(`Service with slug ${params.slug} not found.`);
     notFound();
   }
 
   // If the service doesn't have a details page enabled, redirect to booking.
   if (!service.hasDetailsPage) {
-    console.log(`Service ${slug} does not have a details page enabled. Redirecting to slots.`);
+    console.log(`Service ${params.slug} does not have a details page enabled. Redirecting to slots.`);
     redirect(`/book/${service.id}/slots`);
   }
   
