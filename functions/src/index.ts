@@ -387,12 +387,10 @@ exports.saveService = functions.https.onCall(async (data: any, context: function
         ...service,
         detailSections: Array.isArray(service.detailSections) ? service.detailSections.map(s => {
             if (s.type === 'text') {
-                const textSection = s as Extract<ServiceSection, { type: 'text' }>;
-                return { type: 'text', title: textSection.title || "", content: textSection.content || "" };
+                return s as Extract<ServiceSection, { type: 'text' }>;
             }
             if (s.type === 'image') {
-                const imageSection = s as Extract<ServiceSection, { type: 'image' }>;
-                return { type: 'image', title: imageSection.title || "", imageUrl: imageSection.imageUrl || "", imageHint: imageSection.imageHint || '' };
+                return { ...s, imageHint: s.imageHint || '' } as Extract<ServiceSection, { type: 'image' }>;
             }
             return null;
         }).filter((s): s is ServiceSection => s !== null) : [],
@@ -949,3 +947,4 @@ exports.deleteBlogPost = functions.https.onCall(async (data: any, context: funct
     
 
     
+

@@ -14,6 +14,7 @@ export type ServiceSection = {
 
 export interface Service {
   id: string;
+  slug?: string;
   name: string;
   description: string;
   price: number;

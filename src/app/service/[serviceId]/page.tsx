@@ -1,5 +1,5 @@
 
-import { getDoc, getDocs, doc, collection, query, where, orderBy, limit } from 'firebase/firestore';
+import { getDocs, collection, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Service, Testimonial } from '@/types';
 import { notFound, redirect } from 'next/navigation';
@@ -18,20 +18,22 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 export const dynamic = 'force-dynamic';
 
 type Props = {
-  params: { serviceId: string }
+  params: { slug: string }
 }
 
-async function getServiceDetails(serviceId: string): Promise<Service | null> {
+async function getServiceDetails(slug: string): Promise<Service | null> {
     try {
-        const serviceDocRef = doc(db, 'services', serviceId);
-        const serviceSnap = await getDoc(serviceDocRef);
+        const servicesCollectionRef = collection(db, 'services');
+        const q = query(servicesCollectionRef, where('slug', '==', slug), limit(1));
+        const serviceSnap = await getDocs(q);
 
-        if (serviceSnap.exists()) {
-            return { id: serviceSnap.id, ...serviceSnap.data() } as Service;
+        if (!serviceSnap.empty) {
+            const doc = serviceSnap.docs[0];
+            return { id: doc.id, ...doc.data() } as Service;
         }
         return null;
     } catch (error) {
-        console.error(`Error fetching service ${serviceId}:`, error);
+        console.error(`Error fetching service with slug ${slug}:`, error);
         return null;
     }
 }
@@ -59,7 +61,7 @@ export async function generateMetadata(
   { params }: Props,
   parent: ResolvingMetadata
 ): Promise<Metadata> {
-  const service = await getServiceDetails(params.serviceId);
+  const service = await getServiceDetails(params.slug);
 
   if (!service) {
     return {
@@ -122,18 +124,18 @@ export async function generateMetadata(
 }
 
 export default async function ServiceDetailsPage({ params }: Props) {
-  const { serviceId } = params;
-  const service = await getServiceDetails(serviceId);
+  const { slug } = params;
+  const service = await getServiceDetails(slug);
 
   if (!service) {
-    console.warn(`Service with ID ${serviceId} not found.`);
+    console.warn(`Service with slug ${slug} not found.`);
     notFound();
   }
 
   // If the service doesn't have a details page enabled, redirect to booking.
   if (!service.hasDetailsPage) {
-    console.log(`Service ${serviceId} does not have a details page enabled. Redirecting to slots.`);
-    redirect(`/book/${serviceId}/slots`);
+    console.log(`Service ${slug} does not have a details page enabled. Redirecting to slots.`);
+    redirect(`/book/${service.id}/slots`);
   }
   
   let testimonials: Testimonial[] = [];
@@ -142,7 +144,7 @@ export default async function ServiceDetailsPage({ params }: Props) {
     const q = query(
       testimonialsCol, 
       where('status', '==', 'approved'), 
-      where('serviceId', '==', serviceId),
+      where('serviceId', '==', service.id),
       orderBy('createdAt', 'desc'),
       limit(3)
     );
@@ -155,7 +157,7 @@ export default async function ServiceDetailsPage({ params }: Props) {
           } as Testimonial;
         });
   } catch (error) {
-    console.error(`Error fetching testimonials for service ${serviceId}:`, error);
+    console.error(`Error fetching testimonials for service ${service.id}:`, error);
     // Non-critical error, the page can still render without testimonials.
   }
 

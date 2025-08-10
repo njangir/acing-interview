@@ -49,9 +49,9 @@ export function ServiceCard({ service }: ServiceCardProps) {
         <p className="mt-4 text-2xl font-bold text-primary">₹{service.price}</p>
       </CardContent>
       <CardFooter className="flex flex-col sm:flex-row gap-2">
-        {service.hasDetailsPage && (
+        {service.hasDetailsPage && service.slug && (
           <Button asChild variant="outline" className="w-full border-primary text-primary hover:bg-primary/10">
-            <Link href={`/service/${service.id}`}>
+            <Link href={`/service/${service.slug}`}>
               <Info className="mr-2 h-4 w-4"/> Know More
             </Link>
           </Button>

@@ -40,6 +40,7 @@ const fileToBase64 = (file: File): Promise<string> => {
 
 const initialServiceFormState: Omit<Service, 'id' | 'features' | 'detailSections'> & { features: string; detailSections: ServiceSection[] } = {
   name: '',
+  slug: '',
   description: '',
   price: 0,
   duration: '',
@@ -91,6 +92,7 @@ export default function AdminServicesPage() {
     if (currentService) {
       setFormData({
         name: currentService.name,
+        slug: currentService.slug || '',
         description: currentService.description,
         price: currentService.price,
         duration: currentService.duration,
@@ -207,6 +209,7 @@ export default function AdminServicesPage() {
       price: Number(formData.price),
       isBookable: formData.isBookable,
       detailSections: formData.detailSections,
+      slug: formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
       id: currentService?.id
     };
     
@@ -379,6 +382,10 @@ export default function AdminServicesPage() {
                   <div>
                     <Label htmlFor="name">Name</Label>
                     <Input id="name" name="name" value={formData.name} onChange={handleInputChange} required />
+                  </div>
+                  <div>
+                    <Label htmlFor="slug">URL Slug</Label>
+                    <Input id="slug" name="slug" value={formData.slug} onChange={handleInputChange} placeholder="e.g., ssb-mock-interview" />
                   </div>
                   <div>
                     <Label htmlFor="description">Description</Label>
