@@ -10,6 +10,8 @@ import type { Metadata } from 'next';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
+export const dynamic = 'force-dynamic';
+
 interface HeroData {
     heroTitle: string;
     heroSubtitle: string;
@@ -65,13 +67,12 @@ export default async function HomePage() {
               </Button>
             </div>
           </div>
-          <div className="hidden md:block relative animate-subtle-appear group overflow-hidden rounded-lg shadow-2xl" style={{ animationDelay: '0.2s' }}>
+          <div className="hidden md:block relative animate-subtle-appear group overflow-hidden rounded-lg shadow-2xl max-h-[40vh]" style={{ animationDelay: '0.2s' }}>
             <Image
               src={heroData.heroImageUrl}
               alt="SSB Interview Preparation"
-              width={600}
-              height={450}
-              className="rounded-lg transition-transform duration-300 group-hover:scale-105"
+              fill
+              className="rounded-lg transition-transform duration-300 group-hover:scale-105 w-full h-full object-contain"
               data-ai-hint={heroData.heroDataAiHint}
               priority
             />

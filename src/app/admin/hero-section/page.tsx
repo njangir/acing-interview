@@ -17,17 +17,14 @@ import { useToast } from '@/hooks/use-toast';
 import { LayoutDashboard, Loader2, AlertTriangle, Upload } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-import { functions, storage } from '@/lib/firebase';
+import { functions } from '@/lib/firebase';
 import { httpsCallable } from 'firebase/functions';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { HeroSectionData } from '@/types';
 
 const saveHeroSection = httpsCallable(functions, 'saveHeroSection');
-// We will reuse the 'uploadReport' function structure for this, as it handles file uploads.
-// In a real-world large scale app, you might create a more generic 'uploadFile' function.
-const uploadFile = httpsCallable(functions, 'uploadReport');
+const uploadFile = httpsCallable(functions, 'uploadFile');
 
 
 const fileToBase64 = (file: File): Promise<string> => {
@@ -118,16 +115,16 @@ export default function AdminHeroSectionPage() {
         try {
             const fileDataUrl = await fileToBase64(imageFile);
             const uploadResult: any = await uploadFile({
-                // The function expects a bookingId, we can use a generic identifier
-                bookingId: 'site_content_hero', 
                 fileName: imageFile.name,
                 fileDataUrl: fileDataUrl,
+                folder: 'site_content',
+                oldFileUrl: heroData?.heroImageUrl
             });
             
-            if (!uploadResult.data.success) {
+            if (!uploadResult.data.downloadURL) {
                 throw new Error(uploadResult.data.error || 'File upload failed on the server.');
             }
-            finalImageUrl = uploadResult.data.downloadUrl;
+            finalImageUrl = uploadResult.data.downloadURL;
             console.log("Image uploaded successfully. New URL:", finalImageUrl);
 
         } catch (uploadError) {
