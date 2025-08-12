@@ -43,7 +43,6 @@ export interface UserMessage {
 
 export type ServiceSection = {
   type: 'text';
-  title: string;
   content: string; 
 } | {
   type: 'image';
@@ -177,7 +176,6 @@ export interface UserNotification {
 
 export type BlogPostSection = {
   type: 'text';
-  title: string;
   content: string;
 } | {
   type: 'image';

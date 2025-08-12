@@ -188,7 +188,7 @@ function BlogPostFormModal({ isOpen, onClose, post, onSave, authorName }: BlogPo
 
     const handleAddSection = (type: 'text' | 'image') => {
         if (type === 'text') {
-            setSections([...sections, { type: 'text', title: '', content: '' }]);
+            setSections([...sections, { type: 'text', content: '' }]);
         } else {
              setSections([...sections, { type: 'image', title: '', imageUrl: '', imageHint: '' }]);
         }
@@ -308,12 +308,12 @@ function BlogPostFormModal({ isOpen, onClose, post, onSave, authorName }: BlogPo
                                             <Trash2 className="h-4 w-4 text-destructive"/>
                                         </Button>
                                         <Label>Section {index + 1}: {section.type === 'text' ? 'Text' : 'Image'}</Label>
-                                        <Input value={section.title} onChange={e => handleSectionChange(index, 'title', e.target.value)} placeholder="Section Title (e.g., Introduction)" />
                                         {section.type === 'text' ? (
-                                            <Textarea value={section.content} onChange={e => handleSectionChange(index, 'content', e.target.value)} placeholder="Enter content. Use markdown for formatting, e.g., **bold**, *italic*, [link](url)." rows={5} />
+                                            <Textarea value={section.content} onChange={e => handleSectionChange(index, 'content', e.target.value)} placeholder="Use Markdown: # Heading, ## Subheading, --- for lines." rows={5} />
                                         ) : (
                                             <div>
-                                                <Input type="file" accept="image/*" onChange={e => { if(e.target.files?.[0]) handleImageUploadForSection(index, e.target.files[0])}}/>
+                                                <Input value={section.title} onChange={e => handleSectionChange(index, 'title', e.target.value)} placeholder="Image Title (for context)" />
+                                                <Input type="file" accept="image/*" className="mt-2" onChange={e => { if(e.target.files?.[0]) handleImageUploadForSection(index, e.target.files[0])}}/>
                                                 {section.imageUrl && <Image src={section.imageUrl} alt="Section image" width={150} height={100} className="mt-2 rounded-md border" />}
                                             </div>
                                         )}
@@ -338,4 +338,3 @@ function BlogPostFormModal({ isOpen, onClose, post, onSave, authorName }: BlogPo
         </Dialog>
     );
 }
-

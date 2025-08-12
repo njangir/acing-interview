@@ -194,7 +194,6 @@ export default async function ServiceDetailsPage({ params }: Props) {
                      if (section.type === 'text') {
                         return (
                             <section key={index} className="prose prose-lg dark:prose-invert max-w-none">
-                                <h2 className="text-2xl font-bold text-primary mb-4">{section.title}</h2>
                                 <ReactMarkdown
                                     components={{
                                         a: ({node, ...props}) => <a className="text-accent hover:underline" {...props} />,

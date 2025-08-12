@@ -107,7 +107,6 @@ export default async function BlogPostPage({ params }: Props) {
                 if (section.type === 'text') {
                     return (
                         <section key={index} className="mb-8">
-                            <h2 className="text-2xl font-bold text-primary mb-4">{section.title}</h2>
                             <ReactMarkdown
                                 className="text-foreground/90 space-y-4"
                                 components={{

@@ -3,7 +3,6 @@ import type { LucideIcon } from 'lucide-react';
 
 export type ServiceSection = {
   type: 'text';
-  title: string;
   content: string; 
 } | {
   type: 'image';
@@ -32,7 +31,6 @@ export interface Service {
 
 export type BlogPostSection = {
   type: 'text';
-  title: string;
   content: string;
 } | {
   type: 'image';

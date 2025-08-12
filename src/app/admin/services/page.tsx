@@ -137,7 +137,7 @@ export default function AdminServicesPage() {
 
   const addSection = (type: 'text' | 'image') => {
     if (type === 'text') {
-        setFormData(prev => ({...prev, detailSections: [...prev.detailSections, { type: 'text', title: '', content: '' }]}));
+        setFormData(prev => ({...prev, detailSections: [...prev.detailSections, { type: 'text', content: '' }]}));
     } else {
         setFormData(prev => ({...prev, detailSections: [...prev.detailSections, { type: 'image', title: '', imageUrl: '', imageHint: '' }]}));
     }
@@ -440,12 +440,12 @@ export default function AdminServicesPage() {
                             <div key={index} className="space-y-2 border p-3 rounded-md relative">
                                 <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={() => removeSection(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
                                 <Label>Section {index + 1}: {section.type === 'text' ? 'Text' : 'Image'}</Label>
-                                <Input value={section.title} onChange={(e) => handleSectionChange(index, 'title', e.target.value)} placeholder="Section Title (e.g., Introduction)" />
                                 {section.type === 'text' ? (
-                                  <Textarea value={section.content} onChange={(e) => handleSectionChange(index, 'content', e.target.value)} placeholder="Use Markdown for formatting: **bold**, *italic*, [link](url)" rows={5} />
+                                    <Textarea value={section.content} onChange={e => handleSectionChange(index, 'content', e.target.value)} placeholder="Use Markdown for headings, e.g., # Title, ## Subtitle, and horizontal lines with ---." rows={5} />
                                 ) : (
                                   <div>
-                                    <Input type="file" accept="image/*" onChange={(e) => { if(e.target.files?.[0]) handleSectionImageUpload(index, e.target.files[0])}}/>
+                                    <Input value={section.title} onChange={(e) => handleSectionChange(index, 'title', e.target.value)} placeholder="Image Title (for context)" />
+                                    <Input type="file" accept="image/*" className="mt-2" onChange={e => { if(e.target.files?.[0]) handleSectionImageUpload(index, e.target.files[0])}}/>
                                     {section.imageUrl && <Image src={section.imageUrl} alt="Section image" width={150} height={100} className="mt-2 rounded-md border" />}
                                   </div>
                                 )}
