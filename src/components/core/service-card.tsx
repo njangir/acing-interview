@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import Image from 'next/image';
-import { CheckCircle, Info } from 'lucide-react';
+import { CheckCircle, Info, Clock } from 'lucide-react';
 
 interface ServiceCardProps {
   service: Service;
@@ -46,7 +46,13 @@ export function ServiceCard({ service }: ServiceCardProps) {
             </li>
           ))}
         </ul>
-        <p className="mt-4 text-2xl font-bold text-primary">₹{service.price}</p>
+        <div className="mt-4 flex items-baseline justify-between">
+            <p className="text-2xl font-bold text-primary">₹{service.price}</p>
+            <p className="text-sm font-medium text-muted-foreground flex items-center">
+              <Clock className="h-4 w-4 mr-1"/>
+              {service.duration}
+            </p>
+        </div>
       </CardContent>
       <CardFooter className="flex flex-col sm:flex-row gap-2">
         {service.hasDetailsPage && service.slug && (
