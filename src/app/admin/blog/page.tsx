@@ -23,11 +23,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 
-// TODO: Refactor these into a single cloud function file if they grow
-const getBlogPosts = httpsCallable(functions, 'getBlogPosts');
-const saveBlogPost = httpsCallable(functions, 'saveBlogPost');
-const deleteBlogPost = httpsCallable(functions, 'deleteBlogPost');
-const uploadFile = httpsCallable(functions, 'uploadReport'); // Reusing this function
+// Correctly use the generic public file upload function
+const uploadFile = httpsCallable(functions, 'uploadFile');
 
 const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -210,9 +207,9 @@ function BlogPostFormModal({ isOpen, onClose, post, onSave, authorName }: BlogPo
         setIsSubmitting(true);
         try {
             const fileDataUrl = await fileToBase64(file);
-            const result: any = await uploadFile({ bookingId: `blog_sections`, fileName: file.name, fileDataUrl });
-            if (result.data.success) {
-                handleSectionChange(index, 'imageUrl', result.data.downloadUrl);
+            const result: any = await uploadFile({ fileName: file.name, fileDataUrl, folder: 'blog_sections' });
+            if (result.data.downloadURL) {
+                handleSectionChange(index, 'imageUrl', result.data.downloadURL);
             } else {
                 throw new Error('Upload failed');
             }
@@ -231,9 +228,9 @@ function BlogPostFormModal({ isOpen, onClose, post, onSave, authorName }: BlogPo
         try {
             if (bannerImageFile) {
                 const fileDataUrl = await fileToBase64(bannerImageFile);
-                const result: any = await uploadFile({ bookingId: `blog_banners`, fileName: bannerImageFile.name, fileDataUrl });
-                if (result.data.success) {
-                    finalBannerUrl = result.data.downloadUrl;
+                const result: any = await uploadFile({ fileName: bannerImageFile.name, fileDataUrl, folder: 'blog_banners' });
+                if (result.data.downloadURL) {
+                    finalBannerUrl = result.data.downloadURL;
                 } else {
                     throw new Error('Banner upload failed');
                 }
@@ -309,7 +306,7 @@ function BlogPostFormModal({ isOpen, onClose, post, onSave, authorName }: BlogPo
                                         </Button>
                                         <Label>Section {index + 1}: {section.type === 'text' ? 'Text' : 'Image'}</Label>
                                         {section.type === 'text' ? (
-                                            <Textarea value={section.content} onChange={e => handleSectionChange(index, 'content', e.target.value)} placeholder="Use Markdown: # Heading, ## Subheading, --- for lines." rows={5} />
+                                            <Textarea value={section.content} onChange={e => handleSectionChange(index, 'content', e.target.value)} placeholder="Use Markdown for headings (#) and horizontal lines (---)." rows={5} />
                                         ) : (
                                             <div>
                                                 <Input value={section.title} onChange={e => handleSectionChange(index, 'title', e.target.value)} placeholder="Image Title (for context)" />
@@ -338,3 +335,5 @@ function BlogPostFormModal({ isOpen, onClose, post, onSave, authorName }: BlogPo
         </Dialog>
     );
 }
+
+    

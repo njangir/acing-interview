@@ -10,6 +10,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Blog',
   description: 'Read articles, tips, and insights on how to prepare for your armed forces interview and succeed in your career.',
@@ -17,47 +19,25 @@ export const metadata: Metadata = {
 
 async function getBlogPosts(): Promise<{ posts: BlogPost[], error: string | null }> {
   try {
-    console.log("Attempting to fetch blog posts...");
     const postsCollectionRef = collection(db, 'blogPosts');
-    
-    // First, try to get all documents to check if collection exists and has data
-    console.log("Testing basic collection access...");
-    const allDocsSnapshot = await getDocs(postsCollectionRef);
-    console.log(`Found ${allDocsSnapshot.docs.length} total documents in blogPosts collection`);
-    
-    if (allDocsSnapshot.docs.length === 0) {
-      console.log("No documents found in blogPosts collection");
-      return { posts: [], error: null };
-    }
-
-    // Log sample document structure
-    const sampleDoc = allDocsSnapshot.docs[0];
-    console.log("Sample document structure:", sampleDoc.data());
-    
-    // Try the filtered query
-    console.log("Attempting filtered query...");
     const q = query(postsCollectionRef, where('status', '==', 'published'), orderBy('publicationDate', 'desc'));
     const postsSnapshot = await getDocs(q);
-    console.log(`Found ${postsSnapshot.docs.length} published posts`);
+    
+    if (postsSnapshot.docs.length === 0) {
+      return { posts: [], error: null };
+    }
     
     const posts = postsSnapshot.docs.map(doc => {
         const data = doc.data();
-        console.log(`Processing post: ${data.title}, publicationDate type:`, typeof data.publicationDate);
         
-        // Handle different publicationDate formats
         let publicationDateISO: string;
         if (data.publicationDate && typeof data.publicationDate.toDate === 'function') {
-          // Firestore Timestamp
           publicationDateISO = data.publicationDate.toDate().toISOString();
         } else if (data.publicationDate && typeof data.publicationDate === 'string') {
-          // Already a string
           publicationDateISO = data.publicationDate;
         } else if (data.publicationDate && data.publicationDate instanceof Date) {
-          // JavaScript Date
           publicationDateISO = data.publicationDate.toISOString();
         } else {
-          // Fallback to current date
-          console.warn(`Invalid publicationDate for post ${doc.id}:`, data.publicationDate);
           publicationDateISO = new Date().toISOString();
         }
         
@@ -68,16 +48,11 @@ async function getBlogPosts(): Promise<{ posts: BlogPost[], error: string | null
         } as BlogPost;
     });
     
-    console.log(`Successfully processed ${posts.length} blog posts`);
     return { posts, error: null };
   } catch (err: any) {
     console.error("Detailed error fetching blog posts:", err);
-    console.error("Error code:", err.code);
-    console.error("Error message:", err.message);
-    
-    // Provide more specific error messages
     if (err.code === 'failed-precondition' && err.message.includes('index')) {
-      return { posts: [], error: "Database index missing. Please check the console for details." };
+      return { posts: [], error: "Database index missing. Please check Firestore configuration." };
     } else if (err.code === 'permission-denied') {
       return { posts: [], error: "Permission denied. Please check Firestore security rules." };
     } else {
@@ -146,3 +121,5 @@ export default async function BlogIndexPage() {
     </>
   );
 }
+
+    
