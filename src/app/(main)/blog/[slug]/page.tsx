@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, User } from 'lucide-react';
 import type { Metadata, ResolvingMetadata } from 'next';
 import ReactMarkdown from 'react-markdown';
+import { BlogContactCta } from '@/components/core/blog-contact-cta';
 
 type Props = {
   params: { slug: string }
@@ -143,6 +144,9 @@ export default async function BlogPostPage({ params }: Props) {
                 }
              })}
         </article>
+        
+        <BlogContactCta />
+
       </div>
     </>
   );
