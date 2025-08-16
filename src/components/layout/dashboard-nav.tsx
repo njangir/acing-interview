@@ -16,8 +16,7 @@ export function DashboardNav() {
         const Icon = item.icon;
         const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
         return (
-          <Link key={item.href} href={item.href} legacyBehavior passHref>
-            <a className="block">
+          <Link key={item.href} href={item.href}>
                 <Button
                 variant={isActive ? 'default': 'ghost'}
                 className={cn(
@@ -29,7 +28,6 @@ export function DashboardNav() {
                 <Icon className="mr-2 h-4 w-4" />
                 {item.label}
                 </Button>
-            </a>
           </Link>
         );
       })}

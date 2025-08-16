@@ -16,8 +16,7 @@ export function AdminNav() {
         const Icon = item.icon;
         const isActive = pathname === item.href || (item.href !== '/admin' && item.href !== '/admin/export-reports' && pathname.startsWith(item.href));
         return (
-          <Link key={item.href} href={item.href} legacyBehavior>
-            <a className="block">
+          <Link key={item.href} href={item.href}>
               <Button
                 variant={isActive ? 'default': 'ghost'}
                 className={cn(
@@ -29,7 +28,6 @@ export function AdminNav() {
                 <Icon className="mr-2 h-4 w-4" />
                 {item.label}
               </Button>
-            </a>
           </Link>
         );
       })}
